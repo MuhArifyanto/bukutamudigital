@@ -1,0 +1,21 @@
+# Environment Variables
+.env
+.env.local
+
+# Google API Credentials (Old JSON file)
+google_credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+env/
+venv/
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# Node
+node_modules/

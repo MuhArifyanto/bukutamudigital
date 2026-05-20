@@ -1,0 +1,179 @@
+{% extends 'guest_book/tamu_base.html' %}
+{% load static %}
+
+{% block title %}Detail Kunjungan{% endblock %}
+
+{% block page_title %}Aktifitas{% endblock %}
+{% block page_subtitle %}Detail Kunjungan Saya{% endblock %}
+
+{% block content %}
+<style>
+    .timeline-dot {
+        position: absolute; left: -21px; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff;
+    }
+    .dot-completed { background: #10b981; box-shadow: 0 0 0 2px #10b981; }
+    .dot-cancelled { background: #ef4444; box-shadow: 0 0 0 2px #ef4444; }
+    .dot-in-progress { background: #3b82f6; box-shadow: 0 0 0 2px #3b82f6; }
+    .dot-pending { background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
+
+    .detail-layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    .actions-wrapper {
+        margin-top: 2rem; 
+        padding-top: 1.5rem; 
+        border-top: 1px solid #e2e8f0; 
+        display: flex; 
+        justify-content: flex-end; 
+        gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .detail-layout { grid-template-columns: 1fr; }
+        .info-grid { grid-template-columns: 1fr; }
+        .actions-wrapper { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+        .actions-wrapper button, .actions-wrapper a { width: 100%; justify-content: center; }
+        
+        .header-top { flex-direction: column; align-items: flex-start !important; gap: 1rem; }
+    }
+</style>
+<div style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
+    <!-- BACK BUTTON & HEADER -->
+    <div class="header-top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <a href="{% url 'tamu:riwayat' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: #64748b; text-decoration: none; font-size: 0.9rem; font-weight: 600;">
+            <i class="fas fa-arrow-left"></i> Kembali ke Riwayat
+        </a>
+        <div>
+            {% if kunjungan.status == 'completed' %}
+            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">SELESAI</span>
+            {% elif kunjungan.status == 'pending' %}
+            <span style="background: #f1f5f9; color: #475569; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">MENUNGGU</span>
+            {% elif kunjungan.status == 'cancelled' %}
+            <span style="background: #fee2e2; color: #991b1b; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">DIBATALKAN</span>
+            {% else %}
+            <span style="background: #fef08a; color: #854d0e; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">{{ kunjungan.get_status_display|upper }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="detail-layout">
+        <!-- LEFT COLUMN: INFO -->
+        <div>
+            <!-- Main Info Card -->
+            <div style="background: #fff; border-radius: 12px; padding: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 2rem;">
+                <h3 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Informasi Kunjungan
+                </h3>
+                
+                <div class="info-grid">
+                    <div>
+                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">KEPERLUAN</div>
+                        <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">{{ kunjungan.purpose }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">PEGAWAI YANG DITUJU</div>
+                        <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">{{ kunjungan.pegawai.name|default:"–" }}</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">{{ kunjungan.pegawai.department|default:"Umum" }}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">WAKTU KEDATANGAN</div>
+                        <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">{{ kunjungan.arrival_time|date:"d M Y, H:i" }} WIB</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">WAKTU KEPULANGAN</div>
+                        <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">{{ kunjungan.departure_time|date:"d M Y, H:i"|default:"–" }}</div>
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">CATATAN SAYA</div>
+                        <div style="font-size: 0.9rem; color: #475569;">{{ kunjungan.notes|default:"Tidak ada catatan." }}</div>
+                    </div>
+                </div>
+
+                <div class="actions-wrapper">
+                    {% if kunjungan.status == 'pending' %}
+                        <form method="post" action="{% url 'tamu:kunjungan_batal' kunjungan.pk %}" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan kunjungan ini?')">
+                            {% csrf_token %}
+                            <button type="submit" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-times-circle"></i> Batalkan Kunjungan
+                            </button>
+                        </form>
+                    {% endif %}
+                    
+                    {% if kunjungan.status == 'approved' or kunjungan.status == 'in_progress' or kunjungan.status == 'completed' %}
+                        <a href="{% url 'tamu:tamu_cetak_kartu' kunjungan.pk %}" target="_blank" style="background: #0f172a; color: #fff; text-decoration: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-print"></i> Cetak Kartu Pengunjung
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Notes from Staff -->
+            {% if notes_list %}
+            <div style="background: #fff; border-radius: 12px; padding: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <h3 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-comment-dots" style="color: #10b981;"></i> Catatan dari Pegawai
+                </h3>
+                
+                {% for note in notes_list %}
+                <div style="padding: 1rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">{{ note.author_type|capfirst }}</span>
+                        <span style="color: #64748b; font-size: 0.75rem;">{{ note.created_at|date:"d M Y, H:i" }} WIB</span>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #475569; margin: 0;">{{ note.content }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- RIGHT COLUMN: TIMELINE -->
+        <div>
+            <div style="background: #fff; border-radius: 12px; padding: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 2rem;">
+                <h3 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-history" style="color: #64748b;"></i> Riwayat Status
+                </h3>
+                
+                <div style="position: relative; padding-left: 1.5rem;">
+                    <!-- Vertical Line -->
+                    <div style="position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; background: #e2e8f0;"></div>
+                    
+                    <!-- Item: Created -->
+                    <div style="position: relative; margin-bottom: 1.5rem;">
+                        <div style="position: absolute; left: -21px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; box-shadow: 0 0 0 2px #3b82f6;"></div>
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">Kunjungan Dibuat</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">{{ kunjungan.created_at|date:"d M Y, H:i" }} WIB</div>
+                    </div>
+                    
+                    <!-- History Loop -->
+                    {% for hist in status_history %}
+                    <div style="position: relative; margin-bottom: 1.5rem;">
+                        <div class="timeline-dot 
+                            {% if hist.new_status == 'completed' %}dot-completed
+                            {% elif hist.new_status == 'cancelled' %}dot-cancelled
+                            {% elif hist.new_status == 'in_progress' %}dot-in-progress
+                            {% else %}dot-pending{% endif %}"></div>
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">Status: {{ hist.get_new_status_display|default:hist.new_status|upper }}</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">{{ hist.changed_at|date:"d M Y, H:i" }} WIB</div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">Oleh: {{ hist.changed_by_type|capfirst }}</div>
+                    </div>
+                    {% empty %}
+                    <div style="position: relative;">
+                        <div style="position: absolute; left: -21px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #94a3b8; border: 2px solid #fff; box-shadow: 0 0 0 2px #94a3b8;"></div>
+                        <div style="font-weight: 700; color: #64748b; font-size: 0.85rem;">Menunggu Tindakan</div>
+                        <div style="font-size: 0.75rem; color: #94a3b8;">Belum ada perubahan status</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

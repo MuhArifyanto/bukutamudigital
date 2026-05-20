@@ -1,0 +1,641 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}VISITOR LOGS{% endblock %}
+{% block page_subtitle %}Monitoring real-time kunjungan tamu{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Stats Cards ── */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .stat-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.75rem;
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        box-shadow: 0 4px 20px rgba(15,23,42,0.05);
+        border: 1px solid rgba(15,23,42,0.04);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(15,23,42,0.08);
+    }
+    .stat-icon {
+        width: 64px; height: 64px;
+        border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+    .stat-icon.blue   { background: #f0f7ff; color: #3b82f6; }
+    .stat-icon.green  { background: #f0fdf4; color: #10b981; }
+    .stat-icon.orange { background: #fff7ed; color: #f97316; }
+
+    .stat-body { flex: 1; }
+    .stat-label { 
+        font-size: 0.75rem; font-weight: 700; color: #64748b; 
+        text-transform: uppercase; letter-spacing: 0.05em; 
+        margin-bottom: 4px;
+    }
+    .stat-value { font-size: 2.25rem; font-weight: 800; color: #0f172a; line-height: 1; }
+    
+    .stat-badge {
+        position: absolute; top: 1.5rem; right: 1.5rem;
+        font-size: 0.65rem; font-weight: 800; padding: 4px 10px;
+        border-radius: 30px; letter-spacing: 0.02em;
+    }
+    .stat-badge.total  { background: #eff6ff; color: #3b82f6; }
+    .stat-badge.growth { background: #f0fdf4; color: #10b981; }
+    .stat-badge.urgent { background: #fef2f2; color: #ef4444; }
+
+    /* ── Institution Banner ── */
+    .inst-banner {
+        background: #0f172a;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(15,23,42,0.15);
+    }
+    .inst-banner::after {
+        content: '';
+        position: absolute; right: 0; bottom: 0;
+        width: 300px; height: 300px;
+        background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .inst-logo {
+        width: 64px; height: 64px;
+        border-radius: 15px;
+        background: rgba(255,255,255,0.05);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.75rem; color: #fff;
+        flex-shrink: 0;
+        border: 1px solid rgba(255,255,255,0.1);
+        backdrop-filter: blur(4px);
+    }
+    .inst-info h5 { font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0 0 4px; letter-spacing: -0.01em; }
+    .inst-info p { font-size: 0.85rem; color: #94a3b8; margin: 0; display: flex; align-items: center; gap: 0.75rem; }
+    .status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981; }
+    
+    .inst-action {
+        margin-left: auto;
+        display: inline-flex; align-items: center; gap: 0.6rem;
+        background: #3b82f6; color: #fff;
+        font-size: 0.875rem; font-weight: 700;
+        padding: 0.75rem 1.5rem; border-radius: 12px;
+        text-decoration: none; transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+    }
+    .inst-action:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(59,130,246,0.4); color: #fff; }
+
+    /* ── Chart & Table Cards ── */
+    .card-premium {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.75rem;
+        box-shadow: 0 4px 20px rgba(15,23,42,0.05);
+        border: 1px solid rgba(15,23,42,0.04);
+        margin-bottom: 2rem;
+    }
+    .card-header-flex {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        margin-bottom: 1.75rem; gap: 1rem; flex-wrap: wrap;
+    }
+    .card-header-flex h5 { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -0.01em; }
+    .card-header-flex p { font-size: 0.85rem; color: #64748b; margin: 4px 0 0; }
+
+    /* ── Chart ── */
+    .chart-container { position: relative; height: 320px; width: 100%; }
+    .dropdown-toggle::after { display: none; }
+    
+    .chart-legend { display: flex; gap: 1.5rem; margin-top: -10px; margin-bottom: 15px; }
+    .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; font-weight: 700; color: #64748b; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ── Table ── */
+    .visit-table-wrapper { overflow-x: auto; }
+    .visit-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .visit-table th {
+        font-size: 0.75rem; font-weight: 700; color: #94a3b8;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        padding: 1rem; border-bottom: 1px solid #f1f5f9;
+        text-align: left;
+    }
+    .visit-table td { padding: 1.25rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .visit-table tr:last-child td { border-bottom: none; }
+    .visit-table tr:hover td { background: #f8fafc; }
+
+    .avatar-square {
+        width: 44px; height: 44px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1rem; font-weight: 800; color: #fff;
+        flex-shrink: 0;
+    }
+    .guest-name { font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
+    .guest-sub { font-size: 0.75rem; color: #64748b; }
+
+    .status-pill {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        padding: 6px 12px; border-radius: 30px;
+        font-size: 0.75rem; font-weight: 700;
+    }
+    .pill-completed  { background: #ecfdf5; color: #059669; }
+    .pill-in_progress{ background: #eff6ff; color: #2563eb; }
+    .pill-pending    { background: #fff7ed; color: #d97706; }
+    .pill-cancelled  { background: #f1f5f9; color: #64748b; }
+
+    .action-btn-circle {
+        width: 36px; height: 36px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        color: #94a3b8; transition: all 0.2s; text-decoration: none;
+    }
+    .action-btn-circle:hover { background: #f1f5f9; color: #0f172a; }
+
+    .btn-group-custom { display: flex; gap: 0.5rem; }
+    .btn-action-light {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.6rem 1rem; border-radius: 10px;
+        border: 1px solid #e2e8f0; background: #fff;
+        font-size: 0.8rem; font-weight: 700; color: #475569;
+        text-decoration: none; transition: all 0.2s;
+    }
+    .btn-action-light:hover { border-color: #3b82f6; color: #3b82f6; background: #f0f7ff; }
+    .btn-action-primary {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.6rem 1.25rem; border-radius: 10px;
+        background: #3b82f6; font-size: 0.8rem; font-weight: 700; color: #fff;
+        text-decoration: none; transition: all 0.2s;
+        box-shadow: 0 4px 10px rgba(59,130,246,0.2);
+    }
+    .btn-action-primary:hover { background: #2563eb; transform: translateY(-1px); color: #fff; }
+
+    @media (max-width: 1024px) {
+        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+        .stats-grid { grid-template-columns: 1fr; gap: 1rem; }
+        .stat-card { padding: 1.25rem; }
+        .stat-badge { top: 1.25rem; right: 1.25rem; }
+        .inst-banner { flex-direction: column; text-align: center; padding: 1.5rem; }
+        .inst-action { margin-left: 0; width: 100%; justify-content: center; }
+        .card-premium { padding: 1.25rem; }
+        .card-header-flex { flex-direction: column; align-items: stretch; gap: 1rem; }
+        .chart-legend { flex-wrap: wrap; gap: 0.75rem; margin-top: 0; }
+        .chart-container { height: 260px; }
+        
+        .btn-group-custom { flex-direction: column; align-items: stretch; width: 100%; }
+        .btn-group-custom .dropdown { width: 100%; }
+        .btn-group-custom .dropdown-toggle, .btn-group-custom .btn-action-primary { width: 100%; justify-content: space-between; }
+        .btn-group-custom .btn-action-primary { justify-content: center; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- 1. Stats Summary -->
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+    <h6 style="font-size: 0.85rem; font-weight: 800; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">Ringkasan Data Hari Ini</h6>
+    <a href="?" class="btn-action-light" style="padding: 4px 10px; font-size: 0.7rem;">
+        <i class="fas fa-sync-alt me-1"></i> Perbarui Data
+    </a>
+</div>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+        <div class="stat-body">
+            <p class="stat-label">Total Tamu</p>
+            <div class="stat-value" id="stat-total-tamu">{{ total_tamu }}</div>
+        </div>
+        <span class="stat-badge total">TOTAL</span>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon green"><i class="fas fa-calendar-day"></i></div>
+        <div class="stat-body">
+            <p class="stat-label">Kunjungan Hari Ini</p>
+            <div class="stat-value" id="stat-kunjungan-hari-ini">{{ kunjungan_hari_ini }}</div>
+        </div>
+        <span class="stat-badge growth">
+            {% if growth_pct >= 0 %}+{% endif %}{{ growth_pct }}%
+        </span>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon orange"><i class="fas fa-user-clock"></i></div>
+        <div class="stat-body">
+            <p class="stat-label">Menunggu Verifikasi</p>
+            <div class="stat-value" id="stat-menunggu-verifikasi">{{ menunggu_verifikasi }}</div>
+        </div>
+        <span class="stat-badge urgent">URGENT</span>
+    </div>
+</div>
+
+<!-- 2. Institution Highlight -->
+
+<!-- 3. Analytical Chart -->
+<div class="card-premium">
+    <div class="card-header-flex">
+        <div>
+            <h5>{{ chart_data.title }}</h5>
+            <p>Statistik perbandingan volume tamu per hari</p>
+        </div>
+        <div class="dropdown">
+            <button class="btn-action-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-width: 180px; justify-content: space-between;">
+                {% if chart_data.current_range == '30' %}
+                    30 Hari Terakhir
+                {% elif chart_data.current_range == '365' %}
+                    1 Tahun Terakhir
+                {% else %}
+                    7 Hari Terakhir
+                {% endif %}
+                <i class="fas fa-chevron-down ms-2" style="font-size: 0.75rem; opacity: 0.6;"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" style="border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 0.5rem; min-width: 180px;">
+                <li><a class="dropdown-item {% if chart_data.current_range == '7' %}active{% endif %}" href="{% url 'tamu:admin_dashboard' %}?range=7" style="border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.65rem 1rem;">7 Hari Terakhir</a></li>
+                <li><a class="dropdown-item {% if chart_data.current_range == '30' %}active{% endif %}" href="{% url 'tamu:admin_dashboard' %}?range=30" style="border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.65rem 1rem;">30 Hari Terakhir</a></li>
+                <li><a class="dropdown-item {% if chart_data.current_range == '365' %}active{% endif %}" href="{% url 'tamu:admin_dashboard' %}?range=365" style="border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.65rem 1rem;">1 Tahun Terakhir</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="chart-legend">
+        <div class="legend-item">
+            <span class="legend-dot" style="background: #3b82f6;"></span>
+            Periode Ini
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot" style="background: #cbd5e1;"></span>
+            Periode Sebelumnya
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot" style="background: #10b981;"></span>
+            Pengunjung Website
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="mainVisitChart"></canvas>
+    </div>
+</div>
+
+<!-- 4. Recent Visits Table -->
+<div class="card-premium">
+    <div class="card-header-flex">
+        <div>
+            <h5>Riwayat Kunjungan Terbaru</h5>
+            <p>Memantau aliran masuk dan keluar tamu secara real-time</p>
+        </div>
+        <div class="btn-group-custom">
+            <!-- Filter Dropdown -->
+            <div class="dropdown">
+                <button class="btn-action-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-filter"></i> 
+                    {% if k_status == 'all' %}Filter{% elif k_status == 'pending' %}Verifikasi{% elif k_status == 'in_progress' %}Bertamu{% elif k_status == 'completed' %}Selesai{% else %}{{ k_status|title }}{% endif %}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 10px 30px rgba(0,0,0,0.08); padding:0.5rem;">
+                    <li><a class="dropdown-item {% if k_status == 'all' %}active{% endif %}" href="?k_status=all&k_sort={{ k_sort }}&range={{ chart_data.current_range }}">Semua Status</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item {% if k_status == 'pending' %}active{% endif %}" href="?k_status=pending&k_sort={{ k_sort }}&range={{ chart_data.current_range }}">Pending</a></li>
+                    <li><a class="dropdown-item {% if k_status == 'in_progress' %}active{% endif %}" href="?k_status=in_progress&k_sort={{ k_sort }}&range={{ chart_data.current_range }}">Bertamu</a></li>
+                    <li><a class="dropdown-item {% if k_status == 'completed' %}active{% endif %}" href="?k_status=completed&k_sort={{ k_sort }}&range={{ chart_data.current_range }}">Selesai</a></li>
+                </ul>
+            </div>
+
+            <!-- Sort Dropdown -->
+            <div class="dropdown">
+                <button class="btn-action-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-sort-amount-down"></i> 
+                    {% if k_sort == '-created_at' %}Terbaru{% elif k_sort == 'tamu__name' %}Nama A-Z{% else %}Waktu{% endif %}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 10px 30px rgba(0,0,0,0.08); padding:0.5rem;">
+                    <li><a class="dropdown-item {% if k_sort == '-created_at' %}active{% endif %}" href="?k_sort=-created_at&k_status={{ k_status }}&range={{ chart_data.current_range }}">Paling Baru</a></li>
+                    <li><a class="dropdown-item {% if k_sort == 'arrival_time' %}active{% endif %}" href="?k_sort=arrival_time&k_status={{ k_status }}&range={{ chart_data.current_range }}">Waktu Kedatangan</a></li>
+                    <li><a class="dropdown-item {% if k_sort == 'tamu__name' %}active{% endif %}" href="?k_sort=tamu__name&k_status={{ k_status }}&range={{ chart_data.current_range }}">Nama Tamu (A-Z)</a></li>
+                </ul>
+            </div>
+
+            <a href="{% url 'tamu:kunjungan_baru' %}" class="btn-action-primary">
+                <i class="fas fa-plus"></i> Kunjungan Baru
+            </a>
+        </div>
+    </div>
+
+    <div class="visit-table-wrapper">
+        <table class="visit-table">
+            <thead>
+                <tr>
+                    <th>Nama Tamu</th>
+                    <th>Keperluan</th>
+                    <th>Waktu Masuk</th>
+                    <th>Status</th>
+                    <th style="width: 120px; text-align: right;">Aksi Cepat</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for k in riwayat_terbaru %}
+                <tr id="row-{{ k.id }}">
+                    <td>
+                        <div style="display:flex; align-items:center; gap:1rem;">
+                            {% if k.tamu.profile_picture %}
+                                <img src="{{ k.tamu.profile_picture.url }}" style="width: 44px; height: 44px; border-radius: 12px; object-fit: cover;" alt="Avatar">
+                            {% else %}
+                                <div class="avatar-square initials-avatar" data-name="{{ k.tamu.name }}">
+                                    {{ k.tamu.name|slice:":2"|upper }}
+                                </div>
+                            {% endif %}
+                            <div>
+                                <div class="guest-name">{{ k.tamu.name }}</div>
+                                <div class="guest-sub">{{ k.tamu.instansi|default:"Personal" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size:0.875rem; color:#475569; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ k.purpose }}">
+                            {{ k.purpose }}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size:0.9rem; font-weight:700; color:#0f172a;">
+                            {{ k.arrival_time|date:"H:i" }} <span style="font-size:0.75rem; color:#94a3b8; font-weight:500;">WIB</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="status-pill pill-{{ k.status }}" id="badge-{{ k.id }}">
+                            {% if k.status == 'completed' %}Selesai{% elif k.status == 'in_progress' %}Bertamu{% elif k.status == 'pending' %}Verifikasi{% else %}Batal{% endif %}
+                        </span>
+                    </td>
+                    <td style="text-align: right;">
+                        <div class="btn-group-custom" style="justify-content: flex-end;">
+                            {% if k.status == 'in_progress' %}
+                            <button onclick="updateStatus('{{ k.id }}', 'completed')" class="action-btn-circle" style="color:#3b82f6; background:#eff6ff;" title="Selesaikan (Check-out)">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </button>
+                            {% endif %}
+                            <a href="{% url 'tamu:admin_kunjungan_detail' k.id %}" class="action-btn-circle" title="Detail Lengkap">
+                                <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align:center; padding:3rem; color:#94a3b8;">
+                        <i class="fas fa-clipboard-list" style="font-size:2.5rem; margin-bottom:1rem; opacity:0.3; display:block;"></i>
+                        {% if k_status != 'all' %}
+                            Tidak ada kunjungan dengan status <strong>{{ k_status }}</strong>.
+                        {% else %}
+                            Belum ada riwayat kunjungan tersedia.
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Data for Chart -->
+{{ chart_data.labels|json_script:"labels-data" }}
+{{ chart_data.values|json_script:"values-data" }}
+{{ chart_data.prev_values|json_script:"prev-values-data" }}
+{{ chart_data.visitor_values|json_script:"visitor-values-data" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    (function() {
+        "use strict";
+
+        // Safely extract data
+        const getJsonData = (id) => {
+            const el = document.getElementById(id);
+            return el ? JSON.parse(el.textContent) : [];
+        };
+
+        const chartLabels = getJsonData('labels-data');
+        const chartValues = getJsonData('values-data');
+        const prevValues  = getJsonData('prev-values-data');
+        const visitorValues = getJsonData('visitor-values-data');
+
+        console.log("Dashboard DB Connected - Labels:", chartLabels);
+        console.log("Dashboard DB Connected - Values:", chartValues);
+        console.log("Dashboard DB Connected - Prev Values:", prevValues);
+
+        const ctx = document.getElementById('mainVisitChart');
+        if (ctx) {
+            const chartCtx = ctx.getContext('2d');
+            const gradient = chartCtx.createLinearGradient(0, 0, 0, 320);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
+            gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+            new Chart(chartCtx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            label: 'Periode Ini',
+                            data: chartValues,
+                            borderColor: '#3b82f6',
+                            borderWidth: 3,
+                            backgroundColor: gradient,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#3b82f6',
+                            pointBorderWidth: 2,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                        },
+                        {
+                            label: 'Periode Sebelumnya',
+                            data: prevValues,
+                            borderColor: '#cbd5e1',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            backgroundColor: 'transparent',
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
+                        },
+                        {
+                            label: 'Pengunjung Website',
+                            data: visitorValues,
+                            borderColor: '#10b981',
+                            borderWidth: 2,
+                            backgroundColor: 'transparent',
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#10b981',
+                            pointBorderWidth: 2,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeInOutQuart'
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            titleFont: { size: 13, weight: 'bold' },
+                            bodyFont: { size: 13 },
+                            padding: 12,
+                            cornerRadius: 10,
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y} Kunjungan`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 50,
+                            grid: { color: '#f1f5f9', drawBorder: false },
+                            ticks: { 
+                                color: '#94a3b8', 
+                                font: { size: 12 }, 
+                                padding: 10,
+                                stepSize: 10
+                            },
+                            title: {
+                                display: true,
+                                text: 'Jumlah Pengunjung',
+                                color: '#94a3b8',
+                                font: { size: 11, weight: '600' }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', font: { size: 12 }, padding: 10 }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'limitLine',
+                    afterDraw: (chart) => {
+                        const {ctx, chartArea: {top, right, bottom, left}, scales: {y}} = chart;
+                        ctx.save();
+                        const yVal = y.getPixelForValue(50);
+                        if (yVal >= top && yVal <= bottom) {
+                            ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+                            ctx.setLineDash([5, 5]);
+                            ctx.lineWidth = 1.5;
+                            ctx.beginPath();
+                            ctx.moveTo(left, yVal);
+                            ctx.lineTo(right, yVal);
+                            ctx.stroke();
+                            
+                            ctx.fillStyle = 'rgba(239, 68, 68, 0.6)';
+                            ctx.font = 'bold 10px Plus Jakarta Sans';
+                            ctx.fillText('KAPASITAS MAKS (50)', left + 5, yVal - 5);
+                        }
+                        ctx.restore();
+                    }
+                }]
+            });
+        }
+
+        // Initials Avatar Coloring
+        document.querySelectorAll('.initials-avatar').forEach(el => {
+            const name = el.getAttribute('data-name') || "";
+            const hue = (name.length * 37) % 360;
+            el.style.backgroundColor = `hsl(${hue}, 55%, 50%)`;
+        });
+
+        // Real-time Dashboard Polling
+        function updateDashboardStats() {
+            fetch('{% url "tamu:api_dashboard_stats" %}')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const totalElem = document.getElementById('stat-total-tamu');
+                    const hariIniElem = document.getElementById('stat-kunjungan-hari-ini');
+                    const pendingElem = document.getElementById('stat-menunggu-verifikasi');
+                    
+                    if (totalElem) totalElem.innerText = data.total_tamu;
+                    if (hariIniElem) hariIniElem.innerText = data.kunjungan_hari_ini;
+                    if (pendingElem) pendingElem.innerText = data.menunggu_verifikasi;
+                }
+            })
+            .catch(err => console.error('Error polling stats:', err));
+        }
+        
+        // Poll every 5 seconds
+        setInterval(updateDashboardStats, 5000);
+
+        // Global Update Status Function
+        window.updateStatus = function(id, status) {
+            const statusLabels = {
+                'pending': 'Verifikasi',
+                'in_progress': 'Bertamu',
+                'completed': 'Selesai',
+                'cancelled': 'Dibatalkan'
+            };
+            const label = statusLabels[status] || status;
+            if (!confirm(`Apakah Anda yakin ingin mengubah status kunjungan ini menjadi ${label}?`)) return;
+            
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            fetch('{% url "tamu:api_update_kunjungan_status" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ kunjungan_id: id, status: status })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Update UI or Refresh
+                    window.location.reload(); 
+                } else {
+                    alert('Gagal memperbarui status: ' + (data.error || 'Terjadi kesalahan'));
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Terjadi kesalahan koneksi.');
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            });
+        };
+    })();
+</script>
+{% endblock %}

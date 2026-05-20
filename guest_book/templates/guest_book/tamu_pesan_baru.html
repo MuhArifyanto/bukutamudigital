@@ -1,0 +1,62 @@
+{% extends "guest_book/base.html" %}
+{% load static %}
+
+{% block title %}Kirim Pesan{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Kirim Pesan ke Admin</h1>
+  <p>Sampaikan pertanyaan atau keluhan Anda kepada admin.</p>
+</div>
+
+<div style="max-width:600px;">
+  <div class="card">
+    <form method="post" action="{% url 'tamu:pesan_baru' %}" id="pesanForm">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label class="form-label" for="id_subject">Subjek</label>
+        <div class="input-icon-wrap">
+          <i data-lucide="message-square" class="input-icon"></i>
+          <input type="text" id="id_subject" name="subject"
+            class="form-control {% if form.subject.errors %}is-invalid{% endif %}"
+            placeholder="Subjek pesan..."
+            value="{{ form.subject.value|default:'' }}" required>
+        </div>
+        {% for error in form.subject.errors %}
+          <div class="form-error"><i data-lucide="alert-circle"></i>{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="id_content">Isi Pesan</label>
+        <textarea id="id_content" name="content" rows="6"
+          class="form-control {% if form.content.errors %}is-invalid{% endif %}"
+          placeholder="Tulis pesan Anda di sini..." required>{{ form.content.value|default:'' }}</textarea>
+        {% for error in form.content.errors %}
+          <div class="form-error"><i data-lucide="alert-circle"></i>{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="display:flex;gap:0.75rem;">
+        <button type="submit" class="btn btn-primary btn-lg" id="btnSend">
+          <i data-lucide="send"></i> Kirim Pesan
+        </button>
+        <a href="{% url 'tamu:dashboard' %}" class="btn btn-outline btn-lg">
+          <i data-lucide="arrow-left"></i> Batal
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.getElementById('pesanForm')?.addEventListener('submit', function() {
+    const btn = document.getElementById('btnSend');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Mengirim...';
+  });
+</script>
+{% endblock %}

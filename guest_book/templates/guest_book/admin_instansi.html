@@ -1,0 +1,218 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block title %}Profil Instansi — Admin Portal{% endblock %}
+{% block page_title %}PROFIL INSTANSI{% endblock %}
+{% block page_subtitle %}Konfigurasi identitas dan struktur organisasi Diskominfosantik{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card-prem {
+        background: #fff;
+        border-radius: 24px;
+        padding: 2rem;
+        box-shadow: 0 4px 24px rgba(15,23,42,0.06);
+        border: 1px solid rgba(15,23,42,0.05);
+        margin-bottom: 2rem;
+        transition: transform 0.3s;
+    }
+    
+    .section-title {
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .section-title::after {
+        content: ''; height: 1px; flex: 1; background: #f1f5f9;
+    }
+
+    .form-group-prem { margin-bottom: 1.5rem; }
+    .form-label-prem {
+        display: block; font-size: 0.75rem; font-weight: 700;
+        color: #475569; margin-bottom: 0.6rem;
+    }
+    .form-control-prem {
+        width: 100%; padding: 0.8rem 1rem; border-radius: 14px;
+        border: 1.5px solid #f1f5f9; background: #f8fafc;
+        font-size: 0.9rem; font-weight: 600; color: #1e293b;
+        transition: all 0.2s;
+    }
+    .form-control-prem:focus {
+        border-color: var(--accent); background: #fff; outline: none;
+        box-shadow: 0 0 0 4px var(--accent-glow);
+    }
+    
+    .select-prem {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 1rem center; background-size: 0.9rem;
+    }
+
+    .btn-save-prem {
+        background: linear-gradient(135deg, var(--accent), #6366f1);
+        color: #fff; border: none; padding: 1rem 2.5rem; border-radius: 16px;
+        font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; gap: 0.8rem;
+        box-shadow: 0 8px 25px var(--accent-glow); transition: all 0.3s;
+    }
+    .btn-save-prem:hover { transform: translateY(-2px); box-shadow: 0 12px 30px var(--accent-glow); opacity: 0.95; }
+
+    /* Bidang Table */
+    .table-bidang { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .table-bidang th {
+        padding: 1rem; font-size: 0.65rem; font-weight: 800; color: #94a3b8;
+        text-transform: uppercase; border-bottom: 1px solid #f1f5f9;
+    }
+    .table-bidang td { padding: 1.25rem 1rem; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+    .table-bidang tr:last-child td { border-bottom: none; }
+    
+    .bidang-name { font-weight: 700; color: #1e293b; font-size: 0.9rem; }
+    .bidang-code { font-size: 0.7rem; font-weight: 800; color: var(--accent); background: var(--accent-glow); padding: 2px 8px; border-radius: 6px; margin-left: 8px; }
+
+    .btn-trash {
+        width: 36px; height: 36px; border-radius: 10px; border: none;
+        background: #fff1f2; color: #ef4444; display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s;
+    }
+    .btn-trash:hover { background: #fee2e2; transform: scale(1.05); }
+
+    .empty-state { text-align: center; padding: 3rem 0; color: #94a3b8; }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.3; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Identitas Instansi -->
+    <div class="col-lg-7">
+        <div class="card-prem">
+            <div class="section-title">
+                <i class="fas fa-building"></i> Identitas Instansi
+            </div>
+            
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_instansi">
+                
+                <div class="row">
+                    <div class="col-12 form-group-prem">
+                        <label class="form-label-prem">Nama Instansi</label>
+                        <input type="text" name="nama" class="form-control-prem" value="{{ instansi.nama|default:'' }}" required>
+                    </div>
+                    <div class="col-12 form-group-prem">
+                        <label class="form-label-prem">Slogan / Tagline</label>
+                        <input type="text" name="slogan" class="form-control-prem" value="{{ instansi.slogan|default:'' }}">
+                    </div>
+                    <div class="col-md-6 form-group-prem">
+                        <label class="form-label-prem">Status Operasional</label>
+                        <select name="status_operasional" class="form-control-prem select-prem">
+                            <option value="Aktif" {% if instansi.status_operasional == 'Aktif' %}selected{% endif %}>Aktif</option>
+                            <option value="Maintenance" {% if instansi.status_operasional == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+                            <option value="Tutup" {% if instansi.status_operasional == 'Tutup' %}selected{% endif %}>Tutup</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 form-group-prem">
+                        <label class="form-label-prem">Jumlah Petugas</label>
+                        <input type="number" name="jumlah_petugas" class="form-control-prem" value="{{ instansi.jumlah_petugas|default:8 }}">
+                    </div>
+                    <div class="col-md-6 form-group-prem">
+                        <label class="form-label-prem">Kapasitas Maksimal</label>
+                        <input type="number" name="kapasitas_maksimal" class="form-control-prem" value="{{ instansi.kapasitas_maksimal|default:20 }}">
+                    </div>
+                    <div class="col-md-3 form-group-prem">
+                        <label class="form-label-prem">Jam Buka</label>
+                        <input type="time" name="jam_buka" class="form-control-prem" value="{{ instansi.jam_buka|time:'H:i'|default:'08:00' }}">
+                    </div>
+                    <div class="col-md-3 form-group-prem">
+                        <label class="form-label-prem">Jam Tutup</label>
+                        <input type="time" name="jam_tutup" class="form-control-prem" value="{{ instansi.jam_tutup|time:'H:i'|default:'16:00' }}">
+                    </div>
+                    <div class="col-12 form-group-prem">
+                        <label class="form-label-prem">Alamat Kantor</label>
+                        <textarea name="alamat" class="form-control-prem" rows="3">{{ instansi.alamat|default:'' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="btn-save-prem">
+                        <i class="fas fa-save"></i> Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Manajemen Bidang -->
+    <div class="col-lg-5">
+        <div class="card-prem">
+            <div class="section-title">
+                <i class="fas fa-sitemap"></i> Struktur Bidang / Bagian
+            </div>
+
+            <!-- Form Tambah -->
+            <form method="POST" class="mb-4">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_departemen">
+                <div class="row g-2">
+                    <div class="col-8">
+                        <input type="text" name="nama" class="form-control-prem" placeholder="Nama Bidang..." required>
+                    </div>
+                    <div class="col-4">
+                        <input type="text" name="kode" class="form-control-prem" placeholder="Kode">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-3 mt-2" style="border-radius:14px;">
+                            <i class="fas fa-plus me-1"></i> Tambah Bidang
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table-bidang">
+                    <thead>
+                        <tr>
+                            <th>BIDANG / BAGIAN</th>
+                            <th class="text-end">AKSI</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dept in departemen_all %}
+                        <tr>
+                            <td>
+                                <span class="bidang-name">{{ dept.nama }}</span>
+                                {% if dept.kode %}<span class="bidang-code">{{ dept.kode }}</span>{% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-end">
+                                    <form method="POST" onsubmit="return confirm('Hapus bidang {{ dept.nama }}?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_departemen">
+                                        <input type="hidden" name="dept_id" value="{{ dept.id }}">
+                                        <button type="submit" class="btn-trash"><i class="far fa-trash-alt"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2">
+                                <div class="empty-state">
+                                    <i class="fas fa-folder-open d-block"></i>
+                                    Belum ada data bidang.
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

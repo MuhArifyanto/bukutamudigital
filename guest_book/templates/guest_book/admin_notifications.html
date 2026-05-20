@@ -1,0 +1,88 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block title %}Pusat Notifikasi{% endblock %}
+{% block active_page %}notifications{% endblock %}
+
+{% block extra_css %}
+<style>
+    .header-section { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3rem; }
+    .header-text h1 { font-weight: 800; font-size: 2.2rem; margin: 0; letter-spacing: -1px; }
+    
+    .stats-brief { display: flex; gap: 2rem; background: #fff; padding: 1.25rem 2rem; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
+    .stat-item { text-align: center; }
+    .stat-val { display: block; font-weight: 800; font-size: 1.2rem; color: var(--accent-blue); }
+    .stat-label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+    .notif-container { display: flex; flex-direction: column; gap: 1.25rem; }
+    .notif-item { background: #fff; border-radius: 24px; padding: 1.75rem; display: flex; gap: 1.5rem; border: 1px solid transparent; transition: all 0.3s ease; position: relative; overflow: hidden; }
+    .notif-item:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0,0,0,0.05); border-color: rgba(59, 130, 246, 0.2); }
+    .notif-item.unread { background: linear-gradient(to right, #fff, #f8faff); border-left: 6px solid var(--accent-blue); }
+    .unread-dot { position: absolute; top: 20px; right: 20px; width: 12px; height: 12px; background: var(--accent-blue); border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+
+    .notif-visual { width: 60px; height: 60px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+    .type-visit { background: #eff6ff; color: #3b82f6; }
+    .type-message { background: #f0fdf4; color: #22c55e; }
+    .type-alert { background: #fff7ed; color: #f97316; }
+
+    .notif-info { flex: 1; }
+    .notif-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .notif-top h4 { font-weight: 800; font-size: 1.15rem; margin: 0; }
+    .notif-time { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
+    .notif-text { color: var(--text-muted); line-height: 1.6; margin-bottom: 1.5rem; font-size: 0.95rem; }
+
+    .btn-action { padding: 0.6rem 1.5rem; border-radius: 12px; font-size: 0.8rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 0.6rem; transition: all 0.2s; }
+    .btn-primary-action { background: var(--accent-blue); color: #fff; }
+    .btn-secondary-action { background: #f1f5f9; color: var(--text-dark); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-section">
+    <div class="header-text">
+        <h1>Pusat Notifikasi</h1>
+        <p>Pantau aktivitas tamu dan sistem secara real-time</p>
+    </div>
+    <div class="stats-brief">
+        <div class="stat-item"><span class="stat-val">{{ notifications|length }}</span><span class="stat-label">Total</span></div>
+        <div class="stat-item" style="border-left:1px solid #f1f5f9; padding-left:2rem;"><span class="stat-val text-danger">{{ unread_notifications_count }}</span><span class="stat-label">Baru</span></div>
+    </div>
+</div>
+
+<div class="notif-container">
+    {% if notifications %}
+        {% for n in notifications %}
+        <div class="notif-item {% if n.status == 'unread' %}unread{% endif %}">
+            {% if n.status == 'unread' %}<div class="unread-dot"></div>{% endif %}
+            <div class="notif-visual {% if n.notification_type == 'visit_registered' %}type-visit{% elif n.notification_type == 'message_received' %}type-message{% else %}type-alert{% endif %}">
+                {% if n.notification_type == 'visit_registered' %}<i class="fas fa-user-plus"></i>{% elif n.notification_type == 'message_received' %}<i class="fas fa-envelope"></i>{% else %}<i class="fas fa-bolt"></i>{% endif %}
+            </div>
+            <div class="notif-info">
+                <div class="notif-top"><h4>{{ n.title }}</h4><span class="notif-time"><i class="far fa-clock"></i> {{ n.created_at|timesince }} yang lalu</span></div>
+                <p class="notif-text">{{ n.message }}</p>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'tamu:admin_kunjungan_list' %}" class="btn-action btn-primary-action">Lihat Detail</a>
+                    {% if n.status == 'unread' %}
+                    <button onclick="markAsRead('{{ n.id }}')" class="btn-action btn-secondary-action">Tandai Dibaca</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-5"><i class="fas fa-bell-slash mb-3" style="font-size:4rem; opacity:0.1;"></i><p class="text-muted">Belum ada notifikasi.</p></div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function markAsRead(id) {
+        const fd = new FormData();
+        fd.append('notification_id', id);
+        fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        fetch("{% url 'tamu:api_mark_notification_read' %}", { method: 'POST', body: fd })
+        .then(res => res.json()).then(data => { if(data.success) location.reload(); });
+    }
+</script>
+{% endblock %}

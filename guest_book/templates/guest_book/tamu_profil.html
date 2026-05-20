@@ -1,0 +1,361 @@
+{% extends 'guest_book/tamu_base.html' %}
+{% load static %}
+
+{% block title %}Profil Saya{% endblock %}
+
+{% block extra_css %}
+<style>
+    .visit-card {
+        border-left-width: 4px !important;
+        border-left-style: solid !important;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .visit-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    }
+    .visit-card.status-completed {
+        border-left-color: #10b981 !important;
+    }
+    .visit-card.status-pending {
+        border-left-color: #64748b !important;
+    }
+    .visit-card.status-cancelled {
+        border-left-color: #ef4444 !important;
+    }
+    .visit-card.status-rejected {
+        border-left-color: #ef4444 !important;
+    }
+
+    /* Layout Classes */
+    .profile-layout {
+        display: grid;
+        grid-template-columns: 350px 1fr;
+        gap: 2rem;
+        align-items: flex-start;
+    }
+    .profile-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+    .visits-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+    }
+    .form-actions-wrapper { 
+        grid-column: span 2; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        margin-top: 1rem; 
+    }
+    .btn-form-group { 
+        display: flex; 
+        gap: 0.75rem; 
+    }
+    .security-card { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+        .profile-layout { grid-template-columns: 1fr; }
+        .visits-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 576px) {
+        .profile-form { grid-template-columns: 1fr; }
+        .visits-grid { grid-template-columns: 1fr; }
+        .form-actions-wrapper { flex-direction: column; align-items: stretch; gap: 1rem; grid-column: span 1; }
+        .btn-form-group { flex-direction: column; width: 100%; }
+        .btn-form-group .btn { width: 100%; justify-content: center; }
+        .security-card { flex-direction: column; align-items: flex-start; gap: 1rem; }
+        .security-card .btn { width: 100%; text-align: center; justify-content: center; }
+        .span-2-mobile { grid-column: span 1 !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
+    <!-- PAGE HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+        <div>
+            <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem;">
+                <a href="{% url 'tamu:dashboard' %}" style="color: #64748b; text-decoration: none;">BukuTamu DG</a> &gt; <span>Profil</span>
+            </div>
+            <h1 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem;">Profil Akun</h1>
+            <p style="font-size: 0.85rem; color: #64748b;">Kelola informasi pribadi dan identitas akses Anda di Diskominfosatik.</p>
+        </div>
+        <div>
+            <span style="background: #eff6ff; color: #1e40af; font-size: 0.75rem; font-weight: 700; padding: 0.4rem 0.75rem; border-radius: 99px; display: flex; align-items: center; gap: 0.25rem;">
+                <i class="fas fa-check-circle"></i> Identitas Terverifikasi Sistem
+            </span>
+        </div>
+    </div>
+
+    <div class="profile-layout">
+        <!-- LEFT COLUMN -->
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            <!-- AVATAR CARD -->
+            <div style="background: #fff; border-radius: 16px; padding: 2rem; border: 1px solid #e2e8f0; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="position: relative; width: 120px; height: 120px; margin: 0 auto 1.5rem;">
+                    {% if tamu.profile_picture %}
+                    <img src="{{ tamu.profile_picture.url }}" style="width: 120px; height: 120px; border-radius: 20px; object-fit: cover;">
+                    {% else %}
+                    <div style="width: 120px; height: 120px; background: #e2e8f0; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #94a3b8;">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    {% endif %}
+                    <label for="profile_pic" style="position: absolute; bottom: -5px; right: -5px; width: 32px; height: 32px; background: #0f172a; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid #fff;">
+                        <i class="fas fa-camera" style="font-size: 0.8rem;"></i>
+                    </label>
+                    <input type="file" id="profile_pic" style="display: none;" accept="image/*">
+                </div>
+                
+                <h2 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem;">{{ tamu.name }}</h2>
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1.5rem;">{{ tamu.jabatan|default:"Warga / Tamu" }}</p>
+                
+                <div style="display: flex; justify-content: center; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+                    <div style="flex: 1; border-right: 1px solid #e2e8f0;">
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ total_kunjungan|default:0 }}</div>
+                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 800;">KUNJUNGAN</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ total_instansi|default:0 }}</div>
+                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 800;">INSTANSI</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KONTAK DARURAT -->
+            <div style="background: #0f172a; color: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <h3 style="font-size: 0.85rem; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 1rem; color: #38bdf8;">KONTAK DARURAT</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <i class="fas fa-phone" style="color: #94a3b8;"></i>
+                        <span>{{ tamu.phone|default:"-" }}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <i class="fas fa-envelope" style="color: #94a3b8;"></i>
+                        <span>{{ tamu.email }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            <!-- INFORMASI PERSONAL -->
+            <div style="background: #fff; border-radius: 16px; padding: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 1.1rem; font-weight: 800; color: #0f172a;">Informasi Personal</h3>
+                    <span style="font-size: 0.75rem; color: #94a3b8;">Pembaruan terakhir: {% now "d M Y" %}</span>
+                </div>
+
+                <form id="profile_form" class="profile-form">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em;">NAMA LENGKAP</label>
+                        <div style="position: relative;">
+                            <i class="fas fa-user" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                            <input type="text" value="{{ tamu.name }}" style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.5rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #0f172a; background: #f8fafc;" readonly>
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em;">NIK (NOMOR INDUK KEPENDUDUKAN)</label>
+                        <div style="position: relative;">
+                            <i class="fas fa-id-card" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                            <input type="text" value="{{ tamu.nik|default:'' }}" style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.5rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #0f172a; background: #f8fafc;" readonly>
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em;">NOMOR TELEPON</label>
+                        <div style="position: relative;">
+                            <i class="fas fa-phone" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                            <input type="text" id="profile_phone" value="{{ tamu.phone }}" style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.5rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #0f172a; background: #f8fafc;">
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em;">INSTANSI / PERUSAHAAN</label>
+                        <div style="position: relative;">
+                            <i class="fas fa-building" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                            <input type="text" id="profile_instansi" value="{{ tamu.instansi|default:'' }}" style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.5rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #0f172a; background: #f8fafc;">
+                        </div>
+                    </div>
+                    <div class="span-2-mobile" style="display: flex; flex-direction: column; gap: 0.5rem; grid-column: span 2;">
+                        <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em;">ALAMAT DOMISILI</label>
+                        <div style="position: relative;">
+                            <i class="fas fa-map-marker-alt" style="position: absolute; left: 1rem; top: 1rem; color: #94a3b8;"></i>
+                            <textarea style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.5rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #0f172a; background: #f8fafc; resize: none; height: 80px;">Jl. Merdeka No. 45, Kebayoran Baru, Jakarta Selatan, 12110</textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-actions-wrapper span-2-mobile">
+                        <span style="font-size: 0.75rem; color: #ef4444; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-info-circle"></i> Data akan diverifikasi.
+                        </span>
+                        <div class="btn-form-group">
+                            <button type="button" class="btn" style="background: #fff; color: #475569; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; padding: 0.6rem 1.25rem; font-weight: 600;">Batalkan</button>
+                            <button type="submit" class="btn" style="background: #0f172a; color: #fff; border-radius: 8px; font-size: 0.85rem; padding: 0.6rem 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; justify-content: center;">
+                                <i class="fas fa-save"></i> Simpan Perubahan
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- KEAMANAN AKUN -->
+            {% if needs_password_change %}
+            <div class="security-card" style="background: #fef2f2; border-radius: 16px; padding: 1.5rem; border: 1px solid #fecaca;">
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <div style="width: 40px; height: 40px; background: #fee2e2; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #ef4444; font-size: 1.2rem;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <h4 style="font-size: 0.95rem; font-weight: 800; color: #991b1b; margin-bottom: 0.25rem;">Keamanan Akun</h4>
+                        <p style="font-size: 0.75rem; color: #b91c1c; margin: 0;">Anda belum mengganti kata sandi dalam {{ days_since_change }} hari terakhir. Demi keamanan, harap perbarui secara berkala.</p>
+                    </div>
+                </div>
+                <button class="btn" style="background: #fff; color: #991b1b; border: 1px solid #fecaca; border-radius: 8px; font-size: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; cursor: pointer;">UBAH SEKARANG</button>
+            </div>
+            {% else %}
+            <div class="security-card" style="background: #f0fdf4; border-radius: 16px; padding: 1.5rem; border: 1px solid #bbf7d0;">
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <div style="width: 40px; height: 40px; background: #dcfce7; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #16a34a; font-size: 1.2rem;">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div>
+                        <h4 style="font-size: 0.95rem; font-weight: 800; color: #166534; margin-bottom: 0.25rem;">Keamanan Akun</h4>
+                        <p style="font-size: 0.75rem; color: #15803d; margin: 0;">Kata sandi Anda aman. Terakhir diperbarui {{ days_since_change }} hari yang lalu.</p>
+                    </div>
+                </div>
+                <button class="btn" style="background: #fff; color: #166534; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; cursor: pointer;">UBAH SEKARANG</button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- AKTIVITAS KUNJUNGAN TERAKHIR -->
+    <div style="margin-top: 3rem;">
+        <h3 style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-history" style="color: #64748b;"></i> Aktivitas Kunjungan Terakhir
+        </h3>
+        
+        <div class="visits-grid">
+            {% for item in recent_visits %}
+            <a href="{% url 'tamu:kunjungan_detail' item.id %}" style="text-decoration: none; color: inherit; display: block;">
+                <div class="visit-card status-{{ item.status }}" style="background: #fff; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">{{ item.arrival_time|date:"d M Y" }}</span>
+                        {% if item.status == 'completed' %}
+                        <span style="background: #e0f2fe; color: #0369a1; font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.5rem; border-radius: 99px;">SELESAI</span>
+                        {% elif item.status == 'pending' %}
+                        <span style="background: #f1f5f9; color: #475569; font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.5rem; border-radius: 99px;">MENUNGGU</span>
+                        {% elif item.status == 'cancelled' %}
+                        <span style="background: #fee2e2; color: #991b1b; font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.5rem; border-radius: 99px;">BATAL</span>
+                        {% endif %}
+                    </div>
+                    <h4 style="font-size: 0.9rem; font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">{{ item.purpose|truncatechars:30 }}</h4>
+                    <p style="font-size: 0.75rem; color: #64748b; margin: 0;">{{ item.pegawai.department|default:"Umum" }}</p>
+                </div>
+            </a>
+            {% empty %}
+            <div style="grid-column: span 3; text-align: center; color: #64748b; font-size: 0.85rem; padding: 2rem;">
+                Belum ada riwayat kunjungan.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const fileInput = document.getElementById('profile_pic');
+    const avatarContainer = document.querySelector('label[for="profile_pic"]').parentNode;
+
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('profile_picture', file);
+
+            // Ganti icon camera dengan spinner
+            const label = document.querySelector('label[for="profile_pic"]');
+            const originalIcon = label.innerHTML;
+            label.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size: 0.8rem;"></i>';
+
+            fetch("{% url 'tamu:api_tamu_update_profile_picture' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload halaman adalah cara paling aman untuk memperbarui semua komponen foto
+                    location.reload();
+                } else {
+                    alert('Gagal mengunggah foto: ' + data.error);
+                }
+            })
+            .catch(err => console.error(err))
+            .finally(() => {
+                label.innerHTML = originalIcon;
+                fileInput.value = '';
+            });
+        });
+    }
+
+    const profileForm = document.getElementById('profile_form');
+    if (profileForm) {
+        profileForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const phone = document.getElementById('profile_phone').value;
+            const instansi = document.getElementById('profile_instansi').value;
+            
+            const submitBtn = profileForm.querySelector('button[type="submit"]');
+            const originalBtnContent = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
+            submitBtn.disabled = true;
+
+            fetch("{% url 'tamu:api_tamu_update_profile_data' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    phone: phone,
+                    instansi: instansi
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Profil berhasil diperbarui!');
+                    location.reload();
+                } else {
+                    alert('Gagal memperbarui profil: ' + data.error);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Terjadi kesalahan koneksi.');
+            })
+            .finally(() => {
+                submitBtn.innerHTML = originalBtnContent;
+                submitBtn.disabled = false;
+            });
+        });
+    }
+</script>
+{% endblock %}

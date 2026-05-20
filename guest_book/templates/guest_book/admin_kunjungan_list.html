@@ -1,0 +1,520 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block title %}Daftar Kunjungan{% endblock %}
+{% block page_title %}DAFTAR KUNJUNGAN{% endblock %}
+{% block page_subtitle %}Kelola dan pantau seluruh data pengunjung instansi{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── SEARCH & TOP BAR ── */
+    .top-search-bar {
+        background: #fff;
+        border-radius: 16px;
+        padding: 0.75rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        margin-bottom: 1.5rem;
+        border: 1px solid #f1f5f9;
+    }
+    .top-search-bar i { color: #94a3b8; font-size: 0.9rem; }
+    .top-search-bar input {
+        border: none; outline: none; width: 100%;
+        font-size: 0.9rem; font-weight: 500; color: #1e293b;
+    }
+
+    /* ── FILTER CARD ── */
+    .filter-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 20px rgba(15,23,42,0.04);
+        border: 1px solid rgba(15,23,42,0.05);
+    }
+    .filter-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr auto;
+        gap: 1rem;
+        align-items: flex-end;
+    }
+    .filter-group label {
+        display: block; font-size: 0.65rem; font-weight: 800;
+        color: #94a3b8; text-transform: uppercase;
+        letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+    .select-prem {
+        width: 100%; padding: 0.75rem 1rem; border-radius: 12px;
+        border: 1.5px solid #f1f5f9; background: #f8fafc;
+        font-size: 0.85rem; font-weight: 600; color: #334155;
+        cursor: pointer; appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 1rem center; background-size: 0.9rem;
+    }
+    .select-prem:focus { border-color: #3b82f6; background-color: #fff; outline: none; }
+
+    .btn-filter-icon {
+        width: 46px; height: 46px; border-radius: 12px;
+        background: #f1f5f9; border: none; color: #64748b;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: all 0.2s;
+    }
+    .btn-filter-icon:hover { background: #e2e8f0; color: #0f172a; }
+
+    /* ── TABLE CARD ── */
+    .table-container {
+        background: #fff;
+        border-radius: 24px;
+        box-shadow: 0 10px 40px rgba(15,23,42,0.06);
+        border: 1px solid rgba(15,23,42,0.05);
+        margin-bottom: 2rem;
+        overflow-x: auto;
+    }
+    .table-prem { width: 100%; min-width: 900px; border-collapse: separate; border-spacing: 0; }
+    .table-prem th {
+        background: #fafbff; padding: 1.25rem 1.5rem;
+        font-size: 0.72rem; font-weight: 800; color: #94a3b8;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        border-bottom: 1px solid #f1f5f9; text-align: left;
+    }
+    .table-prem th:first-child { border-top-left-radius: 24px; }
+    .table-prem th:last-child { border-top-right-radius: 24px; }
+    .table-prem td {
+        padding: 1.25rem 1.5rem; border-bottom: 1px solid #f8fafc;
+        vertical-align: middle; transition: all 0.2s;
+    }
+    .table-prem tr:last-child td { border-bottom: none; }
+    .table-prem tr:hover td { background: #fbfcfe; }
+
+    /* Pengunjung Cell */
+    .visitor-info { display: flex; align-items: center; gap: 1rem; }
+    .v-avatar {
+        width: 42px; height: 42px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.9rem; font-weight: 700; color: #fff;
+        flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .v-name { font-size: 0.92rem; font-weight: 700; color: #0f172a; line-height: 1.2; }
+    .v-sub { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+
+    /* Waktu Cell */
+    .time-info { font-size: 0.88rem; font-weight: 700; color: #334155; }
+    .time-sub { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+
+    /* Status Pills */
+    .status-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 6px 14px; border-radius: 20px;
+        font-size: 0.78rem; font-weight: 700;
+    }
+    .pill-selesai { background: #dcfce7; color: #15803d; }
+    .pill-menunggu { background: #fef9c3; color: #a16207; }
+    .pill-ditolak { background: #fee2e2; color: #b91c1c; }
+    .pill-bertamu { background: #e0f2fe; color: #0369a1; }
+    
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .action-more {
+        color: #94a3b8; font-size: 1.1rem; cursor: pointer;
+        padding: 8px; border-radius: 8px; transition: all 0.2s;
+    }
+    .action-more:hover { background: #f1f5f9; color: #0f172a; }
+
+    /* ── EXPORT BUTTON ── */
+    .btn-main-export {
+        width: 100%; padding: 1.1rem; border-radius: 18px;
+        background: #3b82f6; color: #fff; border: none;
+        font-size: 0.95rem; font-weight: 700;
+        display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+        cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none; box-shadow: 0 4px 14px rgba(59,130,246,0.3);
+    }
+    .btn-main-export:hover {
+        background: #2563eb; transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(59,130,246,0.4);
+    }
+
+    /* ── PAGINATION ── */
+    .pag-wrap {
+        padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between;
+        background: #fff; border-top: 1px solid #f1f5f9;
+        flex-wrap: wrap; gap: 1rem;
+    }
+    .pag-info { font-size: 0.8rem; color: #94a3b8; font-weight: 500; }
+    .pag-btns { display: flex; gap: 6px; }
+    .pag-btn {
+        width: 34px; height: 34px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.85rem; font-weight: 700; color: #64748b;
+        text-decoration: none; transition: all 0.2s;
+    }
+    .pag-btn:hover:not(.active) { background: #f1f5f9; color: #0f172a; }
+    .pag-btn.active { background: #3b82f6; color: #fff; box-shadow: 0 4px 10px rgba(59,130,246,0.25); }
+
+    @media (max-width: 992px) {
+        .filter-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 576px) {
+        .filter-grid { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Top Search & Button -->
+<div class="d-flex flex-column flex-md-row gap-3 mb-4">
+    <form method="GET" class="top-search-bar mb-0 w-100" style="flex: 1;">
+        <i class="fas fa-search"></i>
+        <input type="text" name="q" placeholder="Cari nama, instansi, atau tujuan..." value="{{ search_query }}">
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        {% if range_filter %}<input type="hidden" name="range" value="{{ range_filter }}">{% endif %}
+    </form>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#manualKunjunganModal" style="border-radius: 16px; font-weight: 600; padding: 0.75rem 1.5rem; background: #3b82f6; border: none; color: white; white-space: nowrap;">
+        <i class="fas fa-plus"></i> Tambah Kunjungan
+    </button>
+</div>
+
+<!-- Filter Card -->
+<div class="filter-card">
+    <form method="GET" class="filter-grid" id="filterForm">
+        {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+        
+        <div class="filter-group">
+            <label>Rentang Tanggal</label>
+            <select name="range" class="select-prem" onchange="this.form.submit()">
+                <option value="all" {% if range_filter == 'all' %}selected{% endif %}>Semua Waktu</option>
+                <option value="today" {% if range_filter == 'today' %}selected{% endif %}>Hari Ini</option>
+                <option value="week" {% if range_filter == 'week' %}selected{% endif %}>Minggu Ini</option>
+                <option value="month" {% if range_filter == 'month' %}selected{% endif %}>Bulan Ini</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Status</label>
+            <select name="status" class="select-prem" onchange="this.form.submit()">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Semua Status</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Menunggu</option>
+                <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>Bertamu</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Selesai</option>
+                <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Dibatalkan</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Bidang / Bagian</label>
+            <select name="dept" class="select-prem" onchange="this.form.submit()">
+                <option value="all">Semua Bidang</option>
+                {% for d in departemen_list %}
+                <option value="{{ d.id }}" {% if dept_filter == d.id|stringformat:"s" %}selected{% endif %}>{{ d.nama }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="button" class="btn-filter-icon">
+            <i class="fas fa-sliders-h"></i>
+        </button>
+    </form>
+</div>
+
+<!-- Table Container -->
+<div class="table-container">
+    <table class="table-prem">
+        <thead>
+            <tr>
+                <th>Pengunjung</th>
+                <th>Waktu Kunjungan</th>
+                <th>Tujuan & Bidang</th>
+                <th>Status</th>
+                <th style="width: 60px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for k in kunjungan %}
+            <tr>
+                <td>
+                    <div class="visitor-info">
+                        {% if k.tamu.profile_picture %}
+                            <img src="{{ k.tamu.profile_picture.url }}" class="v-avatar" style="object-fit: cover;" alt="{{ k.tamu.name }}">
+                        {% else %}
+                            <div class="v-avatar initials-avatar" data-name="{{ k.tamu.name }}">
+                                {{ k.tamu.name|slice:":2"|upper }}
+                            </div>
+                        {% endif %}
+                        <div>
+                            <div class="v-name">{{ k.tamu.name }}</div>
+                            <div class="v-sub">{{ k.tamu.instansi|default:"Pribadi" }}</div>
+                            <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 4px;">
+                                No. Urut: <span style="color: #1e3a8a;">{{ k.nomor_urut|default:"01" }}</span> | Kode: <span style="color: #1e3a8a;">{{ k.nomor_unik|default:"ABC12345" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="time-info">{{ k.arrival_time|date:"d M Y" }}</div>
+                    <div class="time-sub">{{ k.arrival_time|date:"H:i" }} - {% if k.departure_time %}{{ k.departure_time|date:"H:i" }}{% else %}Saat ini{% endif %}</div>
+                </td>
+                <td>
+                    <div class="time-info">{{ k.purpose|truncatechars:35 }}</div>
+                    <div class="time-sub"><i class="far fa-building me-1"></i> {{ k.pegawai.department_rel.nama|default:k.pegawai.department|default:"Umum" }}</div>
+                </td>
+                <td>
+                    {% if k.status == 'completed' %}
+                    <span class="status-pill pill-selesai"><span class="dot"></span>Selesai</span>
+                    {% elif k.status == 'pending' %}
+                    <span class="status-pill pill-menunggu"><span class="dot"></span>Menunggu</span>
+                    {% elif k.status == 'cancelled' %}
+                    <span class="status-pill pill-ditolak"><span class="dot"></span>Dibatalkan</span>
+                    {% elif k.status == 'in_progress' %}
+                    <span class="status-pill pill-bertamu"><span class="dot"></span>Bertamu</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="dropdown">
+                        <i class="fas fa-ellipsis-v action-more" data-bs-toggle="dropdown"></i>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" style="border-radius:12px; padding:0.5rem;">
+                            <li><a class="dropdown-item py-2 px-3" href="{% url 'tamu:admin_kunjungan_detail' k.id %}" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-eye me-2 text-primary"></i> Detail</a></li>
+                            <li><a class="dropdown-item py-2 px-3" href="{% url 'tamu:admin_cetak_kartu' k.id %}" target="_blank" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-print me-2 text-secondary"></i> Cetak Kartu</a></li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            {% if k.status == 'pending' %}
+                            <li><a class="dropdown-item py-2 px-3 text-success" href="#" onclick="updateStatus('{{ k.id }}', 'in_progress')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-check me-2"></i> Terima (ACC)</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-danger" href="#" onclick="updateStatus('{{ k.id }}', 'cancelled')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Tolak</a></li>
+                            {% elif k.status == 'in_progress' %}
+                            <li><a class="dropdown-item py-2 px-3 text-primary" href="#" onclick="updateStatus('{{ k.id }}', 'completed')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-sign-out-alt me-2"></i> Selesai</a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align:center; padding:6rem;">
+                    <img src="{% static 'guest_book/img/empty-data.svg' %}" alt="" style="width:120px; opacity:0.1; margin-bottom:1.5rem; display:block; margin-inline:auto;">
+                    <p style="color:#94a3b8; font-weight:600;">Tidak ada data kunjungan ditemukan.</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if kunjungan.has_other_pages %}
+    <div class="pag-wrap">
+        <div class="pag-info">
+            Menampilkan {{ kunjungan.start_index }} - {{ kunjungan.end_index }} dari {{ kunjungan.paginator.count }} data
+        </div>
+        <div class="pag-btns">
+            {% if kunjungan.has_previous %}
+            <a href="?page={{ kunjungan.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if range_filter %}&range={{ range_filter }}{% endif %}{% if dept_filter %}&dept={{ dept_filter }}{% endif %}" class="pag-btn"><i class="fas fa-chevron-left"></i></a>
+            {% endif %}
+
+            {% for i in kunjungan.paginator.page_range %}
+                {% if kunjungan.number == i %}
+                <span class="pag-btn active">{{ i }}</span>
+                {% elif i > kunjungan.number|add:'-3' and i < kunjungan.number|add:'3' %}
+                <a href="?page={{ i }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if range_filter %}&range={{ range_filter }}{% endif %}{% if dept_filter %}&dept={{ dept_filter }}{% endif %}" class="pag-btn">{{ i }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if kunjungan.has_next %}
+            <a href="?page={{ kunjungan.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if range_filter %}&range={{ range_filter }}{% endif %}{% if dept_filter %}&dept={{ dept_filter }}{% endif %}" class="pag-btn"><i class="fas fa-chevron-right"></i></a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Export Actions -->
+<div class="row g-3">
+    <div class="col-md-6">
+        <a href="{% url 'tamu:admin_kunjungan_export_excel' %}" class="btn-main-export" style="background: #10b981; box-shadow: 0 4px 14px rgba(16,185,129,0.3);">
+            <i class="fas fa-file-excel"></i> Export Data ke Excel (.csv)
+        </a>
+    </div>
+    <div class="col-md-6">
+        <a href="{% url 'tamu:admin_kunjungan_cetak_pdf' %}" target="_blank" class="btn-main-export" style="background: #ef4444; box-shadow: 0 4px 14px rgba(239,68,68,0.3);">
+            <i class="fas fa-file-pdf"></i> Cetak Laporan &amp; Simpan PDF
+        </a>
+    </div>
+</div>
+
+<!-- Modal Tambah Kunjungan Manual -->
+<div class="modal fade" id="manualKunjunganModal" tabindex="-1" aria-labelledby="manualKunjunganModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" style="border-radius: 20px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+      <div class="modal-header" style="border-bottom: 1px solid #f1f5f9; padding: 1.5rem;">
+        <h5 class="modal-title" id="manualKunjunganModalLabel" style="font-weight: 700; color: #0f172a;">Catat Kunjungan Manual</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{% url 'tamu:admin_kunjungan_manual_create' %}" method="POST">
+        {% csrf_token %}
+        <div class="modal-body" style="padding: 1.5rem;">
+          <div class="row g-3">
+            <!-- Data Tamu -->
+            <div class="col-md-6">
+              <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Nama Tamu</label>
+              <input type="text" name="name" class="form-control" placeholder="Nama Lengkap" required style="border-radius: 10px; padding: 0.75rem;">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">NIK (Opsional)</label>
+              <input type="text" name="nik" class="form-control" placeholder="16 Digit NIK" style="border-radius: 10px; padding: 0.75rem;">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Nomor Telepon</label>
+              <input type="text" name="phone" class="form-control" placeholder="Contoh: 0812xxxx" required style="border-radius: 10px; padding: 0.75rem;">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Email (Opsional)</label>
+              <input type="email" name="email" class="form-control" placeholder="nama@email.com" style="border-radius: 10px; padding: 0.75rem;">
+            </div>
+            <div class="col-md-12">
+              <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Instansi / Lembaga</label>
+              <input type="text" name="instansi" class="form-control" placeholder="Nama Instansi Asal" style="border-radius: 10px; padding: 0.75rem;">
+            </div>
+            
+            <hr style="border-color: #f1f5f9; margin: 1.5rem 0;">
+            
+            <!-- Data Kunjungan -->
+            <div class="col-md-6">
+              <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Bidang / Unit Tujuan</label>
+              <select name="departemen" class="form-select" required style="border-radius: 10px; padding: 0.75rem;" onchange="filterPegawai(this.value)">
+                <option value="">-- Pilih Bidang --</option>
+                {% for d in departemen_list %}
+                <option value="{{ d.id }}">{{ d.nama }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Pegawai yang Ingin Ditemui</label>
+              <select name="pegawai" id="modal_pegawai" class="form-select" required style="border-radius: 10px; padding: 0.75rem;">
+                <option value="">-- Pilih Pegawai --</option>
+                {% for p in pegawai_list %}
+                <option value="{{ p.id }}" data-dept="{{ p.department_rel_id }}">{{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Tujuan Kunjungan / Keperluan</label>
+              <textarea name="purpose" class="form-control" rows="3" placeholder="Jelaskan secara singkat keperluan kunjungan..." required style="border-radius: 10px; padding: 0.75rem;"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top: 1px solid #f1f5f9; padding: 1.5rem;">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: 10px; font-weight: 600; padding: 0.75rem 1.25rem;">Batal</button>
+          <button type="submit" class="btn btn-primary" style="border-radius: 10px; font-weight: 600; padding: 0.75rem 1.25rem; background: #3b82f6; border: none;">Simpan Kunjungan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function() {
+        "use strict";
+        // Avatar Colors
+        document.querySelectorAll('.initials-avatar').forEach(el => {
+            const name = el.getAttribute('data-name') || "Visitor";
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const h = Math.abs(hash % 360);
+            el.style.background = `linear-gradient(135deg, hsl(${h}, 70%, 60%) 0%, hsl(${h}, 70%, 45%) 100%)`;
+        });
+
+        window.filterPegawai = function(deptId) {
+            const select = document.getElementById('modal_pegawai');
+            const options = select.querySelectorAll('option');
+            
+            select.value = ""; // Reset
+            
+            options.forEach(opt => {
+                if (!deptId || opt.value === "") {
+                    opt.style.display = "block";
+                } else if (opt.getAttribute('data-dept') === deptId) {
+                    opt.style.display = "block";
+                } else {
+                    opt.style.display = "none";
+                }
+            });
+        };
+
+        // Global Update Status Function
+        window.updateStatus = function(id, status) {
+            const statusLabels = {
+                'pending': 'Menunggu',
+                'in_progress': 'Bertamu',
+                'completed': 'Selesai',
+                'cancelled': 'Dibatalkan'
+            };
+            const label = statusLabels[status] || status;
+            if (!confirm(`Apakah Anda yakin ingin mengubah status kunjungan ini menjadi ${label}?`)) return;
+            
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            fetch('{% url "tamu:api_update_kunjungan_status" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ kunjungan_id: id, status: status })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload(); 
+                } else {
+                    alert('Gagal memperbarui status: ' + (data.error || 'Terjadi kesalahan'));
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Terjadi kesalahan koneksi.');
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            });
+        };
+
+        // Auto-refresh (Live Update) setiap 10 detik dengan tetap mempertahankan filter
+        setInterval(() => {
+            fetch(window.location.href)
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newContent = doc.querySelector('.table-container');
+                const currentContent = document.querySelector('.table-container');
+                
+                if (newContent && currentContent) {
+                    currentContent.innerHTML = newContent.innerHTML;
+                    
+                    // Terapkan ulang warna avatar untuk elemen baru
+                    document.querySelectorAll('.initials-avatar').forEach(el => {
+                        const name = el.getAttribute('data-name') || "Visitor";
+                        let hash = 0;
+                        for (let i = 0; i < name.length; i++) {
+                            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+                        }
+                        const h = Math.abs(hash % 360);
+                        el.style.background = `linear-gradient(135deg, hsl(${h}, 70%, 60%) 0%, hsl(${h}, 70%, 45%) 100%)`;
+                    });
+                }
+            })
+            .catch(err => console.error('Error auto-refreshing:', err));
+        }, 10000);
+    })();
+</script>
+{% endblock %}

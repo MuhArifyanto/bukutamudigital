@@ -1,0 +1,798 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buku Tamu Digital</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0a2558;
+            --primary-light: #1e40af;
+            --secondary: #3b82f6;
+            --accent: #60a5fa;
+            --bg-light: #f8fafc;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #1f2937;
+            overflow-x: hidden;
+        }
+
+        /* ── NAVBAR ── */
+        .navbar {
+            background: var(--primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,.1);
+            padding: .75rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #fff !important;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+        .navbar-brand .brand-icon {
+            background: #fff;
+            color: var(--primary);
+            width: 34px; height: 34px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .9rem;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+            font-weight: 500;
+            font-size: .9rem;
+            padding: .4rem .9rem !important;
+            transition: color .2s;
+        }
+        .nav-link:hover { color: #fff !important; }
+        .btn-nav-masuk {
+            color: #fff !important;
+            border: 1.5px solid rgba(255,255,255,0.5);
+            border-radius: 8px;
+            padding: .4rem 1.1rem !important;
+            font-weight: 600;
+            font-size: .9rem;
+            transition: all .2s;
+        }
+        .btn-nav-masuk:hover {
+            background: #fff;
+            color: var(--primary) !important;
+        }
+        .btn-nav-daftar {
+            background: #fff;
+            color: var(--primary) !important;
+            border-radius: 8px;
+            padding: .4rem 1.2rem !important;
+            font-weight: 700;
+            font-size: .9rem;
+            border: none;
+            transition: opacity .2s;
+        }
+        .btn-nav-daftar:hover { opacity: .9; }
+
+        /* ── HERO ── */
+        .hero-section {
+            background: linear-gradient(160deg, #eef2ff 0%, #e0f2fe 60%, #f0fdf4 100%);
+            min-height: 88vh;
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            padding: 4rem 0 3rem;
+        }
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: -120px; right: -120px;
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(14,165,233,.12) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            bottom: -80px; left: -80px;
+            width: 350px; height: 350px;
+            background: radial-gradient(circle, rgba(30,58,138,.08) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            background: rgba(30,58,138,.08);
+            color: var(--primary);
+            border: 1px solid rgba(30,58,138,.15);
+            border-radius: 50px;
+            padding: .35rem 1rem;
+            font-size: .8rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            letter-spacing: .03em;
+        }
+        .hero-badge .dot {
+            width: 7px; height: 7px;
+            background: var(--secondary);
+            border-radius: 50%;
+            animation: pulse 1.8s infinite;
+        }
+        @keyframes pulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .5; transform: scale(1.3); }
+        }
+        .hero-title {
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 800;
+            line-height: 1.15;
+            color: #111827;
+            margin-bottom: 1.2rem;
+        }
+        .hero-title .highlight {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-desc {
+            color: #4b5563;
+            font-size: 1rem;
+            line-height: 1.7;
+            max-width: 480px;
+            margin-bottom: 2rem;
+        }
+        .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .btn-hero-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: .75rem 1.8rem;
+            font-weight: 700;
+            font-size: .95rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            transition: all .25s;
+            box-shadow: 0 4px 14px rgba(30,58,138,.3);
+        }
+        .btn-hero-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(30,58,138,.4);
+            color: #fff;
+        }
+        .btn-hero-outline {
+            background: #fff;
+            color: var(--primary);
+            border: 1.5px solid var(--primary);
+            border-radius: 10px;
+            padding: .75rem 1.8rem;
+            font-weight: 600;
+            font-size: .95rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            transition: all .25s;
+        }
+        .btn-hero-outline:hover {
+            background: var(--primary);
+            color: #fff;
+            transform: translateY(-2px);
+        }
+
+        /* ── HERO VISUAL UPGRADE ── */
+        .hero-visual {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 1000px;
+        }
+        .hero-card-wrap {
+            position: relative;
+            width: 100%;
+            max-width: 480px; /* Increased from 380px */
+            transform: rotateY(-10deg) rotateX(5deg);
+            transition: all 0.5s ease;
+        }
+        .hero-card-wrap:hover {
+            transform: rotateY(0deg) rotateX(0deg) scale(1.02);
+        }
+
+        .hero-main-card {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+            border-radius: 32px;
+            padding: 2.5rem;
+            color: #fff;
+            box-shadow: 0 40px 100px rgba(15, 23, 42, 0.4);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .hero-main-card::before {
+            content: '';
+            position: absolute;
+            top: -20%; right: -20%;
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(14,165,233,0.2) 0%, transparent 70%);
+            filter: blur(40px);
+        }
+        
+        .card-header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+        }
+        .card-icon {
+            width: 64px; height: 64px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.8rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card-badge-live {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            padding: 0.4rem 0.8rem;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            display: flex; align-items: center; gap: 0.4rem;
+            border: 1px solid rgba(74, 222, 128, 0.2);
+        }
+        .pulse-dot {
+            width: 6px; height: 6px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        }
+
+        .hero-main-card h5 { font-weight: 800; font-size: 1.4rem; margin-bottom: .5rem; letter-spacing: -0.02em; }
+        .hero-main-card p { font-size: .95rem; opacity: 0.7; margin: 0; line-height: 1.5; }
+
+        .card-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 2.5rem;
+            padding: 1.5rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .stat-item { text-align: center; }
+        .stat-num { font-size: 1.6rem; font-weight: 800; color: #fff; margin-bottom: 0.2rem; }
+        .stat-lbl { font-size: .65rem; opacity: 0.6; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+
+        /* Floating Premium Cards */
+        .hero-float-card {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 1.2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #0f172a;
+            border: 1px solid rgba(255,255,255,0.4);
+            z-index: 10;
+        }
+        .hero-float-card.card-1 { 
+            bottom: -40px; left: -40px; 
+            animation: float 4s ease-in-out infinite; 
+        }
+        .hero-float-card.card-2 { 
+            top: -30px; right: -50px; 
+            animation: float 5s ease-in-out infinite reverse; 
+        }
+        .hero-float-card.card-3 { /* New card */
+            top: 40%; right: -80px; 
+            padding: 0.8rem;
+            font-size: 0.75rem;
+            animation: float 6s ease-in-out infinite 1s;
+        }
+
+        .fc-icon {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .hero-float-card.card-1 .fc-icon { background: #dcfce7; color: #16a34a; }
+        .hero-float-card.card-2 .fc-icon { background: #eff6ff; color: #2563eb; }
+        .hero-float-card.card-3 .fc-icon { background: #fef2f2; color: #dc2626; }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            50% { transform: translateY(-15px) translateX(10px); }
+        }
+
+        /* Decorative Elements */
+        .hero-deco-dot {
+            position: absolute;
+            width: 12px; height: 12px;
+            background: var(--secondary);
+            border-radius: 50%;
+            opacity: 0.4;
+            filter: blur(2px);
+        }
+
+        /* ── FEATURES ── */
+        .features-section {
+            padding: 5rem 0;
+            background: #fff;
+        }
+        .section-label {
+            font-size: .8rem;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--secondary);
+            margin-bottom: .5rem;
+        }
+        .section-title {
+            font-size: clamp(1.5rem, 3vw, 2rem);
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: .75rem;
+        }
+        .section-desc {
+            color: #6b7280;
+            font-size: .95rem;
+            max-width: 520px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+        .feature-card {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 2rem 1.5rem;
+            height: 100%;
+            border: 1px solid #e2e8f0;
+            transition: all .3s;
+            text-align: center;
+        }
+        .feature-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 40px rgba(30,58,138,.1);
+            border-color: var(--secondary);
+        }
+        .feature-icon {
+            width: 60px; height: 60px;
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 1.2rem;
+        }
+        .feature-card h5 {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #111827;
+            margin-bottom: .6rem;
+        }
+        .feature-card p {
+            color: #6b7280;
+            font-size: .875rem;
+            line-height: 1.65;
+            margin: 0;
+        }
+
+        /* ── CTA ── */
+        .cta-section {
+            background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 50%, var(--secondary) 100%);
+            padding: 5rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: -100px; right: -100px;
+            width: 400px; height: 400px;
+            background: rgba(255,255,255,.05);
+            border-radius: 50%;
+        }
+        .cta-section::after {
+            content: '';
+            position: absolute;
+            bottom: -80px; left: -80px;
+            width: 300px; height: 300px;
+            background: rgba(255,255,255,.04);
+            border-radius: 50%;
+        }
+        .cta-section h2 {
+            font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: .75rem;
+        }
+        .cta-section p {
+            color: rgba(255,255,255,.8);
+            font-size: .95rem;
+            max-width: 500px;
+            margin: 0 auto 2rem;
+            line-height: 1.7;
+        }
+        .btn-cta-white {
+            background: #fff;
+            color: var(--primary);
+            border: none;
+            border-radius: 10px;
+            padding: .8rem 2rem;
+            font-weight: 700;
+            font-size: .95rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            transition: all .25s;
+            box-shadow: 0 4px 14px rgba(0,0,0,.15);
+        }
+        .btn-cta-white:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,.2);
+            color: var(--primary);
+        }
+        .btn-cta-outline {
+            background: transparent;
+            color: #fff;
+            border: 1.5px solid rgba(255,255,255,.6);
+            border-radius: 10px;
+            padding: .8rem 2rem;
+            font-weight: 600;
+            font-size: .95rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            transition: all .25s;
+        }
+        .btn-cta-outline:hover {
+            background: rgba(255,255,255,.1);
+            border-color: #fff;
+            color: #fff;
+            transform: translateY(-2px);
+        }
+
+        /* ── FOOTER ── */
+        .footer {
+            background: var(--primary);
+            color: rgba(255,255,255,0.7);
+            padding: 4rem 0 2rem;
+        }
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            margin-bottom: .75rem;
+        }
+        .footer-brand .brand-icon {
+            background: #fff;
+            color: var(--primary);
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .85rem;
+        }
+        .footer-brand span {
+            font-weight: 700;
+            color: #fff;
+            font-size: .95rem;
+        }
+        .footer-desc { font-size: .85rem; line-height: 1.65; max-width: 260px; color: rgba(255,255,255,0.6); }
+        .footer-heading {
+            color: #fff;
+            font-weight: 700;
+            font-size: .9rem;
+            margin-bottom: 1rem;
+        }
+        .footer-links { list-style: none; padding: 0; margin: 0; }
+        .footer-links li { margin-bottom: .5rem; }
+        .footer-links a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: .85rem;
+            transition: color .2s;
+        }
+        .footer-links a:hover { color: #fff; }
+        .footer-divider {
+            border-color: rgba(255,255,255,0.1);
+            margin: 2rem 0 1.2rem;
+        }
+        .footer-bottom {
+            font-size: .8rem;
+            color: rgba(255,255,255,0.4);
+        }
+
+        /* ── RESPONSIVE FIXES FOR MOBILE ── */
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 3rem 0;
+                text-align: center;
+                min-height: auto;
+            }
+            .hero-desc {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .hero-actions {
+                justify-content: center;
+            }
+            .hero-card-wrap {
+                transform: none !important; /* Matikan efek 3D di HP agar tidak miring */
+                max-width: 100%;
+                margin-top: 2rem;
+            }
+            .hero-float-card {
+                display: none !important; /* Sembunyikan kartu melayang agar tidak bikin scrolling horizontal */
+            }
+            .hero-title {
+                font-size: 2.2rem; /* Ukuran font yang lebih pas di HP */
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════ NAVBAR ══════════════ -->
+<nav class="navbar navbar-expand-lg">
+    <div class="container">
+        <a class="navbar-brand" href="#">
+            <div class="brand-icon"><i class="fas fa-book-open"></i></div>
+            Buku Tamu Digital
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMain">
+            <ul class="navbar-nav mx-auto">
+                <li class="nav-item"><a class="nav-link" href="#beranda">Beranda</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tamu:tentang_kami' %}">Tentang Kami</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan Privasi</a></li>
+            </ul>
+            <div class="d-flex gap-2 mt-2 mt-lg-0">
+                <a href="{% url 'tamu:login' %}" class="nav-link btn-nav-masuk">Masuk</a>
+                <a href="{% url 'tamu:register' %}" class="nav-link btn-nav-daftar">Daftar</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- ══════════════ HERO ══════════════ -->
+<section class="hero-section" id="beranda">
+    <div class="container position-relative" style="z-index:1;">
+        <div class="row align-items-center g-5">
+            <!-- Left -->
+            <div class="col-lg-6">
+                <div class="hero-badge">
+                    <span class="dot"></span>
+                    SISTEM BUKU TAMU DIGITAL
+                </div>
+                <h1 class="hero-title">
+                    Selamat Datang di<br>
+                    <span class="highlight">E-Guestbook<br>Digital</span><br>
+                    Diskominfosatik
+                </h1>
+                <p class="hero-desc">
+                    Sistem pencatatan tamu digital Dinas Komunikasi, Informatika, Statistik dan Persandian. Mewujudkan tata kelola administrasi yang modern, transparan, dan akuntabel.
+                </p>
+                <div class="hero-actions">
+                    <a href="{% url 'tamu:register' %}" class="btn-hero-primary">
+                        <i class="fas fa-calendar-plus"></i> Daftar Kunjungan
+                    </a>
+                    <a href="#" class="btn-hero-outline" style="border-color: #e2e8f0; background: #fff; color: #1f2937;">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" width="18" height="18" style="margin-right: 8px;">
+                        Masuk dengan Google
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="hero-visual">
+                    <div class="hero-card-wrap">
+                        <!-- Decorative dots -->
+                        <div class="hero-deco-dot" style="top: -20px; left: 100px;"></div>
+                        <div class="hero-deco-dot" style="bottom: 50px; right: -30px; background: var(--primary);"></div>
+
+                        <div class="hero-main-card">
+                            <div class="card-header-top">
+                                <div class="card-icon">
+                                    <i class="fas fa-chart-pie"></i>
+                                </div>
+                                <div class="card-badge-live">
+                                    <span class="pulse-dot"></span>
+                                    LIVE ACTIVITY
+                                </div>
+                            </div>
+                            <h5>Analytics Dashboard</h5>
+                            <p>Pantau data kunjungan secara real-time dengan sistem monitoring terpadu Diskominfosatik.</p>
+                            
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-num">500+</div>
+                                    <div class="stat-lbl">Tamu</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-num">1.2K</div>
+                                    <div class="stat-lbl">Visit</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-num">98%</div>
+                                    <div class="stat-lbl">Rate</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Float card 1: Success -->
+                        <div class="hero-float-card card-1">
+                            <div class="fc-icon"><i class="fas fa-check-circle"></i></div>
+                            <div>
+                                <div style="font-size:.7rem;color:#64748b;font-weight:500;text-transform:uppercase;">Status</div>
+                                <div style="font-size:.85rem;">Kunjungan Disetujui</div>
+                            </div>
+                        </div>
+
+                        <!-- Float card 2: Security -->
+                        <div class="hero-float-card card-2">
+                            <div class="fc-icon"><i class="fas fa-shield-halved"></i></div>
+                            <div>
+                                <div style="font-size:.7rem;color:#64748b;font-weight:500;text-transform:uppercase;">Keamanan</div>
+                                <div style="font-size:.85rem;">Terenkripsi &amp; Aman</div>
+                            </div>
+                        </div>
+
+                        <!-- Float card 3: New Guest -->
+                        <div class="hero-float-card card-3">
+                            <div class="fc-icon"><i class="fas fa-user-plus"></i></div>
+                            <div>
+                                <div style="font-size:.65rem;color:#64748b;font-weight:500;">TAMU BARU</div>
+                                <div style="font-size:.75rem;">Ahmad Fauzi terdaftar</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════════ FEATURES ══════════════ -->
+<section class="features-section" id="tentang">
+    <div class="container">
+        <div class="text-center mb-5">
+            <div class="section-label">Keunggulan Layanan</div>
+            <h2 class="section-title">Keunggulan Layanan Digital</h2>
+            <p class="section-desc">
+                Kami menghadirkan efisiensi dan kemudahan dalam setiap proses kunjungan digital, agar setiap kunjungan Anda tercatat dengan baik.
+            </p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background:#eff6ff;">
+                        <i class="fas fa-bolt" style="color:#2563eb;"></i>
+                    </div>
+                    <h5>Kemudahan Pendaftaran</h5>
+                    <p>Proses mudah dan yang cepat dan intuitif. Daftarkan kunjungan Anda dalam hitungan detik dari mana saja dan kapan saja di mana pun Anda berada.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background:#f0fdf4;">
+                        <i class="fas fa-shield-alt" style="color:#16a34a;"></i>
+                    </div>
+                    <h5>Keamanan Data</h5>
+                    <p>Data Anda disimpan dengan aman dan terlindungi dengan standar keamanan tinggi. Informasi pribadi dan data kunjungan terjaga kerahasiaannya.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background:#fdf4ff;">
+                        <i class="fas fa-chart-line" style="color:#9333ea;"></i>
+                    </div>
+                    <h5>Efisiensi Birokrasi</h5>
+                    <p>Minimalkan antrean dan percepat proses administrasi. Dengan panduan yang jelas dan alur yang terstruktur, kunjungan Anda lebih efisien.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════════ CTA ══════════════ -->
+<section class="cta-section">
+    <div class="container text-center position-relative" style="z-index:1;">
+        <h2>Siap Melakukan Kunjungan Hari Ini?</h2>
+        <p>
+            Daftarkan rencana kunjungan Anda terlebih dahulu agar kami dapat memberikan pelayanan yang lebih prima dan terpersonalisasi.
+        </p>
+        <div class="d-flex justify-content-center gap-3 flex-wrap">
+            <a href="{% url 'tamu:register' %}" class="btn-cta-white">
+                <i class="fas fa-user-plus"></i> Mulai Daftar Sekarang
+            </a>
+            <a href="{% url 'tamu:login' %}" class="btn-cta-outline">
+                <i class="fas fa-book-open"></i> Panduan Penggunaan
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer class="footer" id="kebijakan">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="footer-brand">
+                    <div class="brand-icon"><i class="fas fa-book-open"></i></div>
+                    <span>Diskominfosatik E-Guestbook</span>
+                </div>
+                <p class="footer-desc">
+                    Sistem Buku Tamu Digital resmi Dinas Komunikasi, Informatika, Statistik dan Persandian. Tamu kami adalah prioritas kami.
+                </p>
+            </div>
+            <div class="col-lg-2 col-6">
+                <div class="footer-heading">Navigasi</div>
+                <ul class="footer-links">
+                    <li><a href="#beranda">Beranda</a></li>
+                    <li><a href="{% url 'tamu:tentang_kami' %}">Tentang</a></li>
+                    <li><a href="{% url 'tamu:kebijakan_privasi' %}">Kontak</a></li>
+                    <li><a href="{% url 'tamu:login' %}">Masuk</a></li>
+                </ul>
+            </div>
+            <div class="col-lg-3 col-6">
+                <div class="footer-heading">Fitur Utama</div>
+                <ul class="footer-links">
+                    <li><a href="#">Daftar Kunjungan</a></li>
+                    <li><a href="#">Riwayat Kunjungan</a></li>
+                    <li><a href="#">Status Kunjungan</a></li>
+                    <li><a href="#">Kirim Pesan</a></li>
+                </ul>
+            </div>
+            <div class="col-lg-3">
+                <div class="footer-heading">Kebijakan Privasi</div>
+                <ul class="footer-links">
+                    <li><a href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan Privasi</a></li>
+                    <li><a href="#">Syarat &amp; Ketentuan</a></li>
+                    <li><a href="#">Bantuan</a></li>
+                    <li><a href="#">FAQ</a></li>
+                </ul>
+            </div>
+        </div>
+        <hr class="footer-divider">
+        <div class="footer-bottom text-center">
+            &copy; 2024 Diskominfosatik E-Guestbook. Tamu Anda adalah tanggung jawab kami.
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,330 @@
+{% extends "guest_book/tamu_base.html" %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .greeting-section {
+        margin-bottom: 2rem;
+    }
+    .greeting-section h1 {
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #0b1d3a;
+        margin-bottom: 0.5rem;
+    }
+    .greeting-section h1 span {
+        color: #3b82f6;
+    }
+    .greeting-section p {
+        color: #64748b;
+        font-size: 1rem;
+    }
+
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card-custom {
+        background: #ffffff;
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid rgba(15,23,42,0.06);
+        transition: var(--transition);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .stat-card-custom:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-md);
+    }
+    .stat-card-custom .badge-top {
+        align-self: flex-end;
+        background: #e0f2fe;
+        color: #0369a1;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 0.25rem 0.5rem;
+        border-radius: 99px;
+    }
+    .stat-card-custom .badge-top.purple {
+        background: #f3e8ff;
+        color: #6b21a8;
+    }
+    .stat-card-custom .value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1;
+        margin: 0.5rem 0;
+    }
+    .stat-card-custom .label {
+        font-size: 0.85rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .active-status-card {
+        background: #0b1d3a;
+        color: #ffffff;
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+    }
+    .active-status-card::before {
+        content: '';
+        position: absolute;
+        top: -20px; right: -20px;
+        width: 100px; height: 100px;
+        background: radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%);
+    }
+    .active-status-card .status-label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #3b82f6;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .active-status-card .status-label::before {
+        content: '';
+        display: inline-block;
+        width: 8px; height: 8px;
+        background: #10b981;
+        border-radius: 50%;
+    }
+    .active-status-card .company-name {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+    }
+    .active-status-card .sub-text {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.5);
+    }
+    .active-status-card .btn-detail {
+        align-self: flex-end;
+        background: rgba(255,255,255,0.1);
+        color: #ffffff;
+        border: none;
+        padding: 0.4rem 0.8rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition);
+        text-decoration: none;
+    }
+    .active-status-card .btn-detail:hover {
+        background: #3b82f6;
+    }
+
+    .data-card {
+        background: #ffffff;
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid rgba(15,23,42,0.06);
+    }
+    .data-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .data-card-header h5 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+    .data-card-header p {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin: 0;
+    }
+
+    .table-custom {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 0.5rem;
+    }
+    .table-custom th {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        font-weight: 700;
+        padding: 0.75rem 1rem;
+        text-align: left;
+    }
+    .table-custom td {
+        background: #ffffff;
+        padding: 1rem;
+        font-size: 0.85rem;
+        color: #0f172a;
+        border-top: 1px solid #f1f5f9;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .table-custom td:first-child {
+        border-left: 1px solid #f1f5f9;
+        border-top-left-radius: var(--radius-sm);
+        border-bottom-left-radius: var(--radius-sm);
+    }
+    .table-custom td:last-child {
+        border-right: 1px solid #f1f5f9;
+        border-top-right-radius: var(--radius-sm);
+        border-bottom-right-radius: var(--radius-sm);
+    }
+    .table-custom tr:hover td {
+        background: #f8fafc;
+    }
+
+    .badge-status {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 0.25rem 0.5rem;
+        border-radius: 99px;
+    }
+    .badge-status.pending { background: #fef3c7; color: #d97706; }
+    .badge-status.in_progress { background: #dbeafe; color: #2563eb; }
+    .badge-status.completed { background: #dcfce7; color: #16a34a; }
+    .badge-status.cancelled { background: #fee2e2; color: #dc2626; }
+
+    .search-input {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--radius-sm);
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        width: 240px;
+        outline: none;
+        transition: var(--transition);
+    }
+    .search-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    
+    @media (max-width: 576px) {
+        .data-card-header .d-flex {
+            flex-direction: column;
+            width: 100%;
+        }
+        .search-input {
+            width: 100%;
+        }
+        .data-card-header .btn {
+            width: 100%;
+            justify-content: center;
+            padding: 0.75rem;
+            font-size: 0.85rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="greeting-section">
+    <h1>Selamat Datang, <span>{{ tamu.name }}</span></h1>
+    <p>Pantau aktivitas kunjungan Anda di Diskominfosatik hari ini.</p>
+</div>
+
+<div class="stats-container">
+    <!-- Card 1 -->
+    <div class="stat-card-custom">
+        <span class="badge-top">TOTAL</span>
+        <div class="value">{{ stats.total }}</div>
+        <div class="label">Total Kunjungan</div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="stat-card-custom">
+        <span class="badge-top purple">BULAN INI</span>
+        <div class="value">{{ stats.bulan_ini }}</div>
+        <div class="label">Kunjungan Terakhir</div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="active-status-card">
+        <div class="status-label">STATUS AKTIF</div>
+        <div class="company-name">{{ tamu.instansi|default:"Umum" }}</div>
+        <div class="sub-text">Terdaftar sejak: {{ tamu.registration_date|date:"M Y" }}</div>
+        <a href="{% url 'tamu:profil' %}" class="btn-detail">Lihat Profil Lengkap</a>
+    </div>
+</div>
+
+<div class="data-card">
+    <div class="data-card-header">
+        <div>
+            <h5>Riwayat Kunjungan Terakhir</h5>
+            <p>Monitoring aktivitas pengunjung secara real-time</p>
+        </div>
+        <div class="d-flex gap-2">
+            <input type="text" class="search-input" placeholder="Cari kunjungan...">
+            <a href="{% url 'tamu:kunjungan_baru' %}" class="btn btn-primary btn-sm d-flex align-items-center gap-1" style="border-radius: var(--radius-sm);">
+                <i class="fas fa-plus"></i> Buat Kunjungan
+            </a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table-custom">
+            <thead>
+                <tr>
+                    <th>Tujuan Kunjungan</th>
+                    <th>Nama Petugas</th>
+                    <th>Tanggal Pesan</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for k in kunjungan_list %}
+                <tr>
+                    <td style="font-weight: 600;">{{ k.purpose|truncatechars:40 }}</td>
+                    <td>{{ k.pegawai.name|default:"–" }}</td>
+                    <td>
+                        <div>{{ k.arrival_time|date:"d M Y" }}</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">{{ k.arrival_time|date:"H:i" }} WIB</div>
+                    </td>
+                    <td>
+                        <span class="badge-status {{ k.status }}">
+                            {{ k.get_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{% url 'tamu:kunjungan_detail' k.pk %}" class="btn btn-outline-secondary btn-sm" style="border-radius: var(--radius-sm);">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 2rem; color: #64748b;">
+                        Belum ada riwayat kunjungan.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

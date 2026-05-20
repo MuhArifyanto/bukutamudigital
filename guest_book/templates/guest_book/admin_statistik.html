@@ -1,0 +1,637 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block title %}Statistik & Jadwal{% endblock %}
+{% block page_title %}Manajemen Jadwal & Statistik{% endblock %}
+{% block page_subtitle %}Pantau performa kunjungan & kelola konfigurasi operasional{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── TOP STAT CARDS ── */
+    .top-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+        align-items: stretch;
+    }
+
+    /* Dark instansi card - consistent with calendar setting panel */
+    .card-instansi-premium {
+        background: #0f172a;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border-radius: 24px;
+        padding: 1.5rem;
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .card-instansi-premium::before {
+        content: ''; position: absolute;
+        top: -60px; right: -60px;
+        width: 180px; height: 180px;
+        background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .inst-status-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(34,197,94,0.15); color: #4ade80;
+        padding: 4px 12px; border-radius: 20px;
+        font-size: 0.65rem; font-weight: 800; letter-spacing: 0.05em;
+        margin-bottom: 1rem; width: fit-content;
+    }
+    .inst-status-badge::before {
+        content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+    }
+    .inst-icon-box {
+        width: 40px; height: 40px; border-radius: 12px;
+        background: rgba(255,255,255,0.1);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1rem; margin-bottom: 0.75rem;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .inst-org { font-size: 0.7rem; color: rgba(255,255,255,0.5); margin: 0 0 4px; font-weight: 600; text-transform: uppercase; }
+    .inst-name { font-size: 1.05rem; font-weight: 800; margin: 0; line-height: 1.2; }
+
+    /* Light stat card - premium variant */
+    .stat-card-white {
+        background: #fff;
+        border-radius: 24px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(15,23,42,0.04);
+        border: 1px solid rgba(15,23,42,0.05);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .stat-card-white:hover { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(15,23,42,0.08); border-color: #3b82f6; }
+    .stat-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.25rem; }
+    .stat-ico-box {
+        width: 48px; height: 48px; border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.25rem; flex-shrink: 0;
+    }
+    .ico-blue   { background: #eff6ff; color: #3b82f6; }
+    .ico-orange { background: #fff7ed; color: #f97316; }
+    .ico-violet { background: #f5f3ff; color: #7c3aed; }
+    
+    .stat-badge-premium {
+        font-size: 0.65rem; font-weight: 800; padding: 4px 10px;
+        border-radius: 10px;
+    }
+    .sb-green  { background: #dcfce7; color: #16a34a; }
+    .sb-orange { background: #ffedd5; color: #ea580c; }
+    .sb-gray   { background: #f1f5f9; color: #64748b; }
+    .sb-violet { background: #ede9fe; color: #7c3aed; }
+
+    .stat-label-text { font-size: 0.75rem; font-weight: 700; color: #94a3b8; margin-bottom: 0.4rem; }
+    .stat-value-text { font-size: 1.8rem; font-weight: 800; color: #0f172a; line-height: 1; }
+    .stat-sub-text { font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem; }
+
+    /* ── MAIN LAYOUT ── */
+    .main-grid-layout {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+        align-items: start;
+    }
+
+    .card-premium-box {
+        background: #fff;
+        border-radius: 24px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(15,23,42,0.04);
+        border: 1px solid rgba(15,23,42,0.05);
+    }
+
+    .card-header-flex {
+        display: flex; align-items: flex-start;
+        justify-content: space-between; gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .card-header-flex h5 { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; }
+    .card-header-flex p  { font-size: 0.85rem; color: #94a3b8; margin: 4px 0 0; }
+
+    /* Custom Dropdown */
+    .btn-dropdown-prem {
+        background: #fff; border: 1.5px solid #e2e8f0; color: #334155; 
+        border-radius: 12px; padding: 0.6rem 1.2rem; font-weight: 700; 
+        font-size: 0.8rem; display: flex; align-items: center; gap: 0.6rem; 
+        transition: all 0.2s; cursor: pointer;
+    }
+    .btn-dropdown-prem:hover { border-color: #3b82f6; color: #3b82f6; }
+
+    /* ── CONFIG PANEL ── */
+    .config-label { font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem; display: block; }
+    .days-selection { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 1.5rem; max-width: 320px; }
+    .day-toggle-btn {
+        aspect-ratio: 1; border-radius: 50%; border: 1.5px solid #f1f5f9;
+        font-size: 0.75rem; font-weight: 800; cursor: pointer;
+        transition: all 0.2s; background: #f8fafc; color: #94a3b8;
+    }
+    .day-toggle-btn.on { background: #3b82f6; color: #fff; border-color: #3b82f6; box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
+
+    .time-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 2rem; }
+    .time-box label { font-size: 0.65rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; display: block; }
+    .time-input-wrap {
+        display: flex; align-items: center; gap: 4px;
+        padding: 0.5rem 0.5rem; border-radius: 14px;
+        border: 1.5px solid #e2e8f0; background: #fff;
+        transition: all 0.2s;
+    }
+    .time-input-wrap:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.1); }
+    .time-input-wrap input { border: none; outline: none; width: 100%; font-weight: 800; color: #0f172a; font-size: 0.95rem; }
+
+    .btn-save-prem {
+        width: 100%; background: #0f172a; color: #fff; border: none; border-radius: 16px; 
+        padding: 1.1rem; font-weight: 800; font-size: 0.95rem; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 0.75rem; 
+        transition: all 0.3s;
+    }
+    .btn-save-prem:hover { background: #1e293b; transform: translateY(-2px); box-shadow: 0 8px 25px rgba(15, 23, 42, 0.2); }
+
+    /* ── JADWAL TABLE ── */
+    .premium-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .premium-table th {
+        font-size: 0.7rem; font-weight: 800; color: #94a3b8;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        padding: 1rem 1.25rem; border-bottom: 1.5px solid #f1f5f9; text-align: left;
+    }
+    .premium-table td { padding: 1.25rem; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+    .premium-table tr:hover td { background: #fcfdfe; }
+    
+    .visitor-avatar {
+        width: 44px; height: 44px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.85rem; font-weight: 800; color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    .visitor-name { font-size: 0.9rem; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
+    .visitor-meta { font-size: 0.75rem; color: #94a3b8; }
+
+    .status-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 5px 12px; border-radius: 12px;
+        font-size: 0.7rem; font-weight: 800;
+    }
+    .status-pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .status-completed   { background: #dcfce7; color: #15803d; }
+    .status-in_progress { background: #eff6ff; color: #1d4ed8; }
+    .status-pending     { background: #fef3c7; color: #b45309; }
+    .status-cancelled   { background: #f1f5f9; color: #475569; }
+
+    @media(max-width: 1280px) {
+        .top-grid { grid-template-columns: 1fr 1fr; }
+        .main-grid-layout { grid-template-columns: 1fr; }
+    }
+    @media(max-width: 640px) {
+        .top-grid { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── 1. TOP STAT CARDS ── #}
+<div class="top-grid">
+    {# Dark Instansi Card #}
+    <div class="card-instansi-premium">
+        <div class="inst-status-badge">{{ instansi.status_operasional|upper|default:"AKTIF" }}</div>
+        <div class="inst-icon-box"><i class="fas fa-landmark"></i></div>
+        <div>
+            <p class="inst-org">{{ instansi.nama|default:"DISKOMINFOSANTIK" }}</p>
+            <p class="inst-name">{{ instansi.slogan|default:"E-Guestbook System" }}</p>
+        </div>
+    </div>
+
+    {# Kunjungan Minggu Ini #}
+    <div class="stat-card-white">
+        <div class="stat-card-top">
+            <div class="stat-ico-box ico-blue"><i class="fas fa-users"></i></div>
+            <span class="stat-badge-premium {% if stats.growth >= 0 %}sb-green{% else %}sb-orange{% endif %}">
+                {% if stats.growth >= 0 %}+{% endif %}{{ stats.growth|default:0 }}%
+            </span>
+        </div>
+        <div>
+            <p class="stat-label-text">Kunjungan Minggu Ini</p>
+            <div class="stat-value-text">{{ stats.kunjungan_minggu_ini|default:0 }}</div>
+            <p class="stat-sub-text">vs minggu lalu</p>
+        </div>
+    </div>
+
+    {# Kapasitas Terisi #}
+    <div class="stat-card-white">
+        <div class="stat-card-top">
+            <div class="stat-ico-box ico-orange"><i class="fas fa-door-open"></i></div>
+            <span class="stat-badge-premium {% if stats.kapasitas_persen >= 80 %}sb-orange{% else %}sb-gray{% endif %}">
+                {{ stats.kapasitas_label|default:"Normal" }}
+            </span>
+        </div>
+        <div>
+            <p class="stat-label-text">Kapasitas Hari Ini</p>
+            <div class="stat-value-text">{{ stats.kapasitas_persen|default:0 }}%</div>
+            <p class="stat-sub-text">dari {{ instansi.kapasitas_maksimal|default:50 }} kuota</p>
+        </div>
+    </div>
+
+    {# Antrian Pending #}
+    <div class="stat-card-white">
+        <div class="stat-card-top">
+            <div class="stat-ico-box ico-violet"><i class="fas fa-hourglass-half"></i></div>
+            <span class="stat-badge-premium sb-violet">Waiting</span>
+        </div>
+        <div>
+            <p class="stat-label-text">Antrian Pending</p>
+            <div class="stat-value-text">{{ stats.pending|default:0 }}</div>
+            <p class="stat-sub-text">perlu diproses</p>
+        </div>
+    </div>
+</div>
+
+{# ── 2. CHART + CONFIG ── #}
+<div class="main-grid-layout">
+    {# Chart Card #}
+    <div class="card-premium-box">
+        <div class="card-header-flex">
+            <div>
+                <h5>{{ chart_data.title|default:"Tren Kunjungan Mingguan" }}</h5>
+                <p>Analisis volume pengunjung per hari</p>
+            </div>
+            <div class="dropdown">
+                <button class="btn-dropdown-prem dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    {% if chart_data.current_range == '365' %}1 Tahun Terakhir
+                    {% elif chart_data.current_range == '30' %}1 Bulan Terakhir
+                    {% else %}7 Hari Terakhir{% endif %}
+                    <i class="fas fa-chevron-down" style="font-size:0.7rem; opacity:0.5;"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg p-2" style="border-radius:16px; min-width:200px;">
+                    <li><a class="dropdown-item rounded-3 py-2 fw-bold" href="?range=7">7 Hari Terakhir</a></li>
+                    <li><a class="dropdown-item rounded-3 py-2 fw-bold" href="?range=30">1 Bulan Terakhir</a></li>
+                    <li><a class="dropdown-item rounded-3 py-2 fw-bold" href="?range=365">1 Tahun Terakhir</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:1.5rem; margin-bottom:1.5rem;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; font-weight:700; color:#64748b;">
+                <span style="width:10px; height:10px; border-radius:50%; background:#3b82f6;"></span> Periode Ini
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; font-weight:700; color:#64748b;">
+                <span style="width:10px; height:10px; border-radius:50%; background:#cbd5e1;"></span> Sebelumnya
+            </div>
+        </div>
+
+        <div style="position:relative; height:320px;">
+            <canvas id="statsChart"></canvas>
+        </div>
+    </div>
+
+    {# Config Card #}
+    <div class="card-premium-box">
+        <div class="card-header-flex">
+            <div>
+                <h5>Operasional</h5>
+                <p>Hari & jam kerja</p>
+            </div>
+        </div>
+        
+        <form method="POST" action="{% url 'tamu:admin_instansi' %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_instansi">
+            <input type="hidden" name="nama" value="{{ instansi.nama }}">
+            
+            <span class="config-label">Hari Kerja Aktif</span>
+            <div class="days-selection">
+                {% for d in days_config %}
+                <button type="button" class="day-toggle-btn {% if d.active %}on{% endif %}"
+                        onclick="toggleDay(this)" data-day="{{ d.index }}">{{ d.label }}</button>
+                {% endfor %}
+            </div>
+            <input type="hidden" name="hari_kerja" id="hariKerjaInput" value="{{ operasional.hari_kerja }}">
+
+            <span class="config-label">Jam Operasional</span>
+            <div class="time-inputs">
+                <div class="time-box">
+                    <label>Buka</label>
+                    <div class="time-input-wrap">
+                        <input type="time" name="jam_buka" value="{{ operasional.jam_mulai }}">
+                    </div>
+                </div>
+                <div class="time-box">
+                    <label>Tutup</label>
+                    <div class="time-input-wrap">
+                        <input type="time" name="jam_tutup" value="{{ operasional.jam_selesai }}">
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-save-prem">
+                <i class="fas fa-save"></i> Simpan Perubahan
+            </button>
+        </form>
+        
+        <button type="button" class="btn-dropdown-prem w-100 mt-3" data-bs-toggle="modal" data-bs-target="#modalPegawai" style="justify-content: center; background: #eff6ff; color: #1e3a8a; border-color: #bfdbfe;">
+            <i class="fas fa-users-cog"></i> Kelola Pegawai Bidang
+        </button>
+    </div>
+</div>
+
+{# ── 3. JADWAL TABLE ── #}
+<div class="card-premium-box">
+    <div class="card-header-flex">
+        <div>
+            <h5>Pembaruan Jadwal Terkini</h5>
+            <p>Daftar reservasi dan aktivitas terbaru</p>
+        </div>
+        <a href="{% url 'tamu:admin_kunjungan_list' %}" class="btn-dropdown-prem" style="text-decoration:none;">Lihat Semua <i class="fas fa-arrow-right"></i></a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="premium-table">
+            <thead>
+                <tr>
+                    <th>Pengunjung</th>
+                    <th>Keperluan</th>
+                    <th>Waktu</th>
+                    <th>Tujuan</th>
+                    <th>Status</th>
+                    <th class="text-center">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for j in jadwal_terkini %}
+                <tr>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:1rem;">
+                            {% if j.tamu.profile_picture %}
+                                <img src="{{ j.tamu.profile_picture.url }}" style="width: 44px; height: 44px; border-radius: 12px; object-fit: cover;" alt="Avatar">
+                            {% else %}
+                                <div class="visitor-avatar initials-avatar" data-name="{{ j.tamu.name }}">
+                                    {{ j.tamu.name|slice:":2"|upper }}
+                                </div>
+                            {% endif %}
+                            <div>
+                                <div class="visitor-name">{{ j.tamu.name }}</div>
+                                <div class="visitor-meta">{{ j.tamu.instansi|default:"Personal" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="max-width:200px;">
+                        <div style="font-size:0.85rem; color:#475569; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ j.purpose }}">
+                            {{ j.purpose }}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-weight:700; color:#0f172a; font-size:0.85rem;">{{ j.arrival_time|date:"H:i" }}</div>
+                        <div style="font-size:0.7rem; color:#94a3b8; margin-top:2px;">{{ j.arrival_time|date:"d M Y" }}</div>
+                    </td>
+                    <td style="font-size:0.85rem; color:#475569;">{{ j.pegawai.name|default:"Umum" }}</td>
+                    <td>
+                        <span class="status-pill status-{{ j.status }}">
+                            {% if j.status == 'completed' %}Selesai
+                            {% elif j.status == 'in_progress' %}Terjadwal
+                            {% elif j.status == 'pending' %}Menunggu
+                            {% else %}Batal{% endif %}
+                        </span>
+                    <td class="text-center">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-light rounded-pill" type="button" data-bs-toggle="dropdown" style="width:32px; height:32px; padding:0;">
+                                <i class="fas fa-ellipsis-v text-muted"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" style="border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 10px 30px rgba(0,0,0,0.08); padding:0.5rem;">
+                                <li><a class="dropdown-item" href="{% url 'tamu:admin_kunjungan_detail' j.id %}" style="font-size:0.85rem; font-weight:600;"><i class="fas fa-eye me-2 text-primary"></i> Detail Kunjungan</a></li>
+                                {% if j.status == 'pending' %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" onclick="updateStatus('{{ j.id }}', 'in_progress')" style="font-size:0.85rem; font-weight:600; color:#16a34a;"><i class="fas fa-check me-2"></i> Setujui Kunjungan</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="updateStatus('{{ j.id }}', 'cancelled')" style="font-size:0.85rem; font-weight:600; color:#dc2626;"><i class="fas fa-times me-2"></i> Tolak Kunjungan</a></li>
+                                {% elif j.status == 'in_progress' %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" onclick="updateStatus('{{ j.id }}', 'completed')" style="font-size:0.85rem; font-weight:600; color:#2563eb;"><i class="fas fa-sign-out-alt me-2"></i> Selesaikan (Check-out)</a></li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6">
+                        <div style="text-align:center; padding:4rem; color:#94a3b8;">
+                            <i class="fas fa-calendar-xmark" style="font-size:3rem; opacity:0.1; display:block; margin-bottom:1rem;"></i>
+                            <p style="font-size:0.9rem;">Belum ada jadwal kunjungan tersedia.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ chart_data.labels|json_script:"s-labels" }}
+{{ chart_data.values|json_script:"s-values" }}
+{{ chart_data.prev_values|json_script:"s-prev" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+    "use strict";
+    
+    // 1. Chart Configuration
+    const getChartData = id => {
+        const el = document.getElementById(id);
+        return el ? JSON.parse(el.textContent) : [];
+    };
+
+    const labels = getChartData('s-labels');
+    const values = getChartData('s-values');
+    const prevValues = getChartData('s-prev');
+    const ctx = document.getElementById('statsChart');
+
+    if (ctx) {
+        const chartCtx = ctx.getContext('2d');
+        const gradient = chartCtx.createLinearGradient(0, 0, 0, 320);
+        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.25)');
+        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+        new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Periode Ini',
+                        data: values,
+                        borderColor: '#3b82f6',
+                        borderWidth: 3,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#3b82f6',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointHoverBorderWidth: 3
+                    },
+                    {
+                        label: 'Periode Sebelumnya',
+                        data: prevValues,
+                        borderColor: '#cbd5e1',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        titleFont: { size: 13, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        padding: 12,
+                        cornerRadius: 12,
+                        displayColors: true,
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.dataset.label}: ${context.parsed.y} tamu`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 50,
+                        grid: { color: '#f1f5f9', drawBorder: false },
+                        ticks: { color: '#94a3b8', font: { size: 11, weight: '600' }, padding: 10 }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#94a3b8', font: { size: 11, weight: '600' }, padding: 10 }
+                    }
+                },
+                interaction: { mode: 'index', intersect: false }
+            }
+        });
+    }
+
+    // 2. Avatar Initial Colors
+    document.querySelectorAll('.initials-avatar').forEach(avatar => {
+        const name = avatar.getAttribute('data-name') || 'User';
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const h = Math.abs(hash) % 360;
+        avatar.style.background = `hsl(${h}, 50%, 55%)`;
+    });
+
+    // 3. Day Toggle Logic
+    window.toggleDay = function(btn) {
+        btn.classList.toggle('on');
+        const activeDays = [];
+        document.querySelectorAll('.day-toggle-btn.on').forEach(b => {
+            activeDays.push(b.getAttribute('data-day'));
+        });
+        document.getElementById('hariKerjaInput').value = activeDays.join(',');
+    };
+
+    // 4. Global Update Status Function
+    window.updateStatus = function(id, status) {
+        const statusLabels = {
+            'pending': 'Menunggu',
+            'in_progress': 'Terjadwal',
+            'completed': 'Selesai',
+            'cancelled': 'Dibatalkan'
+        };
+        const label = statusLabels[status] || status;
+        if (!confirm(`Apakah Anda yakin ingin mengubah status kunjungan ini menjadi ${label}?`)) return;
+        
+        fetch('{% url "tamu:api_update_kunjungan_status" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ kunjungan_id: id, status: status })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload(); 
+            } else {
+                alert('Gagal memperbarui status: ' + (data.error || 'Terjadi kesalahan'));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Terjadi kesalahan koneksi.');
+        });
+    };
+
+})();
+</script>
+
+<!-- Modal Kelola Pegawai -->
+<div class="modal fade" id="modalPegawai" tabindex="-1" aria-labelledby="modalPegawaiLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+            <div class="modal-header" style="border-bottom: 1px solid #f1f5f9; padding: 1.5rem 2rem;">
+                <div>
+                    <h5 class="modal-title fw-bold" id="modalPegawaiLabel" style="color: #0f172a;">Kelola Pegawai Bidang</h5>
+                    <p class="text-muted mb-0" style="font-size: 0.85rem;">Tambahkan pegawai ke setiap bidang/departemen</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding: 2rem;">
+                <!-- Form Tambah Pegawai -->
+                <form method="POST" action="">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_pegawai">
+                    
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 0.8rem; color: #64748b;">NAMA LENGKAP</label>
+                            <input type="text" name="name" class="form-control" placeholder="Nama Pegawai" required style="border-radius: 12px; padding: 0.6rem 1rem;">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 0.8rem; color: #64748b;">EMAIL</label>
+                            <input type="email" name="email" class="form-control" placeholder="email@bekasikab.go.id" required style="border-radius: 12px; padding: 0.6rem 1rem;">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 0.8rem; color: #64748b;">NOMOR TELEPON</label>
+                            <input type="text" name="phone" class="form-control" placeholder="0812..." required style="border-radius: 12px; padding: 0.6rem 1rem;">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 0.8rem; color: #64748b;">BIDANG / DEPARTEMEN</label>
+                            <select name="department" class="form-select" required style="border-radius: 12px; padding: 0.6rem 1rem;">
+                                <option value="" disabled selected>Pilih Bidang</option>
+                                {% for dept in departemen_all %}
+                                    <option value="{{ dept.id }}">{{ dept.nama }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100" style="border-radius: 12px; padding: 0.8rem; font-weight: 700; background: #0f172a; border: none;">
+                        <i class="fas fa-plus"></i> Tambahkan Pegawai
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

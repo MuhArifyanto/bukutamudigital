@@ -1,0 +1,458 @@
+{% extends 'guest_book/tamu_base.html' %}
+{% load static %}
+
+{% block title %}Pesan Warga{% endblock %}
+
+{% block page_title %}Pesan Warga{% endblock %}
+{% block page_subtitle %}Konsultasi Layanan Tamu{% endblock %}
+
+{% block extra_css %}
+<style>
+    .msg-wrapper {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-end;
+        max-width: 70%;
+    }
+    .msg-wrapper.sent {
+        flex-direction: row-reverse;
+        align-self: flex-end;
+    }
+    .msg-wrapper.received {
+        align-self: flex-start;
+    }
+    
+    .msg-bubble-container {
+        display: flex;
+        flex-direction: column;
+    }
+    .msg-wrapper.sent .msg-bubble-container {
+        align-items: flex-end;
+    }
+    .msg-wrapper.received .msg-bubble-container {
+        align-items: flex-start;
+    }
+    
+    .msg-bubble {
+        padding: 0.75rem 1rem;
+        border-radius: 14px;
+        font-size: 0.85rem;
+        line-height: 1.5;
+    }
+    .msg-wrapper.sent .msg-bubble {
+        background: #10b981;
+        color: #fff;
+        border-bottom-right-radius: 4px;
+    }
+    .msg-wrapper.received .msg-bubble {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-bottom-left-radius: 4px;
+    }
+    
+    @media (max-width: 576px) {
+        .msg-wrapper { max-width: 90%; gap: 0.5rem; }
+        .chat-card { height: 75vh !important; }
+        .message-area { padding: 1rem !important; gap: 1rem !important; }
+        
+        .chat-header-mobile { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; padding: 1rem !important; }
+        .chat-header-mobile > div:last-child { width: 100%; display: flex; justify-content: flex-start; }
+        
+        .op-card-header { flex-direction: column; align-items: flex-start !important; gap: 0.5rem; }
+        .op-card { padding: 1rem !important; }
+        
+        .chat-input-area { padding: 1rem !important; }
+        .chat-input-area form { gap: 0.5rem !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
+    <!-- PAGE HEADER -->
+    <div style="margin-bottom: 2rem;">
+        <h1 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem;">Pesan Warga</h1>
+        <div style="font-size: 0.85rem; color: #64748b;">
+            <a href="{% url 'tamu:dashboard' %}" style="color: #64748b; text-decoration: none;">Dashboard</a> &gt; <span>Pesan Warga</span>
+        </div>
+    </div>
+
+    <!-- JAM OPERASIONAL CARD -->
+    <div class="op-card" style="background: #0f172a; color: #fff; border-radius: 16px; padding: 1.5rem 2rem; margin-bottom: 2rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <div class="op-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-clock" style="color: #38bdf8;"></i>
+                <span style="font-size: 0.75rem; font-weight: 800; letter-spacing: 0.05em; color: #94a3b8;">JAM OPERASIONAL</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 0.75rem; color: #94a3b8;">Status Saat Ini</span>
+                <span style="font-size: 0.85rem; font-weight: 700; color: #4ade80; display: flex; align-items: center; gap: 0.25rem;">
+                    <i class="fas fa-circle" style="font-size: 0.5rem;"></i> Online
+                </span>
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 2rem; font-size: 0.85rem;">
+            <div style="color: #94a3b8;">Senin - Kamis</div>
+            <div style="font-weight: 700; text-align: right;">08:00 - 16:00</div>
+            <div style="color: #94a3b8;">Jumat</div>
+            <div style="font-weight: 700; text-align: right;">08:00 - 16:30</div>
+        </div>
+    </div>
+
+    <!-- CHAT CONTAINER -->
+    <div class="chat-card" style="background: #fff; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; overflow: hidden; display: flex; flex-direction: column; height: 600px;">
+        <!-- CHAT HEADER -->
+        <div class="chat-header-mobile" style="padding: 1.25rem 2rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fff;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="width: 40px; height: 40px; background: #eff6ff; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #1e40af;">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <div>
+                    <h6 style="margin: 0; font-weight: 700; color: #0f172a;">Konsultasi Layanan Tamu</h6>
+                    <span style="font-size: 0.75rem; color: #64748b;">Nomor Tiket: #GS-2023-0092</span>
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-sm" style="background: #f1f5f9; color: #475569; font-weight: 600; border-radius: 8px; font-size: 0.75rem; padding: 0.4rem 0.75rem;">Tandai Selesai</button>
+                <button class="btn btn-sm text-secondary" style="margin-left: 0.5rem;"><i class="fas fa-ellipsis-v"></i></button>
+            </div>
+        </div>
+
+        <!-- MESSAGE AREA -->
+        <div class="message-area" id="messageArea" style="flex: 1; padding: 2rem; overflow-y: auto; background: #fff; display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- DATE SEPARATOR -->
+            <div style="text-align: center; margin: 1rem 0; position: relative;">
+                <span style="background: #eff6ff; color: #1e40af; font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 99px; letter-spacing: 0.05em;">HARI INI</span>
+            </div>
+
+            {% for msg in messages_list %}
+            <div class="msg-wrapper {% if msg.sender_type == 'tamu' %}sent{% else %}received{% endif %}" data-id="{{ msg.id }}" data-created-at="{{ msg.created_at|date:'c' }}">
+                
+                <!-- AVATAR (If received) -->
+                {% if msg.sender_type != 'tamu' %}
+                    {% if msg.sender_obj.profile_picture %}
+                        <img src="{{ msg.sender_obj.profile_picture.url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="Avatar">
+                    {% else %}
+                        <!-- Gunakan Logo Instansi sebagai pengganti foto Admin -->
+                        <img src="/static/images/logo-diskominfosantik.png" style="width: 32px; height: 32px; border-radius: 50%; object-fit: contain; background: #eff6ff; padding: 2px; flex-shrink: 0;" alt="Avatar">
+                    {% endif %}
+                {% endif %}
+
+                <!-- BUBBLE -->
+                <div class="msg-bubble-container">
+                    <div class="msg-bubble">
+                        {% if msg.message_type == 'deleted' %}
+                            <span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>
+                        {% elif msg.message_type == 'image' and msg.attachment %}
+                            <img src="{{ msg.attachment.url }}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">
+                        {% elif msg.message_type == 'file' and msg.attachment %}
+                            <a href="{{ msg.attachment.url }}" target="_blank" style="color: inherit;"><i class="fas fa-file me-2"></i>File Lampiran</a>
+                        {% else %}
+                            {{ msg.content }}
+                        {% endif %}
+                    </div>
+                    <span style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.25rem; display: flex; gap: 0.5rem; align-items: center;">
+                        <span>{% if msg.sender_type != 'tamu' %}{{ msg.sender_obj.name|default:"Admin" }} • {% endif %}{{ msg.created_at|date:"H:i" }} WIB</span>
+                        {% if msg.sender_type == 'tamu' and msg.message_type != 'deleted' %}
+                            <a href="#" class="edit-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-pencil-alt" style="font-size: 0.6rem;"></i></a>
+                            <a href="#" class="delete-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-trash" style="font-size: 0.6rem;"></i></a>
+                        {% endif %}
+                    </span>
+                </div>
+
+                <!-- AVATAR (If sent) -->
+                {% if msg.sender_type == 'tamu' %}
+                    {% if msg.sender_obj.profile_picture %}
+                        <img src="{{ msg.sender_obj.profile_picture.url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="Avatar">
+                    {% else %}
+                        <div style="width: 32px; height: 32px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #fff; flex-shrink: 0;">
+                            {{ tamu.name|slice:":2"|upper }}
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+            {% empty %}
+            <div class="text-center my-auto opacity-50">
+                <i class="fas fa-comments fa-3x mb-3"></i>
+                <p>Belum ada percakapan. Mulai kirim pesan ke Admin!</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- CHAT INPUT AREA -->
+        <div class="chat-input-area" style="padding: 1.25rem 2rem; border-top: 1px solid #e2e8f0; background: #fff;">
+            <form id="chatForm" style="display: flex; align-items: center; gap: 1rem;">
+                {% csrf_token %}
+                <button type="button" class="btn btn-link text-secondary p-0" id="btnAttach" style="font-size: 1.2rem;"><i class="fas fa-paperclip"></i></button>
+                <button type="button" class="btn btn-link text-secondary p-0" style="font-size: 1.2rem;"><i class="fas fa-camera"></i></button>
+                
+                <input type="file" id="chatFileInput" style="display: none;" accept=".doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.svg">
+                
+                <div style="flex: 1; background: #f8fafc; border-radius: 12px; padding: 0.5rem 1rem; border: 1px solid #e2e8f0; display: flex; align-items: center;">
+                    <input type="text" id="chatInput" placeholder="Ketik pesan Anda di sini..." autocomplete="off" style="flex: 1; background: transparent; border: none; outline: none; font-size: 0.85rem; color: #0f172a;">
+                </div>
+
+                <button type="submit" style="width: 40px; height: 40px; background: #0f172a; color: #fff; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s;">
+                    <i class="fas fa-paper-plane" style="font-size: 0.9rem;"></i>
+                </button>
+            </form>
+            <div style="text-align: center; font-size: 0.65rem; color: #94a3b8; margin-top: 0.75rem;">
+                <i class="fas fa-lock" style="font-size: 0.6rem;"></i> Percakapan ini dienkripsi secara resmi oleh Diskominfosantik
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAsJCzp8DUY5PyQ4u7MgO2hppYQ8o4UjlU",
+      authDomain: "bukutamudigital-43ae7.firebaseapp.com",
+      projectId: "bukutamudigital-43ae7",
+      storageBucket: "bukutamudigital-43ae7.firebasestorage.app",
+      messagingSenderId: "304828413385",
+      appId: "1:304828413385:web:798cc84081a335c8d1e418",
+      measurementId: "G-PP2M3Z4NHL"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const storage = getStorage(app);
+
+    const msgArea = document.getElementById('messageArea');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const sessionId = "{{ session_id }}";
+    
+    msgArea.scrollTop = msgArea.scrollHeight;
+
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const chatSocket = new WebSocket(
+        `${wsScheme}://${window.location.host}/ws/chat/${sessionId}/`
+    );
+
+    function addMessage(content, type, time, messageType = 'text', fileUrl = null, messageId = null) {
+        const wrapper = document.createElement('div');
+        wrapper.className = `msg-wrapper ${type}`;
+        if (messageId) wrapper.setAttribute('data-id', messageId);
+        wrapper.setAttribute('data-created-at', new Date().toISOString()); // Untuk pesan baru
+        
+        let bubbleContent = content;
+        if (messageType === 'deleted') {
+            bubbleContent = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
+        } else if (messageType === 'image') {
+            bubbleContent = `<img src="${fileUrl}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">`;
+        } else if (messageType === 'file') {
+            bubbleContent = `<a href="${fileUrl}" target="_blank" style="color: inherit;"><i class="fas fa-file me-2"></i>File Lampiran</a>`;
+        }
+        
+        const isSent = type === 'sent';
+        const avatarHtml = isSent 
+            ? `<div style="width: 32px; height: 32px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #fff; flex-shrink: 0;">{{ tamu.name|slice:":2"|upper }}</div>`
+            : `<div style="width: 32px; height: 32px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #475569; flex-shrink: 0;"><i class="fas fa-user"></i></div>`;
+            
+        let actionButtons = '';
+        if (isSent && messageType !== 'deleted') {
+            actionButtons = `
+                <a href="#" class="edit-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-pencil-alt" style="font-size: 0.6rem;"></i></a>
+                <a href="#" class="delete-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-trash" style="font-size: 0.6rem;"></i></a>
+            `;
+        }
+
+        wrapper.innerHTML = `
+            ${!isSent ? avatarHtml : ''}
+            <div class="msg-bubble-container">
+                <div class="msg-bubble">
+                    ${bubbleContent}
+                </div>
+                <span style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.25rem; display: flex; gap: 0.5rem; align-items: center;">
+                    <span>${!isSent ? 'Sarah • ' : ''}${time} WIB</span>
+                    ${actionButtons}
+                </span>
+            </div>
+            ${isSent ? avatarHtml : ''}
+        `;
+        
+        msgArea.appendChild(wrapper);
+        msgArea.scrollTop = msgArea.scrollHeight;
+        
+    }
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        
+        if (data.action === 'error') {
+            alert(data.message);
+            return;
+        }
+        
+        if (data.action === 'edit') {
+            const msgEl = document.querySelector(`.msg-wrapper[data-id="${data.message_id}"]`);
+            if (msgEl) {
+                const bubble = msgEl.querySelector('.msg-bubble');
+                bubble.innerText = data.message;
+            }
+            return;
+        }
+        
+        if (data.action === 'delete') {
+            const msgEl = document.querySelector(`.msg-wrapper[data-id="${data.message_id}"]`);
+            if (msgEl) {
+                const bubble = msgEl.querySelector('.msg-bubble');
+                bubble.innerHTML = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
+                // Sembunyikan tombol edit/hapus
+                const btns = msgEl.querySelectorAll('.edit-msg-btn, .delete-msg-btn');
+                btns.forEach(b => b.remove());
+            }
+            return;
+        }
+
+        const type = data.sender_type === 'tamu' ? 'sent' : 'received';
+        addMessage(data.message, type, data.created_at, data.message_type, data.file_url, data.message_id);
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+
+    chatForm.onsubmit = (e) => {
+        e.preventDefault();
+        const content = chatInput.value.trim();
+        if (!content) return;
+        
+        chatInput.value = '';
+        
+        chatSocket.send(JSON.stringify({
+            'action': 'create',
+            'message': content,
+            'sender_id': sessionId,
+            'sender_type': 'tamu',
+            'message_type': 'text'
+        }));
+    };
+
+    // Handle Edit Click
+    function handleEditClick(e, messageId) {
+        e.preventDefault();
+        const msgEl = e.target.closest('.msg-wrapper');
+        const createdAtStr = msgEl.getAttribute('data-created-at');
+        const createdAt = new Date(createdAtStr);
+        const now = new Date();
+        
+        // Cek 2 menit di client side
+        if (now - createdAt > 2 * 60 * 1000) {
+            alert('Waktu edit sudah habis (maksimal 2 menit)');
+            return;
+        }
+        
+        const bubble = msgEl.querySelector('.msg-bubble');
+        const currentText = bubble.innerText;
+        
+        const newText = prompt('Edit pesan:', currentText);
+        if (newText && newText.trim() !== currentText) {
+            chatSocket.send(JSON.stringify({
+                'action': 'edit',
+                'message_id': messageId,
+                'message': newText.trim(),
+                'sender_id': sessionId,
+                'sender_type': 'tamu'
+            }));
+        }
+    }
+
+    // Handle Delete Click
+    function handleDeleteClick(e, messageId) {
+        e.preventDefault();
+        if (confirm('Apakah Anda yakin ingin menghapus pesan ini?')) {
+            chatSocket.send(JSON.stringify({
+                'action': 'delete',
+                'message_id': messageId,
+                'sender_id': sessionId,
+                'sender_type': 'tamu'
+            }));
+        }
+    }
+
+    // Event delegation untuk edit dan hapus
+    document.addEventListener('click', function(e) {
+        const editBtn = e.target.closest('.edit-msg-btn');
+        const deleteBtn = e.target.closest('.delete-msg-btn');
+        
+        if (editBtn) {
+            e.preventDefault();
+            const msgEl = editBtn.closest('.msg-wrapper');
+            const messageId = msgEl.getAttribute('data-id');
+            handleEditClick(e, messageId);
+        }
+        
+        if (deleteBtn) {
+            e.preventDefault();
+            const msgEl = deleteBtn.closest('.msg-wrapper');
+            const messageId = msgEl.getAttribute('data-id');
+            handleDeleteClick(e, messageId);
+        }
+    });
+
+    // File Upload Handle
+    const btnAttach = document.getElementById('btnAttach');
+    const chatFileInput = document.getElementById('chatFileInput');
+
+    if (btnAttach && chatFileInput) {
+        btnAttach.addEventListener('click', function() {
+            chatFileInput.click();
+        });
+
+        chatFileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+
+            // Validasi tipe file (Upgrade)
+            const allowedExtensions = ['doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'svg'];
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedExtensions.includes(fileExt)) {
+                alert('Format file tidak didukung! Hanya file Word, Excel, PNG, JPG, dan SVG yang diperbolehkan.');
+                this.value = ''; // Reset input
+                return;
+            }
+
+            btnAttach.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            // Determine message type
+            let messageType = 'file';
+            if (file.type.startsWith('image/')) {
+                messageType = 'image';
+            }
+
+            // Upload to Firebase Storage
+            const storageRef = ref(storage, 'chat_attachments/' + Date.now() + '_' + file.name);
+            
+            uploadBytes(storageRef, file).then((snapshot) => {
+                getDownloadURL(snapshot.ref).then((downloadURL) => {
+                    // Kirim pesan via WebSocket
+                    chatSocket.send(JSON.stringify({
+                        'action': 'create',
+                        'message': file.name, // Gunakan nama file sebagai content
+                        'sender_id': sessionId,
+                        'sender_type': 'tamu',
+                        'message_type': messageType,
+                        'file_url': downloadURL,
+                        'file_path': snapshot.ref.fullPath // Path di Firebase
+                    }));
+                });
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Gagal mengunggah file ke Firebase.');
+            })
+            .finally(() => {
+                btnAttach.innerHTML = '<i class="fas fa-paperclip"></i>';
+                chatFileInput.value = '';
+            });
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,576 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar - Buku Tamu Digital</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{% static 'images/logo-diskominfosantik.png' %}">
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <style>
+        :root {
+            --primary: #0a2558;
+            --secondary: #1e3a8a;
+            --accent: #3b82f6;
+            --bg-body: #f8fafc;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-soft: #e2e8f0;
+            --input-bg: #eff6ff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+
+
+        /* ── MAIN CONTENT TIDY CARD ── */
+        .register-wrapper {
+            min-height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1rem;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+        .register-card {
+            background: #fff;
+            max-width: 1050px;
+            width: 100%;
+            min-height: 680px;
+            display: flex;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 30px 70px rgba(10, 37, 88, 0.12);
+        }
+
+        /* Left Side Slider */
+        .register-info {
+            width: 40%;
+            background: var(--primary);
+            color: #fff;
+            padding: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .slide-container {
+            height: 100%;
+            width: 100%;
+            position: relative;
+        }
+        .slide {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            padding: 4rem 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            opacity: 0;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(20px);
+            background-size: cover;
+            background-position: center;
+        }
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+            z-index: 2;
+        }
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(10,37,88,0.2) 0%, rgba(10,37,88,0.95) 100%);
+            z-index: -1;
+        }
+        
+        .slide-1 { background-image: url('https://images.unsplash.com/photo-1497366754035-f200968a6e72?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80'); }
+        .slide-2 { background-image: url('https://images.unsplash.com/photo-1497215728101-856f4ea42174?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80'); }
+        .slide-3 { background-image: url('https://images.unsplash.com/photo-1497366811353-6870744d04b2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80'); }
+
+        .register-info-content {
+            position: relative;
+            z-index: 5;
+        }
+        .register-info h2 {
+            font-size: 2.4rem;
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            letter-spacing: -0.02em;
+        }
+        .register-info p {
+            font-size: 0.95rem;
+            opacity: 0.9;
+            line-height: 1.6;
+            margin-bottom: 0;
+        }
+        .pagination-dots {
+            position: absolute;
+            bottom: 3rem;
+            left: 3rem;
+            display: flex;
+            gap: 0.5rem;
+            z-index: 10;
+        }
+        .dot {
+            width: 24px; height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .dot.active {
+            background: #fff;
+            width: 40px;
+        }
+
+        /* Right Side Form */
+        .register-form-area {
+            width: 60%;
+            padding: 3.5rem;
+            overflow-y: auto;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .form-inner-container {
+            width: 100%;
+        }
+        .back-to-home {
+            position: absolute;
+            top: 2rem;
+            right: 3.5rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s;
+            z-index: 100;
+        }
+        .back-to-home:hover { 
+            color: var(--primary);
+            transform: translateX(-3px);
+        }
+        .input-group-custom {
+            position: relative;
+            margin-bottom: 1.25rem;
+        }
+        .form-title {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        .form-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        /* Form Controls */
+        .form-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.6rem;
+            display: block;
+        }
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        .form-control-custom {
+            background: transparent;
+            border: 2px solid #f1f5f9;
+            padding: 0.85rem 1rem 0.85rem 2.8rem;
+            font-size: 0.85rem;
+            color: var(--primary);
+            width: 100%;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+        .form-control-custom:focus {
+            outline: none;
+            background: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        textarea.form-control-custom {
+            min-height: 100px;
+        }
+
+        .btn-submit {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 0.9rem;
+            font-weight: 700;
+            width: 100%;
+            margin-top: 0.5rem;
+            transition: all 0.2s;
+        }
+        .btn-submit:hover {
+            background: #081d45;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(10,37,88,0.2);
+        }
+
+        .divider {
+            text-align: center;
+            position: relative;
+            margin: 1.5rem 0;
+        }
+        .divider::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 50%; width: 100%; height: 1px;
+            background: var(--border-soft);
+        }
+        .divider span {
+            background: #fff;
+            padding: 0 1rem;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            position: relative;
+            z-index: 2;
+        }
+
+        .btn-google {
+            background: #fff;
+            color: var(--text-main);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            padding: 0.8rem;
+            font-weight: 600;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .login-footer a {
+            color: var(--primary);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+
+
+        @media (max-width: 991px) {
+            .register-card { flex-direction: column; }
+            .register-info, .register-form-area { width: 100%; }
+            .register-info { min-height: 300px; }
+            .register-form-area { padding: 2.5rem 1.5rem; overflow-y: visible; max-height: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Removed Navbar for Full Screen Focus -->
+<div class="register-wrapper">
+    <div class="register-card">
+        <!-- LEFT: Info Slider -->
+        <div class="register-info">
+            <div class="slide-container">
+                <div class="slide slide-1 active">
+                    <div class="register-info-content">
+
+                        <h2>Selamat Datang di Portal Layanan Tamu</h2>
+                        <p>Sistem manajemen kunjungan digital Dinas Komunikasi, Informatika, Statistik dan Persandian.</p>
+                    </div>
+                </div>
+                <div class="slide slide-2">
+                    <div class="register-info-content">
+                        <h2>Transformasi Digital Pelayanan Publik</h2>
+                        <p>Mewujudkan tata kelola pemerintahan yang cerdas, inovatif, dan berbasis data yang akurat.</p>
+                    </div>
+                </div>
+                <div class="slide slide-3">
+                    <div class="register-info-content">
+                        <h2>Keamanan Data Adalah Prioritas</h2>
+                        <p>Setiap kunjungan tercatat secara sistematis dan aman menggunakan standar enkripsi terkini.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pagination-dots">
+                <div class="dot active" onclick="setSlide(0)"></div>
+                <div class="dot" onclick="setSlide(1)"></div>
+                <div class="dot" onclick="setSlide(2)"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Form -->
+        <div class="register-form-area">
+            <a href="{% url 'tamu:landing' %}" class="back-to-home">
+                <i class="fas fa-arrow-left"></i> Beranda
+            </a>
+            <div class="form-inner-container">
+                <h1 class="form-title">Daftar Akun Baru</h1>
+                <p class="form-subtitle">Lengkapi formulir di bawah untuk membuat identitas tamu resmi.</p>
+
+            <form method="post" action="{% url 'tamu:register' %}">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label" for="id_name">Nama Lengkap</label>
+                        <div class="input-group-custom">
+                            <i class="far fa-user input-icon"></i>
+                            <input type="text" id="id_name" name="name" class="form-control-custom" 
+                                   placeholder="Nama sesuai identitas" value="{{ form.name.value|default:'' }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="id_nik">NIK (16 Digit)</label>
+                        <div class="input-group-custom">
+                            <i class="far fa-id-card input-icon"></i>
+                            <input type="text" id="id_nik" name="nik" class="form-control-custom" 
+                                   placeholder="16 digit nomor NIK" value="{{ form.nik.value|default:'' }}" 
+                                   required minlength="16" maxlength="16" pattern="\d{16}"
+                                   title="NIK harus berjumlah 16 digit angka">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label" for="id_phone">Nomor WhatsApp</label>
+                        <div class="input-group-custom">
+                            <i class="fab fa-whatsapp input-icon"></i>
+                            <input type="tel" id="id_phone" name="phone" class="form-control-custom" 
+                                   placeholder="Contoh: 0812xxxx" value="{{ form.phone.value|default:'' }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="id_instansi">Instansi / Lembaga</label>
+                        <div class="input-group-custom">
+                            <i class="far fa-building input-icon"></i>
+                            <input type="text" id="id_instansi" name="instansi" class="form-control-custom" 
+                                   placeholder="Nama organisasi" value="{{ form.instansi.value|default:'' }}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="form-label" for="id_email">Alamat Email</label>
+                <div class="input-group-custom">
+                    <i class="far fa-envelope input-icon"></i>
+                    <input type="email" id="id_email" name="email" class="form-control-custom" 
+                           placeholder="nama@email.com" value="{{ form.email.value|default:'' }}" required>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="id_password1">Password</label>
+                        <div class="input-group-custom">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="id_password1" name="password1" class="form-control-custom" 
+                                   placeholder="Min. 8 karakter" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="id_password2">Konfirmasi Password</label>
+                        <div class="input-group-custom">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="id_password2" name="password2" class="form-control-custom" 
+                                   placeholder="Ulangi password" required>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="form-label" for="id_purpose">Tujuan Kunjungan Singkat</label>
+                <div class="input-group-custom">
+                    <i class="far fa-edit input-icon"></i>
+                    <textarea id="id_purpose" name="purpose" class="form-control-custom" 
+                              placeholder="Contoh: Koordinasi teknis aplikasi" required>{{ form.purpose.value|default:'' }}</textarea>
+                </div>
+
+                {% if form.errors %}
+                <div class="alert alert-danger py-2" style="border-radius: 12px; font-size: 0.8rem;">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Google reCAPTCHA -->
+                <div class="mb-3 d-flex justify-content-center">
+                    <div class="g-recaptcha" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="submitBtn">Daftarkan Sekarang</button>
+            </form>
+
+            <div class="divider">
+                <span>ATAU DAFTAR DENGAN</span>
+            </div>
+
+            <button type="button" class="btn-google">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" width="20" height="20">
+                Daftar dengan Akun Google
+            </button>
+
+            <div class="login-footer">
+                Sudah memiliki akun? <a href="{% url 'tamu:login' %}">Masuk di sini</a>
+            </div>
+            <div style="margin-top: 4rem; font-size: 0.75rem; color: var(--text-muted); opacity: 0.6;">
+                © 2024 Diskominfosatik. All rights reserved.
+            </div>
+            </div> <!-- End form-inner-container -->
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const dots = document.querySelectorAll('.dot');
+
+    function setSlide(index) {
+        slides[currentSlide].classList.remove('active');
+        dots[currentSlide].classList.remove('active');
+        currentSlide = index;
+        slides[currentSlide].classList.add('active');
+        dots[currentSlide].classList.add('active');
+    }
+
+    function nextSlide() {
+        let next = (currentSlide + 1) % slides.length;
+        setSlide(next);
+    }
+
+    setInterval(nextSlide, 5000);
+
+    // NIK Validation Script
+    const nikInput = document.getElementById('id_nik');
+    nikInput.addEventListener('input', function(e) {
+        // Hapus karakter non-angka
+        this.value = this.value.replace(/[^0-9]/g, '');
+        
+        if (this.value.length > 16) {
+            this.value = this.value.slice(0, 16);
+        }
+        
+        if (this.value.length > 0 && this.value.length < 16) {
+            this.setCustomValidity('NIK harus tepat 16 digit angka.');
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+
+    // Simple check for CAPTCHA before submit
+    document.querySelector('form').addEventListener('submit', function(e) {
+        var response = grecaptcha.getResponse();
+        if(response.length == 0) { 
+            e.preventDefault();
+            alert('Silakan centang reCAPTCHA terlebih dahulu untuk membuktikan Anda bukan robot.');
+        }
+    });
+</script>
+<script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAsJCzp8DUY5PyQ4u7MgO2hppYQ8o4UjlU",
+      authDomain: "bukutamudigital-43ae7.firebaseapp.com",
+      projectId: "bukutamudigital-43ae7",
+      storageBucket: "bukutamudigital-43ae7.firebasestorage.app",
+      messagingSenderId: "304828413385",
+      appId: "1:304828413385:web:798cc84081a335c8d1e418",
+      measurementId: "G-PP2M3Z4NHL"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    // Handle Google Login Click (Popup Style)
+    document.querySelector('.btn-google').addEventListener('click', () => {
+        signInWithPopup(auth, provider)
+            .then((result) => {
+                const user = result.user;
+                
+                // Get ID Token to send to backend
+                user.getIdToken().then(idToken => {
+                    fetch("{% url 'tamu:api_firebase_login' %}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({ id_token: idToken })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message || 'Berhasil!');
+                            window.location.href = data.redirect_url;
+                        } else {
+                            alert(data.message || 'Login gagal.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Terjadi kesalahan saat menghubungi server.');
+                    });
+                });
+            }).catch((error) => {
+                const errorMessage = error.message;
+                console.error('Firebase Auth Error:', error);
+                
+                if (error.code === 'auth/popup-blocked') {
+                    alert('Gagal: Popup diblokir oleh browser. Silakan izinkan popup untuk situs ini.');
+                } else if (error.code === 'auth/popup-closed-by-user') {
+                    alert('Gagal: Anda menutup jendela login Google sebelum selesai. Silakan coba lagi.');
+                } else {
+                    alert('Gagal login dengan Google: ' + errorMessage);
+                }
+            });
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

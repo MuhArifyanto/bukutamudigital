@@ -1,0 +1,611 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kebijakan Privasi - Buku Tamu Digital</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0a2558;
+            --primary-light: #1e40af;
+            --secondary: #3b82f6;
+            --accent: #60a5fa;
+            --bg-light: #f8fafc;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* ── NAVBAR ── */
+        .navbar {
+            background: var(--primary);
+            padding: 1rem 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.15rem;
+            color: #fff !important;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .navbar-brand .brand-icon {
+            background: #fff;
+            color: var(--primary);
+            width: 34px; height: 34px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+            font-weight: 500;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem !important;
+            transition: color 0.2s;
+        }
+        .nav-link:hover { color: #fff !important; }
+        .nav-link.active { color: #fff !important; font-weight: 700; }
+        .btn-nav-masuk {
+            color: #fff !important;
+            border: 1.5px solid rgba(255,255,255,0.5);
+            border-radius: 8px;
+            padding: .4rem 1.1rem !important;
+            font-weight: 600;
+            font-size: .9rem;
+            transition: all .2s;
+        }
+        .btn-nav-masuk:hover {
+            background: #fff;
+            color: var(--primary) !important;
+        }
+        .btn-nav-daftar {
+            background: #fff;
+            color: var(--primary) !important;
+            border-radius: 8px;
+            padding: .4rem 1.2rem !important;
+            font-weight: 700;
+            font-size: .9rem;
+            border: none;
+            transition: opacity .2s;
+        }
+        .btn-nav-daftar:hover { opacity: .9; }
+
+        /* ── LAYOUT UTAMA ── */
+        .main-container {
+            padding: 3rem 0 5rem;
+        }
+        
+        /* ── SIDEBAR KIRI ── */
+        .sidebar {
+            position: sticky;
+            top: 100px;
+        }
+        .doc-card {
+            background: #f4f7fa;
+            border-radius: 12px;
+            padding: 1.8rem;
+            margin-bottom: 1.5rem;
+        }
+        .doc-card-title {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: var(--primary);
+            margin-bottom: 1.2rem;
+        }
+        .doc-card-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+        .doc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .doc-list li {
+            position: relative;
+            padding-left: 1.2rem;
+            margin-bottom: 0.8rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .doc-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 6px;
+            width: 6px;
+            height: 6px;
+            background-color: var(--accent);
+            border-radius: 50%;
+        }
+
+        .commitment-card {
+            background: var(--primary);
+            border-radius: 12px;
+            padding: 2rem 1.8rem;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+        .commitment-card::after {
+            content: '\f3ed';
+            font-family: 'FontAwesome';
+            position: absolute;
+            right: -10px;
+            top: 20px;
+            font-size: 6rem;
+            opacity: 0.1;
+        }
+        .commitment-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 0.8rem;
+            position: relative;
+            z-index: 2;
+        }
+        .commitment-text {
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.5;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* ── KONTEN KANAN ── */
+        .content-area {
+            padding-left: 1rem;
+        }
+        .page-title {
+            font-size: 2.8rem;
+            font-weight: 900;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            letter-spacing: -0.03em;
+        }
+        .page-intro {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+            margin-bottom: 3rem;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+        .content-text {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 2.5rem;
+        }
+
+        /* Data Collection Cards */
+        .data-box {
+            background: #f4f7fa;
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .data-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        }
+        .data-card-icon {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+        .data-card h5 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        .data-card p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* Tujuan List */
+        .tujuan-list {
+            margin-bottom: 3rem;
+        }
+        .tujuan-item {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .tujuan-icon {
+            color: var(--primary);
+            font-size: 1.1rem;
+            margin-top: 0.2rem;
+        }
+        .tujuan-content h5 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.3rem;
+        }
+        .tujuan-content p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* Keamanan Data Box */
+        .security-box {
+            border: 2px solid var(--primary-light);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+            background: #fff;
+        }
+        .security-desc {
+            font-size: 0.95rem;
+            color: var(--text-main);
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+        }
+        .security-tags {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .security-tag {
+            background: #f1f5f9;
+            color: var(--primary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.4rem 1rem;
+            border-radius: 50px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* Hak Pengguna */
+        .hak-list {
+            margin-bottom: 4rem;
+        }
+        .hak-item {
+            border-left: 3px solid var(--primary);
+            padding-left: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .hak-item h5 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.4rem;
+        }
+        .hak-item p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* Bottom Actions */
+        .bottom-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .btn-print {
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-print:hover { color: var(--primary-light); }
+        .btn-understand {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 0.7rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: background 0.2s;
+            text-decoration: none;
+        }
+        .btn-understand:hover { background: #081d45; color: #fff; }
+
+        /* ── FOOTER ── */
+        .footer {
+            background: var(--primary);
+            padding: 4rem 0 2rem;
+            color: rgba(255,255,255,0.7);
+        }
+        .footer-brand {
+            font-weight: 800;
+            color: #fff;
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .footer-desc {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.6);
+        }
+        .footer-links-col h6 {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 1.25rem;
+        }
+        .footer-links {
+            list-style: none;
+            padding: 0; margin: 0;
+        }
+        .footer-links li { margin-bottom: 0.75rem; }
+        .footer-links a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: #fff; }
+        .footer-bottom {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.4);
+        }
+
+        @media (max-width: 991px) {
+            .data-grid { grid-template-columns: 1fr; }
+            .content-area { padding-left: 0; margin-top: 2rem; }
+            .sidebar { position: relative; top: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg">
+    <div class="container">
+        <a class="navbar-brand" href="{% url 'tamu:landing' %}">
+            <div class="brand-icon"><i class="fas fa-book-open"></i></div>
+            Buku Tamu Digital
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMain">
+            <ul class="navbar-nav mx-auto">
+                <li class="nav-item"><a class="nav-link" href="{% url 'tamu:landing' %}">Beranda</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tamu:tentang_kami' %}">Tentang Kami</a></li>
+                <li class="nav-item"><a class="nav-link active" href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan Privasi</a></li>
+            </ul>
+            <div class="d-flex gap-2 mt-2 mt-lg-0">
+                <a href="{% url 'tamu:login' %}" class="nav-link btn-nav-masuk">Masuk</a>
+                <a href="{% url 'tamu:register' %}" class="nav-link btn-nav-daftar">Daftar</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="container main-container">
+    <div class="row">
+        <!-- SIDEBAR -->
+        <div class="col-lg-3">
+            <div class="sidebar">
+                <div class="doc-card">
+                    <div class="doc-card-title">
+                        <i class="fas fa-file-alt"></i> Dokumen Resmi
+                    </div>
+                    <p class="doc-card-text">
+                        Terakhir diperbarui: 24 Mei 2024. Kebijakan ini berlaku untuk seluruh pengunjung Diskominfosatik yang menggunakan layanan E-Guestbook.
+                    </p>
+                    <ul class="doc-list">
+                        <li>Informasi Publik</li>
+                        <li>Perlindungan Data</li>
+                    </ul>
+                </div>
+
+                <div class="commitment-card">
+                    <div class="commitment-label">KOMITMEN KAMI</div>
+                    <div class="commitment-text">
+                        Keamanan data Anda adalah prioritas utama dalam pelayanan digital kami.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="col-lg-8 offset-lg-1 content-area">
+            <h1 class="page-title">Kebijakan Privasi</h1>
+            <p class="page-intro">
+                Diskominfosatik berkomitmen untuk melindungi informasi pribadi Anda dan memastikan transparansi dalam setiap pemrosesan data pengunjung.
+            </p>
+
+            <div class="section-header">
+                <i class="far fa-clock"></i> PENDAHULUAN
+            </div>
+            <p class="content-text">
+                Kebijakan Privasi ini menjelaskan bagaimana <strong>Diskominfosatik</strong> mengumpulkan, menggunakan, dan melindungi data pribadi yang Anda berikan melalui sistem E-Guestbook. Dengan menggunakan layanan ini, Anda menyetujui praktik data yang dijelaskan dalam pernyataan ini sesuai dengan peraturan perundang-undangan yang berlaku di Republik Indonesia mengenai perlindungan data pribadi.
+            </p>
+
+            <div class="data-box">
+                <div class="section-header">
+                    <i class="far fa-folder-open"></i> DATA YANG KAMI KUMPULKAN
+                </div>
+                <div class="data-grid">
+                    <div class="data-card">
+                        <div class="data-card-icon"><i class="far fa-user"></i></div>
+                        <h5>Identitas Diri</h5>
+                        <p>Nama Lengkap sesuai dengan kartu identitas resmi pengunjung.</p>
+                    </div>
+                    <div class="data-card">
+                        <div class="data-card-icon"><i class="far fa-building"></i></div>
+                        <h5>Instansi/Lembaga</h5>
+                        <p>Nama organisasi atau instansi yang Anda wakili saat berkunjung.</p>
+                    </div>
+                    <div class="data-card">
+                        <div class="data-card-icon"><i class="far fa-clipboard"></i></div>
+                        <h5>Tujuan Kunjungan</h5>
+                        <p>Detail keperluan atau unit kerja yang dituju dalam kunjungan Anda.</p>
+                    </div>
+                    <div class="data-card">
+                        <div class="data-card-icon"><i class="fas fa-phone-alt"></i></div>
+                        <h5>Nomor Telepon</h5>
+                        <p>Kontak aktif untuk keperluan verifikasi atau tindak lanjut kunjungan.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <i class="fas fa-crosshairs"></i> TUJUAN PENGUMPULAN DATA
+            </div>
+            <div class="tujuan-list">
+                <div class="tujuan-item">
+                    <div class="tujuan-icon"><i class="far fa-check-circle"></i></div>
+                    <div class="tujuan-content">
+                        <h5>Manajemen Keamanan Gedung</h5>
+                        <p>Mengidentifikasi setiap individu yang memasuki area kantor Diskominfosatik demi keamanan lingkungan kerja.</p>
+                    </div>
+                </div>
+                <div class="tujuan-item">
+                    <div class="tujuan-icon"><i class="far fa-check-circle"></i></div>
+                    <div class="tujuan-content">
+                        <h5>Pelaporan Akuntabilitas Kinerja</h5>
+                        <p>Menyusun statistik kunjungan sebagai bagian dari laporan kinerja instansi secara internal.</p>
+                    </div>
+                </div>
+                <div class="tujuan-item">
+                    <div class="tujuan-icon"><i class="far fa-check-circle"></i></div>
+                    <div class="tujuan-content">
+                        <h5>Peningkatan Pelayanan Publik</h5>
+                        <p>Menganalisis pola kunjungan untuk mengoptimalkan layanan penerimaan tamu dan koordinasi unit kerja.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="security-box">
+                <div class="section-header">
+                    <i class="fas fa-shield-alt"></i> KEAMANAN DATA
+                </div>
+                <p class="security-desc">
+                    Kami menerapkan standar keamanan teknis dan organisasional yang ketat untuk melindungi data Anda dari akses yang tidak sah, perubahan, pengungkapan, atau penghancuran. Seluruh data disimpan dalam server terenkripsi yang dikelola oleh tim keamanan siber Diskominfosatik.
+                </p>
+                <div class="security-tags">
+                    <div class="security-tag"><i class="fas fa-lock"></i> Enkripsi AES-256</div>
+                    <div class="security-tag"><i class="fas fa-user-shield"></i> Akses Terbatas</div>
+                    <div class="security-tag"><i class="fas fa-clipboard-check"></i> Audit Rutin</div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <i class="fas fa-gavel"></i> HAK PENGGUNA
+            </div>
+            <div class="hak-list">
+                <div class="hak-item">
+                    <h5>Hak untuk Mengakses</h5>
+                    <p>Anda berhak mengetahui data apa saja yang kami simpan mengenai kunjungan Anda.</p>
+                </div>
+                <div class="hak-item">
+                    <h5>Hak untuk Perbaikan</h5>
+                    <p>Anda dapat meminta koreksi jika terdapat kesalahan pada data identitas yang tercatat.</p>
+                </div>
+                <div class="hak-item">
+                    <h5>Hak untuk Menghapus</h5>
+                    <p>Sesuai ketentuan retensi data, Anda dapat mengajukan permohonan penghapusan data jika masa berlaku kepentingan administrasi telah berakhir.</p>
+                </div>
+            </div>
+
+            <div class="bottom-actions">
+                <a href="#" class="btn-print" onclick="window.print(); return false;">
+                    <i class="fas fa-print"></i> Cetak Kebijakan
+                </a>
+                <a href="{% url 'tamu:landing' %}" class="btn-understand">
+                    Saya Mengerti
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-6 mb-4 mb-lg-0">
+                <div class="footer-brand">Diskominfosatik</div>
+                <div class="footer-desc">Pemerintah Provinsi - Melayani dengan integritas.</div>
+            </div>
+            <div class="col-lg-3 col-6 footer-links-col">
+                <h6>Tautan</h6>
+                <ul class="footer-links">
+                    <li><a href="{% url 'tamu:tentang_kami' %}">Tentang Kami</a></li>
+                    <li><a href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan Privasi</a></li>
+                </ul>
+            </div>
+            <div class="col-lg-3 col-6 footer-links-col">
+                <h6>Dukungan</h6>
+                <ul class="footer-links">
+                    <li><a href="#">Aksesibilitas</a></li>
+                    <li><a href="#">Hubungi Dukungan</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            &copy; 2024 Diskominfosatik. Seluruh hak cipta dilindungi undang-undang.
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

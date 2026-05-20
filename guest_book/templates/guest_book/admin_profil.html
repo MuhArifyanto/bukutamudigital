@@ -1,0 +1,435 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block title %}Profil Administrator{% endblock %}
+{% block page_title %}Profil Administrator{% endblock %}
+{% block page_subtitle %}Kelola informasi data pribadi dan pengaturan keamanan akun Anda.{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rounded-4 { border-radius: 1rem !important; }
+    .bg-dark-slate { background: #1e293b !important; }
+    .text-secondary-light { color: #94a3b8 !important; }
+    
+    /* Custom switches */
+    .form-switch .form-check-input {
+        width: 3rem;
+        height: 1.5rem;
+        cursor: pointer;
+    }
+    
+    /* Table hover effects */
+    .table-borderless tbody tr:hover {
+        background-color: #f8fafc;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="row g-4">
+        <!-- Left Column -->
+        <div class="col-lg-4">
+            <!-- Profile Card -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4 bg-dark-slate text-white">
+                <div class="card-body text-center p-4">
+                    <div class="position-relative d-inline-block mb-3">
+                        <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}" 
+                             class="rounded-circle border border-4 border-primary" style="width: 100px; height: 100px; object-fit: cover;" alt="Avatar">
+                    </div>
+                    <h5 class="fw-bold mb-1">{{ admin_name }}</h5>
+                    <p class="text-secondary-light small mb-3">NIP: 19880421 201503 1 002</p>
+                    
+                    <span class="badge bg-success-subtle text-success rounded-pill px-3 py-1 small mb-4">AKTIF</span>
+                    
+                    <button class="btn btn-primary w-100 rounded-pill mb-2 fw-bold" id="btnUbahFoto"><i class="fas fa-camera me-2"></i>Ubah Foto</button>
+                    <button class="btn btn-secondary w-100 rounded-pill fw-bold" style="background: #334155; border: none;" data-bs-toggle="modal" data-bs-target="#modalGantiSandi"><i class="fas fa-lock me-2"></i>Ganti Kata Sandi</button>
+                    
+                    <!-- Hidden File Input -->
+                    <input type="file" id="profilePictureInput" style="display: none;" accept="image/*">
+                </div>
+            </div>
+
+            <!-- Notifications Card -->
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-4 d-flex align-items-center"><i class="fas fa-bell me-2 text-primary"></i>Notifikasi</h6>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <p class="fw-bold mb-0">Email Notifikasi</p>
+                            <p class="text-secondary small mb-0">Laporan aktivitas mingguan</p>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="switchEmailNotif" {% if email_notif_enabled %}checked{% endif %}>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="fw-bold mb-0">Push Notifikasi</p>
+                            <p class="text-secondary small mb-0">Peringatan sistem real-time</p>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="switchPushNotif" {% if push_notif_enabled %}checked{% endif %}>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-lg-8">
+            <!-- Data Pribadi Card -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h6 class="fw-bold mb-0 d-flex align-items-center"><i class="fas fa-user-circle me-2 text-primary"></i>Data Pribadi</h6>
+                        <a href="#" class="text-primary text-decoration-none fw-bold small" id="btnEditData">Sunting Data</a>
+                    </div>
+                    
+                    <div class="row g-4" id="profileDataSection">
+                        <div class="col-md-6">
+                            <p class="text-secondary small mb-1">NAMA LENGKAP</p>
+                            <p class="fw-bold text-dark" id="textName">{{ admin_user.name|default:admin_name }}</p>
+                            <input type="text" class="form-control d-none" id="inputName" value="{{ admin_user.name|default:admin_name }}">
+                        </div>
+                        <div class="col-md-6">
+                            <p class="text-secondary small mb-1">NOMOR INDUK PEGAWAI (NIP)</p>
+                            <p class="fw-bold text-dark" id="textNip">{{ admin_user.nip|default:'-' }}</p>
+                            <input type="text" class="form-control d-none" id="inputNip" value="{{ admin_user.nip|default:'' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <p class="text-secondary small mb-1">ALAMAT EMAIL</p>
+                            <p class="fw-bold text-dark" id="textEmail">{{ admin_user.email|default:'admin@email.com' }}</p>
+                            <input type="email" class="form-control d-none" id="inputEmail" value="{{ admin_user.email|default:'admin@email.com' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <p class="text-secondary small mb-1">POSISI / JABATAN</p>
+                            <p class="fw-bold text-dark" id="textJabatan">{{ admin_user.jabatan|default:'-' }}</p>
+                            <input type="text" class="form-control d-none" id="inputJabatan" value="{{ admin_user.jabatan|default:'' }}">
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4 text-secondary opacity-25">
+                    
+                    <div class="row text-center g-0">
+                        <div class="col-4">
+                            <h3 class="fw-bold text-primary mb-1">{{ total_login|default:0 }}</h3>
+                            <p class="text-secondary small mb-0 fw-bold">TOTAL LOGIN</p>
+                        </div>
+                        <div class="col-4 border-start border-end">
+                            <h3 class="fw-bold text-primary mb-1">{{ data_export|default:0 }}</h3>
+                            <p class="text-secondary small mb-0 fw-bold">DATA EXPORT</p>
+                        </div>
+                        <div class="col-4">
+                            <h3 class="fw-bold text-primary mb-1">{{ uptime|default:100 }}%</h3>
+                            <p class="text-secondary small mb-0 fw-bold">UPTIME RATE</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log Aktivitas Card -->
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h6 class="fw-bold mb-0 d-flex align-items-center"><i class="fas fa-history me-2 text-primary"></i>Log Aktivitas Terakhir</h6>
+                        <button class="btn btn-light btn-sm rounded-pill px-3 fw-bold text-secondary">LIHAT SEMUA</button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-borderless align-middle mb-0">
+                            <thead>
+                                <tr class="text-secondary small">
+                                    <th class="fw-bold">AKTIVITAS</th>
+                                    <th class="fw-bold">STATUS</th>
+                                    <th class="fw-bold">WAKTU</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in activity_logs %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="{% if log.action == 'create' %}bg-success-subtle text-success{% elif log.action == 'update' %}bg-primary-subtle text-primary{% else %}bg-danger-subtle text-danger{% endif %} rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas {% if log.action == 'create' %}fa-plus{% elif log.action == 'update' %}fa-pen{% else %}fa-trash{% endif %}"></i>
+                                            </div>
+                                            <div>
+                                                <p class="fw-bold mb-0 text-dark">{{ log.action|title }} di {{ log.table_name }}</p>
+                                                <p class="text-secondary small mb-0">IP: {{ log.ip_address|default:'-' }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge bg-success-subtle text-success rounded-pill px-3">SELESAI</span></td>
+                                    <td class="text-secondary small fw-bold">{{ log.timestamp|date:"d M, H:i" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-secondary py-3">Belum ada aktivitas tercatat</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+    <!-- Modal Ganti Kata Sandi -->
+    <div class="modal fade" id="modalGantiSandi" tabindex="-1" aria-labelledby="modalGantiSandiLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 1rem; border: none;">
+                <div class="modal-header border-0 p-4 pb-0">
+                    <h5 class="fw-bold" id="modalGantiSandiLabel"><i class="fas fa-lock me-2 text-primary"></i>Ganti Kata Sandi</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="formGantiSandi">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">PASSWORD BARU</label>
+                            <input type="password" id="inputNewPassword" class="form-control" style="border-radius: 0.75rem; padding: 12px;" placeholder="Minimal 6 karakter" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">KONFIRMASI PASSWORD BARU</label>
+                            <input type="password" id="inputConfirmPassword" class="form-control" style="border-radius: 0.75rem; padding: 12px;" placeholder="Ulangi password baru" required>
+                        </div>
+                        <button type="button" class="btn btn-primary w-100 fw-bold py-3" style="border-radius: 0.75rem; background: #1e56a0;" onclick="submitGantiSandi()">
+                            <i class="fas fa-check-circle me-2"></i>Simpan Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const btnUbahFoto = document.getElementById('btnUbahFoto');
+        const fileInput = document.getElementById('profilePictureInput');
+        const avatarImg = document.querySelector('.card-body img.rounded-circle');
+
+        if (btnUbahFoto && fileInput) {
+            btnUbahFoto.addEventListener('click', function() {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (!file) return;
+
+                // Validasi tipe file
+                if (!file.type.startsWith('image/')) {
+                    alert('Harap pilih file gambar!');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('profile_picture', file);
+
+                // Tampilkan loading
+                btnUbahFoto.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Mengunggah...';
+                btnUbahFoto.disabled = true;
+
+                fetch("{% url 'tamu:api_update_profile_picture' %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update avatar image
+                        if (avatarImg) {
+                            avatarImg.src = data.file_url + '?v=' + new Date().getTime();
+                        }
+                        alert('Foto profil berhasil diperbarui!');
+                    } else {
+                        alert('Gagal memperbarui foto profil: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Terjadi kesalahan saat mengunggah file.');
+                })
+                .finally(() => {
+                    // Kembalikan tombol
+                    btnUbahFoto.innerHTML = '<i class="fas fa-camera me-2"></i>Ubah Foto';
+                    btnUbahFoto.disabled = false;
+                    fileInput.value = ''; // Reset input
+                });
+            });
+        }
+
+        // Edit Profile Data
+        const btnEditData = document.getElementById('btnEditData');
+        const profileDataSection = document.getElementById('profileDataSection');
+        
+        if (btnEditData) {
+            btnEditData.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const isEditing = btnEditData.innerText === 'Simpan';
+                
+                if (isEditing) {
+                    // Save data
+                    const data = {
+                        name: document.getElementById('inputName').value,
+                        email: document.getElementById('inputEmail').value,
+                        nip: document.getElementById('inputNip').value,
+                        jabatan: document.getElementById('inputJabatan').value
+                    };
+                    
+                    btnEditData.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>...';
+                    btnEditData.disabled = true;
+                    
+                    fetch("{% url 'tamu:api_update_profile_data' %}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(res => res.json())
+                    .then(resData => {
+                        if (resData.success) {
+                            // Update text
+                            document.getElementById('textName').innerText = data.name;
+                            document.getElementById('textEmail').innerText = data.email;
+                            document.getElementById('textNip').innerText = data.nip || '-';
+                            document.getElementById('textJabatan').innerText = data.jabatan || '-';
+                            
+                            // Toggle visibility
+                            toggleEdit(false);
+                            alert('Data pribadi berhasil diperbarui!');
+                        } else {
+                            alert('Gagal memperbarui data: ' + resData.error);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Terjadi kesalahan saat menyimpan data.');
+                    })
+                    .finally(() => {
+                        btnEditData.disabled = false;
+                    });
+                } else {
+                    // Toggle to edit mode
+                    toggleEdit(true);
+                }
+            });
+            
+            function toggleEdit(editing) {
+                const fields = ['Name', 'Email', 'Nip', 'Jabatan'];
+                fields.forEach(field => {
+                    const textEl = document.getElementById('text' + field);
+                    const inputEl = document.getElementById('input' + field);
+                    
+                    if (editing) {
+                        textEl.classList.add('d-none');
+                        inputEl.classList.remove('d-none');
+                    } else {
+                        textEl.classList.remove('d-none');
+                        inputEl.classList.add('d-none');
+                    }
+                });
+                
+                btnEditData.innerText = editing ? 'Simpan' : 'Sunting Data';
+                if (editing) {
+                    btnEditData.classList.add('btn', 'btn-primary', 'btn-sm', 'text-white');
+                } else {
+                    btnEditData.classList.remove('btn', 'btn-primary', 'btn-sm', 'text-white');
+                    btnEditData.classList.add('text-primary', 'text-decoration-none', 'fw-bold', 'small');
+                }
+            }
+        }
+
+        // Notification Switches
+        const switchEmailNotif = document.getElementById('switchEmailNotif');
+        const switchPushNotif = document.getElementById('switchPushNotif');
+
+        function updateNotifSetting(emailNotif, pushNotif) {
+            fetch("{% url 'tamu:api_update_notification_settings' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    email_notif: emailNotif,
+                    push_notif: pushNotif
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('Gagal memperbarui pengaturan: ' + data.error);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Terjadi kesalahan saat menghubungi server.');
+            });
+        }
+
+        if (switchEmailNotif) {
+            switchEmailNotif.addEventListener('change', function() {
+                updateNotifSetting(this.checked, null);
+            });
+        }
+
+        if (switchPushNotif) {
+            switchPushNotif.addEventListener('change', function() {
+                updateNotifSetting(null, this.checked);
+            });
+        }
+    });
+
+    window.submitGantiSandi = function() {
+        const newPw = document.getElementById('inputNewPassword').value;
+        const confirmPw = document.getElementById('inputConfirmPassword').value;
+        
+        if (!newPw) {
+            alert('Password baru tidak boleh kosong!');
+            return;
+        }
+        if (newPw.length < 6) {
+            alert('Password minimal 6 karakter!');
+            return;
+        }
+        if (newPw !== confirmPw) {
+            alert('Konfirmasi password tidak cocok!');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('new_password', newPw);
+        
+        fetch("{% url 'tamu:api_change_password' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Password berhasil diubah!');
+                bootstrap.Modal.getInstance(document.getElementById('modalGantiSandi')).hide();
+                document.getElementById('formGantiSandi').reset();
+            } else {
+                alert('Gagal mengubah password: ' + data.error);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Terjadi kesalahan saat menghubungi server.');
+        });
+    };
+</script>
+{% endblock %}

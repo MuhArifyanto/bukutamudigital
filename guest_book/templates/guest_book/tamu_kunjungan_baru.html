@@ -1,0 +1,529 @@
+{% extends "guest_book/tamu_base.html" %}
+{% load static %}
+
+{% block title %}Buku Tamu{% endblock %}
+
+{% block page_title %}Buku Tamu{% endblock %}
+{% block page_subtitle %}Formulir Kedatangan Tamu{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-header {
+        margin-bottom: 2rem;
+    }
+    .form-header h1 {
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #0b1d3a;
+        margin-bottom: 0.5rem;
+    }
+    .form-header h1 span {
+        color: #3b82f6;
+    }
+    .form-header p {
+        color: #64748b;
+        font-size: 1rem;
+    }
+
+    .form-card {
+        background: #ffffff;
+        border-radius: var(--radius-lg);
+        padding: 2.5rem;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid rgba(15,23,42,0.06);
+        margin-bottom: 2rem;
+    }
+
+    .form-group-custom {
+        margin-bottom: 1.5rem;
+    }
+    .form-group-custom label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        margin-bottom: 0.5rem;
+    }
+
+    .input-custom {
+        width: 100%;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--radius-sm);
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        color: #0f172a;
+        outline: none;
+        transition: var(--transition);
+    }
+    .input-custom.has-badge {
+        padding-right: 6.5rem;
+    }
+    .input-custom:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px var(--accent-glow);
+        background: #ffffff;
+    }
+    .input-custom[readonly] {
+        background: #f1f5f9;
+        color: #64748b;
+        cursor: not-allowed;
+    }
+
+    .input-with-icon {
+        position: relative;
+    }
+    .input-with-icon i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 0.9rem;
+    }
+    .input-with-icon .input-custom {
+        padding-left: 2.5rem;
+    }
+
+    .row-custom {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .status-card {
+        background: #e6f4ea;
+        border-radius: var(--radius-sm);
+        padding: 0.75rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 100%;
+    }
+    .status-card .status-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .status-card .status-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #0d6efd;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .status-card .status-title::before {
+        content: '';
+        display: inline-block;
+        width: 6px; height: 6px;
+        background: #10b981;
+        border-radius: 50%;
+    }
+    .status-card .status-desc {
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+    .status-card .quota-badge {
+        background: #ffffff;
+        color: #16a34a;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0.25rem 0.5rem;
+        border-radius: 99px;
+    }
+
+    .btn-group-custom {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .btn-toggle-custom {
+        flex: 1;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--radius-sm);
+        padding: 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #64748b;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    .btn-toggle-custom:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+    .btn-toggle-custom.active {
+        background: #e0f2fe;
+        border-color: #3b82f6;
+        color: #0369a1;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #f1f5f9;
+    }
+    .btn-submit-custom {
+        background: #0b1d3a;
+        color: #ffffff;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .btn-submit-custom:hover {
+        background: #1e3a8a;
+        box-shadow: 0 4px 12px rgba(11,29,58,0.2);
+    }
+    .btn-cancel-custom {
+        background: #ffffff;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+        padding: 0.75rem 1.5rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: var(--transition);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .btn-cancel-custom:hover {
+        background: #f8fafc;
+        color: #0f172a;
+        border-color: #cbd5e1;
+    }
+
+    .verified-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        background: #e0f2fe;
+        color: #0369a1;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 0.15rem 0.4rem;
+        border-radius: 99px;
+        margin-left: 0.5rem;
+    }
+
+    /* Responsive Mode HP */
+    @media (max-width: 576px) {
+        .form-card { padding: 1.5rem; }
+        .row-custom { grid-template-columns: 1fr; }
+        .form-actions { flex-direction: column-reverse; gap: 0.75rem; }
+        .btn-cancel-custom, .btn-submit-custom { width: 100%; justify-content: center; }
+        
+        .status-card { flex-direction: column !important; align-items: flex-start !important; gap: 0.75rem; height: auto !important; padding: 1rem !important; }
+        .status-card > div:last-child { margin-left: 0 !important; width: 100%; }
+        
+        .verified-badge { font-size: 0.55rem; padding: 0.15rem 0.3rem; }
+        .input-custom.has-badge { padding-right: 5.5rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+<div class="form-header">
+    <h1>Formulir Kedatangan <span style="color: #2563eb;">Tamu</span></h1>
+    <p>Silakan lengkapi data kunjungan Anda di bawah ini dengan informasi yang valid untuk keperluan dokumentasi dan keamanan.</p>
+</div>
+
+<div class="form-card">
+    <form method="post" action="{% url 'tamu:kunjungan_baru' %}" id="realKunjunganForm">
+        {% csrf_token %}
+        
+        <!-- Hidden input untuk digabungkan nanti -->
+        <input type="hidden" name="arrival_time" id="id_arrival_time">
+        <input type="hidden" name="purpose" id="id_purpose">
+
+        <!-- NAMA LENGKAP -->
+        <div class="form-group-custom">
+            <label>Nama Lengkap</label>
+            <div class="input-with-icon">
+                <i class="fas fa-user"></i>
+                <input type="text" class="input-custom has-badge" value="{{ tamu.name }}" readonly style="background: #f1f5f9; color: #475569;">
+                <span style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); display: flex; align-items: center;">
+                    <span class="verified-badge" style="background: #dcfce7; color: #155724; font-size: 0.6rem; padding: 0.2rem 0.5rem;">TERVERIFIKASI</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="row-custom">
+            <!-- TANGGAL KUNJUNGAN -->
+            <div class="form-group-custom">
+                <label>Tanggal Kunjungan</label>
+                <div class="input-with-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                    <input type="text" id="visit_date" class="input-custom" required placeholder="Pilih Tanggal">
+                </div>
+            </div>
+
+            <!-- STATUS KETERSEDIAAN -->
+            <div class="form-group-custom">
+                <label>Status Ketersediaan</label>
+                <div class="status-card" style="background: #e6f4ea; border: 1px solid #c3e6cb; border-radius: var(--radius-sm); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; height: 42px;">
+                    <div class="status-info" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="status-title" style="font-size: 0.85rem; font-weight: 700; color: #155724; display: flex; align-items: center; gap: 0.25rem;"><i class="fas fa-circle" style="font-size: 0.5rem; color: #28a745;"></i> Tersedia</span>
+                        <span class="status-desc" style="font-size: 0.75rem; color: #155724;">(0/10 Kuota Terisi)</span>
+                    </div>
+                    <div style="flex: 1; margin-left: 1.5rem; display: flex; align-items: center; gap: 0.75rem; width: 100%;">
+                        <div style="font-size: 0.6rem; color: #155724; font-weight: 700; white-space: nowrap;">KAPASITAS</div>
+                        <div class="progress" style="height: 8px; background: #c3e6cb; border-radius: 99px; flex: 1;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 10%; border-radius: 99px;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row-custom">
+            <!-- JAM KEDATANGAN -->
+            <div class="form-group-custom">
+                <label>Jam Kedatangan</label>
+                <div class="input-with-icon">
+                    <i class="fas fa-clock"></i>
+                    <input type="text" id="visit_time" class="input-custom" required placeholder="Pilih Jam">
+                </div>
+            </div>
+
+            <!-- BIDANG / UNIT TUJUAN -->
+            <div class="form-group-custom">
+                <label>Bidang / Unit Tujuan</label>
+                <div class="input-with-icon">
+                    <i class="fas fa-building"></i>
+                    <select id="select_bidang" class="input-custom" required>
+                        <option value="">Pilih Bidang</option>
+                        {% for bidang in bidang_list %}
+                        <option value="{{ bidang.id }}">{{ bidang.nama }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row-custom">
+            <!-- NAMA PEGAWAI -->
+            <div class="form-group-custom">
+                <label>Nama Pegawai yang Ingin Ditemui</label>
+                <div class="input-with-icon">
+                    <i class="fas fa-user-tie"></i>
+                    <select name="pegawai" id="id_pegawai" class="input-custom" required>
+                        <option value="">Pilih Pegawai</option>
+                        {% for pegawai in pegawai_list %}
+                        <option value="{{ pegawai.pk }}" data-dept="{{ pegawai.department_rel.id }}">
+                            {{ pegawai.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- KEPERLUAN KUNJUNGAN -->
+            <div class="form-group-custom">
+                <label>Keperluan Kunjungan</label>
+                <div class="btn-group-custom">
+                    <button type="button" class="btn-toggle-custom active" data-value="Dinas">
+                        <i class="fas fa-briefcase"></i> Dinas
+                    </button>
+                    <button type="button" class="btn-toggle-custom" data-value="Pribadi">
+                        <i class="fas fa-user"></i> Pribadi
+                    </button>
+                    <input type="hidden" id="keperluan_cat" value="Dinas">
+                </div>
+            </div>
+        </div>
+
+        <!-- TUJUAN KUNJUNGAN DETAIL -->
+        <div class="form-group-custom">
+            <label>Tujuan Kunjungan Detail</label>
+            <textarea id="purpose_detail" class="input-custom" rows="4" placeholder="Tuliskan tujuan kunjungan Anda secara spesifik..." required></textarea>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="form-actions">
+            <a href="{% url 'tamu:dashboard' %}" class="btn-cancel-custom">
+                <i class="fas fa-times"></i> Batalkan
+            </a>
+            <button type="submit" class="btn-submit-custom">
+                <i class="fas fa-paper-plane"></i> Kirim Data Tamu
+            </button>
+        </div>
+    </form>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Flatpickr CSS & JS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    // Set min date and default date to today
+    const today = new Date().toISOString().split('T')[0];
+
+    function updateQuotaStatus(selectedDate) {
+        if (!selectedDate) return;
+
+        fetch(`/api/check-quota/?date=${selectedDate}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const statusTitle = document.querySelector('.status-title');
+                    const statusDesc = document.querySelector('.status-desc');
+                    const progressBar = document.querySelector('.progress-bar');
+                    const statusCard = document.querySelector('.status-card');
+
+                    if (data.is_holiday) {
+                        statusTitle.innerHTML = `<i class="fas fa-circle" style="font-size: 0.5rem; color: #dc3545;"></i> Libur`;
+                        statusDesc.textContent = data.holiday_name || 'Hari Libur';
+                        statusCard.style.background = '#f8d7da';
+                        statusCard.style.borderColor = '#f5c6cb';
+                        statusTitle.style.color = '#721c24';
+                        statusDesc.style.color = '#721c24';
+                        progressBar.style.width = '0%';
+                        progressBar.classList.remove('bg-success');
+                        progressBar.classList.add('bg-danger');
+                    } else {
+                        const percent = Math.round((data.booked / data.quota) * 100);
+                        statusDesc.textContent = `${data.booked}/${data.quota} Kuota Terisi`;
+                        progressBar.style.width = `${percent}%`;
+
+                        if (percent >= 100) {
+                            statusTitle.innerHTML = `<i class="fas fa-circle" style="font-size: 0.5rem; color: #dc3545;"></i> Penuh`;
+                            statusCard.style.background = '#f8d7da';
+                            statusCard.style.borderColor = '#f5c6cb';
+                            statusTitle.style.color = '#721c24';
+                            statusDesc.style.color = '#721c24';
+                            progressBar.classList.remove('bg-success');
+                            progressBar.classList.add('bg-danger');
+                        } else {
+                            statusTitle.innerHTML = `<i class="fas fa-circle" style="font-size: 0.5rem; color: #28a745;"></i> Tersedia`;
+                            statusCard.style.background = '#e6f4ea';
+                            statusCard.style.borderColor = '#c3e6cb';
+                            statusTitle.style.color = '#155724';
+                            statusDesc.style.color = '#155724';
+                            progressBar.classList.remove('bg-danger');
+                            progressBar.classList.add('bg-success');
+                        }
+                    }
+                }
+            })
+            .catch(err => console.error('Gagal mengecek kuota:', err));
+    }
+
+    // Initialize Flatpickr for Date
+    flatpickr("#visit_date", {
+        minDate: "today",
+        defaultDate: "today",
+        dateFormat: "Y-m-d",
+        onChange: function(selectedDates, dateStr, instance) {
+            updateQuotaStatus(dateStr);
+        }
+    });
+
+    // Initialize Flatpickr for Time
+    flatpickr("#visit_time", {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: "H:i",
+        time_24hr: true,
+        defaultDate: "09:00"
+    });
+
+    // Check Quota on Load
+    updateQuotaStatus(today);
+
+    // Poll quota every 5 seconds
+    setInterval(() => {
+        const selectedDate = document.getElementById('visit_date').value;
+        if (selectedDate) {
+            updateQuotaStatus(selectedDate);
+        }
+    }, 5000);
+
+    // Verifikasi Nama (Tidak boleh mengandung angka atau simbol)
+    const nameValue = "{{ tamu.name|escapejs }}";
+    const nameRegex = /^[a-zA-Z\s]+$/; // Hanya huruf dan spasi
+    const badgeSpan = document.querySelector('.verified-badge');
+    
+    if (badgeSpan) {
+        if (!nameRegex.test(nameValue) || nameValue.trim().length < 3) {
+            badgeSpan.innerHTML = 'GAGAL VERIFIKASI';
+            badgeSpan.style.background = '#fee2e2';
+            badgeSpan.style.color = '#991b1b';
+        }
+    }
+
+    // Toggle Keperluan Buttons
+    const buttons = document.querySelectorAll('.btn-toggle-custom');
+    const hiddenCat = document.getElementById('keperluan_cat');
+    
+    buttons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            buttons.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            hiddenCat.value = this.getAttribute('data-value');
+        });
+    });
+
+    // Dependent Dropdown: Bidang -> Pegawai
+    const selectBidang = document.getElementById('select_bidang');
+    const selectPegawai = document.getElementById('id_pegawai');
+    const originalOptions = Array.from(selectPegawai.options);
+
+    selectBidang.addEventListener('change', function() {
+        const deptId = this.value;
+        selectPegawai.innerHTML = '';
+        
+        // Tambahkan opsi default
+        selectPegawai.appendChild(originalOptions[0]);
+        
+        originalOptions.forEach(opt => {
+            if (opt.value === '') return;
+            if (deptId === '' || opt.getAttribute('data-dept') === deptId) {
+                selectPegawai.appendChild(opt);
+            }
+        });
+    });
+
+    // Handle Form Submit
+    document.getElementById('realKunjunganForm').addEventListener('submit', function(e) {
+        const date = document.getElementById('visit_date').value;
+        const time = document.getElementById('visit_time').value;
+        const cat = document.getElementById('keperluan_cat').value;
+        const detail = document.getElementById('purpose_detail').value;
+
+        if (!date || !time) {
+            alert('Silakan isi tanggal dan jam kedatangan.');
+            e.preventDefault();
+            return;
+        }
+
+        // Gabungkan tanggal dan jam untuk arrival_time
+        document.getElementById('id_arrival_time').value = `${date}T${time}`;
+        
+        // Gabungkan kategori dan detail untuk purpose
+        document.getElementById('id_purpose').value = `[${cat}] ${detail}`;
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,377 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - E-Guestbook Diskominfosantik</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{% static 'images/logo-diskominfosantik.png' %}">
+    <style>
+        :root {
+            --primary: #0a2558;
+            --secondary: #1e3a8a;
+            --accent: #3b82f6;
+            --bg-body: #f8fafc;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-soft: #e2e8f0;
+            --input-bg: #eff6ff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── MAIN CONTENT ── */
+        .login-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 1rem;
+        }
+        .login-card {
+            background: #fff;
+            max-width: 1000px;
+            width: 100%;
+            border-radius: 24px;
+            overflow: hidden;
+            display: flex;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+        }
+
+        /* Left Side Slider */
+        .login-info {
+            width: 40%;
+            background: var(--primary);
+            color: #fff;
+            padding: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .slide-container {
+            height: 100%;
+            width: 100%;
+            position: relative;
+        }
+        .slide {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            padding: 4rem 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            opacity: 0;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(20px);
+            background-size: cover;
+            background-position: center;
+        }
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+            z-index: 2;
+        }
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(10,37,88,0.2) 0%, rgba(10,37,88,0.95) 100%);
+            z-index: -1;
+        }
+        
+        .slide-1 { background-image: url('https://images.unsplash.com/photo-1497366754035-f200968a6e72?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80'); }
+        .slide-2 { background-image: url('https://images.unsplash.com/photo-1497215728101-856f4ea42174?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80'); }
+        .slide-3 { background-image: url('https://images.unsplash.com/photo-1497366811353-6870744d04b2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80'); }
+
+        .login-info-content {
+            position: relative;
+            z-index: 5;
+        }
+        .login-info h2 {
+            font-size: 2.4rem;
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            letter-spacing: -0.02em;
+        }
+        .login-info p {
+            font-size: 0.95rem;
+            opacity: 0.9;
+            line-height: 1.6;
+            margin-bottom: 0;
+        }
+        .pagination-dots {
+            position: absolute;
+            bottom: 3rem;
+            left: 3rem;
+            display: flex;
+            gap: 0.5rem;
+            z-index: 10;
+        }
+        .dot {
+            width: 24px; height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .dot.active {
+            background: #fff;
+            width: 40px;
+        }
+
+        /* Right Side Form */
+        .login-form-area {
+            width: 60%;
+            padding: 3.5rem 4rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .back-to-home {
+            position: absolute;
+            top: 2rem;
+            right: 3.5rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s;
+            z-index: 100;
+        }
+        .back-to-home:hover { 
+            color: var(--primary);
+            transform: translateX(-3px);
+        }
+
+        /* Form Controls */
+        .form-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+        .input-group-custom {
+            position: relative;
+            margin-bottom: 1.25rem;
+        }
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        .form-control-custom {
+            background: transparent;
+            border: 2px solid #f1f5f9;
+            padding: 0.85rem 1rem 0.85rem 2.8rem;
+            font-size: 0.85rem;
+            color: var(--primary);
+            width: 100%;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+        .form-control-custom::placeholder {
+            color: #94a3b8;
+        }
+        .form-control-custom:focus {
+            outline: none;
+            background: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Password Toggle */
+        .password-toggle {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.5rem;
+            transition: color 0.2s;
+            z-index: 10;
+        }
+        .password-toggle:hover {
+            color: var(--primary);
+        }
+
+        .btn-continue {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 1.1rem;
+            font-weight: 700;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            transition: all 0.2s;
+        }
+        .btn-continue:hover {
+            background: #081d45;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(10,37,88,0.2);
+        }
+
+        .register-footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .register-footer a {
+            color: var(--primary);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        @media (max-width: 991px) {
+            .login-card { flex-direction: column; max-width: 500px; }
+            .login-info, .login-form-area { width: 100%; padding: 3rem 2rem; }
+            .login-info { min-height: 300px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-wrapper">
+    <div class="login-card">
+        <!-- LEFT: Info Slider -->
+        <div class="login-info">
+            <div class="slide-container">
+                <div class="slide slide-1 active">
+                    <div class="login-info-content">
+                        <h2>Selamat Datang Kembali di E-Guestbook</h2>
+                        <p>Akses profil tamu Anda untuk mengelola kunjungan dan melihat riwayat dengan mudah.</p>
+                    </div>
+                </div>
+                <div class="slide slide-2">
+                    <div class="login-info-content">
+                        <h2>Transformasi Digital Pelayanan Publik</h2>
+                        <p>Mewujudkan tata kelola pemerintahan yang cerdas, inovatif, dan berbasis data yang akurat.</p>
+                    </div>
+                </div>
+                <div class="slide slide-3">
+                    <div class="login-info-content">
+                        <h2>Keamanan Data Adalah Prioritas</h2>
+                        <p>Setiap kunjungan tercatat secara sistematis dan aman menggunakan standar enkripsi terkini.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pagination-dots">
+                <div class="dot active" onclick="setSlide(0)"></div>
+                <div class="dot" onclick="setSlide(1)"></div>
+                <div class="dot" onclick="setSlide(2)"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Form -->
+        <div class="login-form-area" style="position: relative;">
+            <a href="{% url 'tamu:landing' %}" class="back-to-home">
+                <i class="fas fa-arrow-left"></i> Beranda
+            </a>
+            <div class="form-inner-container" style="width: 100%; max-width: 440px; margin: 0 auto;">
+                <h1 class="form-title" style="font-size: 1.75rem; font-weight: 800; color: var(--primary); margin-bottom: 0.5rem;">Masuk ke Akun</h1>
+                <p class="form-subtitle" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 2.5rem;">Masukkan username dan password admin.</p>
+
+            <form method="post" action="{% url 'tamu:admin_login' %}">
+                {% csrf_token %}
+                
+                <label class="form-label" for="id_username">Username</label>
+                <div class="input-group-custom">
+                    <i class="far fa-user input-icon"></i>
+                    <input type="text" id="id_username" name="username" class="form-control-custom" 
+                           placeholder="Masukkan username admin" required>
+                </div>
+
+                <label class="form-label" for="id_password">Password</label>
+                <div class="input-group-custom">
+                    <i class="fas fa-lock input-icon"></i>
+                    <input type="password" id="id_password" name="password" class="form-control-custom" 
+                           placeholder="Masukkan password admin" required>
+                    <i class="far fa-eye password-toggle" id="togglePassword"></i>
+                </div>
+
+                {% if form.errors %}
+                <div class="alert alert-danger" style="border-radius: 12px; font-size: 0.85rem; padding: 0.75rem 1rem;">
+                    Username atau password salah.
+                </div>
+                {% endif %}
+
+                <button type="submit" class="btn-continue">
+                    Masuk <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <div class="register-footer">
+                Belum memiliki akun? <a href="{% url 'tamu:register' %}">Daftar sekarang</a>
+            </div>
+            <div style="margin-top: 4rem; font-size: 0.75rem; color: var(--text-muted); opacity: 0.6; text-align: center;">
+                © 2026 Diskominfosantik. All rights reserved.
+            </div>
+            </div> <!-- End form-inner-container -->
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const dots = document.querySelectorAll('.dot');
+
+    function setSlide(index) {
+        slides[currentSlide].classList.remove('active');
+        dots[currentSlide].classList.remove('active');
+        currentSlide = index;
+        slides[currentSlide].classList.add('active');
+        dots[currentSlide].classList.add('active');
+    }
+
+    function nextSlide() {
+        let next = (currentSlide + 1) % slides.length;
+        setSlide(next);
+    }
+
+    setInterval(nextSlide, 5000);
+
+    // Password Toggle Logic
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#id_password');
+
+    togglePassword.addEventListener('click', function (e) {
+        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+        password.setAttribute('type', type);
+        this.classList.toggle('fa-eye-slash');
+        this.classList.toggle('fa-eye');
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,1087 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block title %}Manajemen Kalender Kunjungan{% endblock %}
+{% block active_page %}kalender{% endblock %}
+{% block search_placeholder %}Cari data kunjungan...{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── LAYOUT & GLOBAL ── */
+    .kal-layout { display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start; }
+    
+    /* ── HEADER ── */
+    .kal-page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; }
+    .kal-page-header h2 { font-weight: 800; font-size: 1.8rem; margin: 0; color: #0f172a; }
+    .kal-page-header p  { color: #64748b; font-size: 0.875rem; margin: 0.4rem 0 0; }
+    .kal-header-btns { display: flex; gap: 0.75rem; }
+    
+    .btn-kal-white { 
+        background: #fff; border: 1.5px solid #e2e8f0; color: #334155; 
+        border-radius: 12px; padding: 0.7rem 1.4rem; font-weight: 700; 
+        font-size: 0.85rem; display: flex; align-items: center; gap: 0.6rem; 
+        transition: all 0.2s; text-decoration: none;
+    }
+    .btn-kal-white:hover { background: #f8fafc; border-color: #cbd5e1; }
+    
+    .btn-kal-blue { 
+        background: #1e56a0; color: #fff; border: none; 
+        border-radius: 12px; padding: 0.7rem 1.4rem; font-weight: 700; 
+        font-size: 0.85rem; display: flex; align-items: center; gap: 0.6rem; 
+        transition: all 0.2s; text-decoration: none;
+        box-shadow: 0 4px 12px rgba(30, 86, 160, 0.2);
+    }
+    .btn-kal-blue:hover { background: #163172; transform: translateY(-1px); box-shadow: 0 6px 15px rgba(30, 86, 160, 0.3); color: #fff; }
+
+    /* ── CALENDAR CARD ── */
+    .cal-card { 
+        background: #fff; border-radius: 24px; padding: 2rem; 
+        box-shadow: 0 4px 25px rgba(15, 23, 42, 0.04); 
+        border: 1px solid rgba(15, 23, 42, 0.05);
+    }
+
+    .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+    .cal-nav h3 { font-weight: 800; font-size: 1.6rem; margin: 0; color: #0f172a; display: flex; align-items: center; gap: 0.75rem; }
+    .cal-nav-arrows { display: flex; gap: 0.4rem; }
+    .arrow-btn { 
+        width: 34px; height: 34px; border-radius: 10px; border: 1px solid #e2e8f0; 
+        background: #fff; cursor: pointer; display: flex; align-items: center; 
+        justify-content: center; transition: all 0.2s; color: #64748b;
+    }
+    .arrow-btn:hover { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
+
+    .view-toggle { display: flex; background: #f1f5f9; border-radius: 12px; padding: 4px; }
+    .vt-btn { 
+        padding: 0.5rem 1.25rem; border-radius: 10px; border: none; 
+        background: transparent; font-size: 0.8rem; font-weight: 700; 
+        cursor: pointer; color: #64748b; transition: all 0.2s; 
+    }
+    .vt-btn.active { background: #fff; color: #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+    /* ── GRID ── */
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .cal-grid-header { 
+        text-align: center; font-size: 0.75rem; font-weight: 800; 
+        color: #94a3b8; padding-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .cal-grid-header.weekend { color: #f87171; }
+
+    .cal-cell { 
+        min-height: 110px; border-radius: 16px; padding: 0.8rem; cursor: pointer; 
+        transition: all 0.2s; position: relative; border: 2px solid transparent;
+        background: #fff; display: flex; flex-direction: column;
+    }
+    .cal-cell:hover { border-color: #3b82f6; background: #f8faff; }
+    .cal-cell.is-today { border-color: #3b82f6; background: #eff6ff; }
+    .cal-cell.is-selected { border-color: #3b82f6; background: #eff6ff; box-shadow: 0 4px 20px rgba(59,130,246,0.15); z-index: 2; }
+    .cal-cell.is-weekend { background: #fafafa; }
+    .cal-cell.is-past { opacity: 0.5; }
+    .cal-cell.is-holiday { background: #fff1f2; }
+    .cal-cell.has-event { background: #fff7ed; }
+
+    .cell-num { font-weight: 800; font-size: 1rem; color: #0f172a; margin-bottom: 0.5rem; }
+    .cal-cell.is-weekend .cell-num { color: #94a3b8; }
+    .cal-cell.is-holiday .cell-num { color: #ef4444; }
+    .cal-cell.is-today .cell-num   { color: #3b82f6; }
+    .cal-cell.has-event .cell-num { color: #f97316; }
+
+    .cell-today-dot { position: absolute; top: 10px; right: 10px; width: 6px; height: 6px; background: #3b82f6; border-radius: 50%; }
+
+    .slot-info { margin-top: auto; }
+    .slot-bar { height: 4px; border-radius: 10px; background: #f1f5f9; margin-bottom: 0.4rem; overflow: hidden; }
+    .slot-bar-fill { height: 100%; border-radius: 10px; background: #3b82f6; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+    .slot-bar-fill.full { background: #ef4444; }
+    .cell-slot-text { font-size: 0.65rem; font-weight: 800; color: #64748b; }
+    .cell-slot-text.full { color: #ef4444; }
+
+    .holiday-badge-small { 
+        font-size: 0.55rem; font-weight: 800; padding: 4px; border-radius: 6px; 
+        background: #fee2e2; color: #b91c1c; text-transform: uppercase; 
+        margin-top: 0.5rem; display: block; line-height: 1.1;
+        word-break: break-word; overflow-wrap: break-word; white-space: normal;
+    }
+    .event-badge-small { 
+        font-size: 0.55rem; font-weight: 800; padding: 4px; border-radius: 6px; 
+        background: #ffedd5; color: #c2410c; text-transform: uppercase; 
+        margin-top: 0.5rem; display: block; line-height: 1.1;
+        word-break: break-word; overflow-wrap: break-word; white-space: normal;
+    }
+    
+    /* ── STATS CARDS ── */
+    .stat-cards-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2rem; }
+    .stat-card-white { 
+        background: #fff; border-radius: 20px; padding: 1.5rem; 
+        display: flex; align-items: center; gap: 1.25rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.04);
+    }
+    .sc-icon { 
+        width: 48px; height: 48px; border-radius: 14px; 
+        display: flex; align-items: center; justify-content: center; font-size: 1.25rem;
+    }
+    .sc-icon.blue { background: #eff6ff; color: #3b82f6; }
+    .sc-icon.orange { background: #fff7ed; color: #f97316; }
+    
+    .sc-body h6 { font-size: 0.8rem; font-weight: 700; color: #64748b; margin: 0 0 4px; }
+    .sc-body .sc-val { font-size: 1.5rem; font-weight: 800; color: #0f172a; margin: 0; }
+    .sc-body .sc-sub { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+    /* ── RIGHT PANEL: QUOTA ── */
+    .right-panel { display: flex; flex-direction: column; gap: 1.5rem; }
+    
+    .quota-card-premium { 
+        background: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border-radius: 24px; padding: 2rem; color: #fff; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+    }
+    .qc-title { font-size: 0.75rem; font-weight: 800; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.25rem; display: block; }
+    .qc-selected-date { font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.5rem; display: block; }
+    .qc-main-row { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .qc-val { font-size: 3.5rem; font-weight: 900; line-height: 1; }
+    .qc-badge { background: #1d4ed8; font-size: 0.65rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.05em; }
+    
+    .cap-label-row { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.5rem; }
+    .cap-progress { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; margin-bottom: 2rem; }
+    .cap-progress-fill { height: 100%; background: #3b82f6; border-radius: 10px; transition: width 0.6s; }
+    
+    .btn-action-blue { 
+        width: 100%; background: #3b82f6; color: #fff; border: none; border-radius: 14px; 
+        padding: 1rem; font-weight: 800; font-size: 0.9rem; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 0.75rem; 
+        transition: all 0.2s; margin-bottom: 0.75rem; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    .btn-action-blue:hover { background: #2563eb; transform: translateY(-1px); }
+    
+    .btn-action-dark { 
+        width: 100%; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); 
+        border-radius: 14px; padding: 1rem; font-weight: 700; font-size: 0.9rem; cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-action-dark:hover { background: rgba(255,255,255,0.1); }
+
+    /* ── HOLIDAYS LIST ── */
+    .card-plain { background: #fff; border-radius: 24px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
+    .card-plain-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .card-plain-header h6 { font-weight: 800; font-size: 1.05rem; margin: 0; color: #0f172a; }
+    .year-pill { background: #fff1f2; color: #e11d48; font-size: 0.7rem; font-weight: 800; padding: 4px 10px; border-radius: 8px; }
+
+    .h-item { display: flex; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #f1f5f9; }
+    .h-item:last-child { border-bottom: none; }
+    .h-date-box { 
+        min-width: 48px; height: 52px; display: flex; flex-direction: column; 
+        border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .h-date-top { background: #fee2e2; color: #b91c1c; font-weight: 800; font-size: 1rem; flex: 1; display: flex; align-items: center; justify-content: center; }
+    .h-date-bot { background: #b91c1c; color: #fff; font-size: 0.6rem; font-weight: 800; padding: 3px 0; text-align: center; text-transform: uppercase; }
+    
+    .h-content { flex: 1; }
+    .h-content h6 { font-size: 0.85rem; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
+    .h-content p { font-size: 0.72rem; color: #64748b; margin: 0; }
+    .h-notif { color: #e2e8f0; font-size: 0.9rem; transition: color 0.2s; cursor: pointer; }
+    .h-notif:hover { color: #94a3b8; }
+
+    /* ── LEGEND ── */
+    .legend-box { background: #fff; border-radius: 20px; padding: 1.5rem; border: 1px solid #f1f5f9; }
+    .legend-box h6 { font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.25rem; }
+    .legend-item { display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.75rem; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .quick-checkin-bar { 
+        width: 100%; background: #1e56a0; color: #fff; border: none; border-radius: 16px; 
+        padding: 1.25rem; font-weight: 800; font-size: 1rem; cursor: pointer; margin-top: 1.5rem; 
+        display: flex; align-items: center; justify-content: center; gap: 0.75rem; 
+        transition: all 0.3s; box-shadow: 0 8px 25px rgba(30, 86, 160, 0.25);
+    }
+    .quick-checkin-bar:hover { background: #163172; transform: translateY(-2px); box-shadow: 0 12px 30px rgba(30, 86, 160, 0.35); }
+
+    /* ── RESPONSIVE MEDIA QUERIES ── */
+    @media (max-width: 1200px) {
+        .kal-layout { grid-template-columns: 1fr 300px; }
+    }
+    @media (max-width: 992px) {
+        .kal-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+        .right-panel { margin-top: 1rem; }
+    }
+    @media (max-width: 768px) {
+        .kal-page-header { flex-direction: column; gap: 1rem; align-items: stretch; }
+        .kal-header-btns { flex-wrap: wrap; justify-content: space-between; }
+        .kal-header-btns .dropdown { flex: 1 1 calc(50% - 0.5rem); }
+        .btn-kal-white, .btn-kal-blue { width: 100%; justify-content: center; padding: 0.7rem; font-size: 0.8rem; }
+        .kal-header-btns > .btn-kal-blue { flex: 1 1 100%; }
+        .cal-nav { flex-direction: column; gap: 1rem; align-items: stretch; }
+        .cal-nav h3 { justify-content: space-between; font-size: 1.3rem; }
+        .view-toggle { justify-content: center; }
+        .vt-btn { flex: 1; text-align: center; }
+        .stat-cards-row { grid-template-columns: 1fr; gap: 1rem; }
+        .cal-card { padding: 1.5rem; }
+    }
+    @media (max-width: 576px) {
+        .cal-grid { gap: 3px; }
+        .cal-card { padding: 0.75rem; border-radius: 16px; }
+        .cal-cell { min-height: 60px; padding: 0.25rem; border-radius: 8px; justify-content: flex-start; }
+        .cell-num { font-size: 0.8rem; margin-bottom: 0.1rem; }
+        .cell-slot-text { font-size: 0.45rem; line-height: 1; }
+        .holiday-badge-small, .event-badge-small { font-size: 0.4rem; padding: 2px; border-radius: 4px; }
+        .cal-grid-header { font-size: 0.55rem; padding-bottom: 0.25rem; }
+        .slot-bar { height: 3px; margin-bottom: 0.2rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="pageLoadingOverlay" class="loading-overlay d-none">
+    <div class="spinner-premium"></div>
+    <span class="mt-3 text-white fw-bold">Memuat Kalender...</span>
+</div>
+
+<div class="admin-calendar-container animate-fade-in">
+    <div class="kal-page-header">
+    <div>
+        <h2>Manajemen Kalender Kunjungan</h2>
+        <p>Kelola kuota harian, jadwal operasional, dan hari libur nasional.</p>
+    </div>
+    <div class="kal-header-btns">
+        <input type="file" id="excelImportInput" hidden accept=".xlsx, .xls, .csv" onchange="uploadExcelSchedule()">
+        <div class="dropdown">
+            <button class="btn-kal-white dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-file-excel"></i> Import Excel
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end p-2 border-0 shadow-lg" style="border-radius: 12px; min-width: 220px;">
+                <li><a class="dropdown-item p-2 fw-bold" href="#" onclick="document.getElementById('excelImportInput').click()"><i class="fas fa-calendar-alt me-2 text-primary"></i> Unggah Kuota & Libur</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item p-2 text-muted small" href="{% url 'tamu:admin_kalender_download_template' %}"><i class="fas fa-download me-2"></i> Unduh Template Kuota/Libur</a></li>
+            </ul>
+        </div>
+        <div class="dropdown">
+            <button class="btn-kal-white dropdown-toggle" type="button" data-bs-toggle="dropdown" style="border-radius: 12px;">
+                <i class="fas fa-download"></i> Unduh Laporan
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end p-2 border-0 shadow-lg" style="border-radius: 12px; min-width: 180px;">
+                <li><a class="dropdown-item p-2 fw-bold" href="{% url 'tamu:admin_kunjungan_export_excel' %}"><i class="fas fa-file-excel me-2 text-success"></i> Unduh Excel</a></li>
+                <li><a class="dropdown-item p-2 fw-bold" href="{% url 'tamu:admin_kunjungan_cetak_pdf' %}" target="_blank"><i class="fas fa-file-pdf me-2 text-danger"></i> Unduh PDF</a></li>
+            </ul>
+        </div>
+        <button class="btn-kal-blue" data-bs-toggle="modal" data-bs-target="#modalQuickCheckin" onclick="openEventBaru()"><i class="fas fa-plus"></i> Event Baru</button>
+    </div>
+</div>
+
+<div class="kal-layout">
+    <!-- LEFT COLUMN -->
+    <div>
+        <div class="cal-card">
+            <div class="cal-nav">
+                <h3>
+                    {{ current_month_str }} {{ year }}
+                    <div class="cal-nav-arrows">
+                        <a href="?year={{ prev_year }}&month={{ prev_month }}" class="arrow-btn" onclick="showLoader()"><i class="fas fa-chevron-left"></i></a>
+                        <a href="?year={{ next_year }}&month={{ next_month }}" class="arrow-btn" onclick="showLoader()"><i class="fas fa-chevron-right"></i></a>
+                    </div>
+                </h3>
+                <div class="view-toggle" id="viewToggleContainer" style="overflow-x: auto; white-space: nowrap;">
+                    <button class="vt-btn active" onclick="switchView('grid')"><i class="fas fa-calendar-alt me-1"></i> Kalender</button>
+                    <button class="vt-btn" onclick="switchView('table')"><i class="fas fa-list me-1"></i> Tabel Input</button>
+                </div>
+            </div>
+
+            <div id="calendarGridView">
+                <div class="cal-grid">
+                    <div class="cal-grid-header">SEN</div>
+                    <div class="cal-grid-header">SEL</div>
+                    <div class="cal-grid-header">RAB</div>
+                    <div class="cal-grid-header">KAM</div>
+                    <div class="cal-grid-header">JUM</div>
+                    <div class="cal-grid-header weekend">SAB</div>
+                    <div class="cal-grid-header weekend">MIN</div>
+
+                    {% for _ in blank_start %}
+                    <div class="cal-cell" style="background: transparent; cursor: default; border: none; opacity: 0.3;"></div>
+                    {% endfor %}
+
+                    {% for d in days %}
+                    <div class="cal-cell {% if d.is_weekend %}is-weekend{% endif %} {% if d.is_today %}is-today{% endif %} {% if d.is_past %}is-past{% endif %} {% if d.is_holiday %}is-holiday{% endif %} {% if d.holiday_name and not d.is_holiday %}has-event{% endif %}"
+                         id="calday-{{ d.date }}"
+                         data-date="{{ d.date }}" data-booked="{{ d.booked }}" data-quota="{{ d.quota }}" data-holiday="{{ d.holiday_name|default:'' }}"
+                         onclick="selectDay(this)">
+                        
+                        {% if d.is_today %}<span class="cell-today-dot"></span>{% endif %}
+                        <span class="cell-num">{{ d.day }}</span>
+                        
+                        {% if d.is_holiday %}
+                            <span class="holiday-badge-small">{{ d.holiday_name|default:"LIBUR NASIONAL" }}</span>
+                        {% elif d.holiday_name %}
+                            <span class="event-badge-small">{{ d.holiday_name }}</span>
+                        {% elif d.is_weekend %}
+                            <span class="holiday-badge-small" style="background:#fef3c7; color:#92400e;">LIBUR AKHIR PEKAN</span>
+                        {% else %}
+                            <div class="slot-info">
+                                <div class="slot-bar">
+                                    <div class="slot-bar-fill {% if d.is_full %}full{% endif %}" id="slot-bar-{{ d.date }}" data-percentage="{{ d.percentage }}"></div>
+                                </div>
+                                <span class="cell-slot-text {% if d.is_full %}full{% endif %}" id="slot-text-{{ d.date }}">
+                                    {% if d.is_full %}Slot Penuh{% else %}{{ d.booked }}/{{ d.quota }} Slot{% endif %}
+                                </span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- TABLE VIEW (NEW) -->
+            <div id="calendarTableView" class="d-none">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" style="border-collapse: separate; border-spacing: 0 8px;">
+                        <thead>
+                            <tr style="color: #94a3b8; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">
+                                <th style="border: none; padding-left: 1rem;">Tanggal</th>
+                                <th style="border: none;">Hari</th>
+                                <th style="border: none;">Kuota Harian</th>
+                                <th style="border: none;">Status</th>
+                                <th style="border: none;">Keterangan Libur</th>
+                                <th style="border: none; text-align: right; padding-right: 1rem;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in days %}
+                            <tr class="table-row-custom {% if d.is_holiday %}row-holiday{% endif %}" id="row-{{ d.date }}">
+                                <td style="padding-left: 1rem;">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-bold text-dark">{{ d.day }}</span>
+                                        <span class="text-muted small">{{ current_month_str }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge {% if d.is_weekend %}bg-danger-subtle text-danger{% else %}bg-light text-muted{% endif %}" style="font-size: 0.65rem; font-weight: 800;">
+                                        {% if d.is_weekend %}LIBUR{% else %}HARI KERJA{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="number" class="form-control form-control-sm quota-input-table" 
+                                               value="{{ d.quota }}" id="table-quota-{{ d.date }}" 
+                                               onchange="syncTableToGrid('{{ d.date }}', this.value)"
+                                               style="width: 70px; border-radius: 8px; font-weight: 700;">
+                                        <span class="text-muted small">Slot</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="table-holiday-{{ d.date }}" 
+                                               {% if d.is_holiday %}checked{% endif %}
+                                               onchange="syncHolidayToGrid('{{ d.date }}', this.checked)">
+                                        <label class="form-check-label small text-muted">{% if d.is_holiday %}Libur{% else %}Buka{% endif %}</label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm" 
+                                           value="{{ d.holiday_name|default:'' }}" id="table-desc-{{ d.date }}" 
+                                           placeholder="Contoh: Idul Fitri"
+                                           style="border-radius: 8px; font-size: 0.75rem;">
+                                </td>
+                                <td style="text-align: right; padding-right: 1rem;">
+                                    <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="saveSingleRow('{{ d.date }}')">
+                                        <i class="fas fa-save me-1"></i> Simpan
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-cards-row" id="statsCardsRow">
+            <div class="stat-card-white">
+                <div class="sc-icon blue"><i class="fas fa-users"></i></div>
+                <div class="sc-body">
+                    <h6>Rata-rata Kunjungan</h6>
+                    <p class="sc-val">{{ avg_per_day }}</p>
+                    <p class="sc-sub">Orang / Hari 
+                        {% if avg_growth >= 0 %}
+                        <span style="color:#22c55e; font-weight:700; margin-left:4px;">▲ +{{ avg_growth }}%</span>
+                        {% else %}
+                        <span style="color:#ef4444; font-weight:700; margin-left:4px;">▼ {{ avg_growth }}%</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="stat-card-white">
+                <div class="sc-icon orange"><i class="fas fa-calendar-check"></i></div>
+                <div class="sc-body">
+                    <h6>Slot Penuh</h6>
+                    <p class="sc-val">{{ full_slot_days|stringformat:"02d" }}</p>
+                    <p class="sc-sub">Hari Kerja di {{ current_month_str }}</p>
+                </div>
+            </div>
+        </div>
+
+        <button class="quick-checkin-bar" data-bs-toggle="modal" data-bs-target="#modalQuickCheckin" onclick="openQuickCheckin()">
+            <i class="fas fa-plus"></i> Quick Check-in
+        </button>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="right-panel">
+        <div class="quota-card-premium">
+            <span class="qc-title">PENGATURAN KUOTA</span>
+            <span class="qc-selected-date" id="selectedDateLabel">Terpilih: -</span>
+            
+            <div class="qc-main-row">
+                <span class="qc-val" id="quotaDisplay">50</span>
+                <span class="qc-badge">SLOT MAKS</span>
+            </div>
+
+            <div class="quota-slider-wrapper mb-4">
+                <input type="range" id="quotaSlider" min="1" max="50" value="50" class="premium-slider">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-bold text-muted" style="color: #94a3b8 !important;">NAMA EVENT / KETERANGAN</label>
+                <input type="text" id="eventDescription" class="form-control" placeholder="Contoh: Rapat Internal..." style="border-radius:12px; padding:10px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);">
+            </div>
+            
+            <div class="cap-label-row">
+                <span>Kapasitas Harian</span>
+                <span id="capText">50/100</span>
+            </div>
+            <div class="cap-progress">
+                <div class="cap-progress-fill" id="capBarFill" style="width: 50%"></div>
+            </div>
+            
+            <div class="status-indicator mb-3 d-none" id="saveStatus">
+                <i class="fas fa-sync fa-spin me-1"></i> Menyimpan...
+            </div>
+
+            <div class="d-flex flex-column gap-2">
+                <button class="btn-action-blue w-100" id="btnSaveQuota" onclick="saveQuota()">
+                    <i class="fas fa-save me-2"></i> Simpan Perubahan
+                </button>
+                <button class="btn-action-dark w-100" onclick="toggleHoliday()">
+                    Jadikan Libur (Tutup)
+                </button>
+                <button class="btn btn-outline-success w-100 mt-1" onclick="openDateAgain()" style="border-radius:12px; font-weight:700; padding: 12px;">
+                    <i class="fas fa-calendar-check me-2"></i> Buka Kembali Tanggal Ini
+                </button>
+            </div>
+        </div>
+
+        <!-- Daftar Kunjungan Section -->
+        <div class="card-plain mb-4">
+            <div class="card-plain-header">
+                <h6>Daftar Kunjungan</h6>
+                <span class="badge bg-primary rounded-pill" id="visitCountBadge">0</span>
+            </div>
+            <div id="visitListContainer" class="p-3" style="max-height: 300px; overflow-y: auto;">
+                <div class="text-center text-muted small py-4">Silakan pilih tanggal untuk melihat daftar kunjungan.</div>
+            </div>
+        </div>
+
+        <div class="card-plain">
+            <div class="card-plain-header">
+                <h6>Hari Libur Nasional</h6>
+                <span class="year-pill">{{ year }}</span>
+            </div>
+
+            <div class="holiday-list">
+                {% for h in month_holidays %}
+                <div class="h-item">
+                    <div class="h-date-box">
+                        <div class="h-date-top">{{ h.date|slice:"8:10" }}</div>
+                        <div class="h-date-bot">
+                            {% with m=h.date|slice:"5:7" %}
+                                {% if m == "01" %}JAN{% elif m == "02" %}FEB{% elif m == "03" %}MAR{% elif m == "04" %}APR{% elif m == "05" %}MEI{% elif m == "06" %}JUN{% elif m == "07" %}JUL{% elif m == "08" %}AGU{% elif m == "09" %}SEP{% elif m == "10" %}OKT{% elif m == "11" %}NOV{% else %}DES{% endif %}
+                            {% endwith %}
+                        </div>
+                    </div>
+                    <div class="h-content">
+                        <h6>{{ h.name }}</h6>
+                        <p>Nasional</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="h-item" style="justify-content: center; padding: 2rem 0; color: #94a3b8; font-size: 0.85rem;">
+                    Tidak ada hari libur di bulan ini.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="legend-box">
+            <h6>Keterangan Warna</h6>
+            <div class="legend-item"><div class="dot" style="background:#3b82f6;"></div> Kunjungan Terjadwal</div>
+            <div class="legend-item"><div class="dot" style="background:#ef4444;"></div> Hari Libur / Tutup</div>
+            <div class="legend-item"><div class="dot" style="background:#f97316;"></div> Ada Acara / Event</div>
+            <div class="legend-item"><div class="dot" style="background:#e2e8f0;"></div> Sudah Berlampau</div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Quick Check-in -->
+<div class="modal fade" id="modalQuickCheckin" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:24px; border:none; box-shadow: 0 20px 50px rgba(0,0,0,0.15);">
+            <div class="modal-header border-0 p-4 pb-0">
+                <div>
+                    <h5 class="fw-bold mb-1"><i class="fas fa-calendar-plus me-2 text-primary"></i>Tambah Jadwal Kunjungan</h5>
+                    <p class="text-muted small mb-0">Formulir untuk menambahkan jadwal kunjungan tamu baru.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="quickCheckinForm">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">NAMA TAMU</label>
+                        <input type="text" name="name" class="form-control" placeholder="Nama lengkap..." style="border-radius:12px; padding:12px;" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">INSTANSI</label>
+                        <input type="text" name="instansi" class="form-control" placeholder="Instansi asal..." style="border-radius:12px; padding:12px;">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">TANGGAL KUNJUNGAN</label>
+                        <input type="date" id="quickCheckinDate" name="date" class="form-control" style="border-radius:12px; padding:12px;" required>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">WAKTU DATANG</label>
+                            <input type="time" name="time" class="form-control" value="09:00" style="border-radius:12px; padding:12px;">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">STATUS</label>
+                            <select name="status" class="form-select" style="border-radius:12px; padding:12px;">
+                                <option value="in_progress">Check-in Sekarang</option>
+                                <option value="pending">Reservasi</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-muted">KEPERLUAN</label>
+                        <textarea name="purpose" class="form-control" rows="2" placeholder="Tujuan kunjungan..." style="border-radius:12px; padding:12px;"></textarea>
+                    </div>
+                    <button type="button" onclick="submitQuickCheckin()" class="btn btn-primary w-100 fw-bold py-3" style="border-radius:16px; background: linear-gradient(135deg, #1e56a0 0%, #163172 100%); border: none; box-shadow: 0 4px 15px rgba(30, 86, 160, 0.3);">
+                        <i class="fas fa-check-circle me-2"></i> Daftarkan Sekarang
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let selectedDate = null;
+    let selectedVisit = 0;
+    let selectedMax = 50;
+
+    function selectDay(el) {
+        // If we are in table view, don't trigger selection logic (optional)
+        if (!document.getElementById('calendarTableView').classList.contains('d-none')) return;
+        
+        const dateStr = el.getAttribute('data-date');
+        const visitCount = parseInt(el.getAttribute('data-booked'));
+        const maxCap = parseInt(el.getAttribute('data-quota'));
+        const holidayName = el.getAttribute('data-holiday') || '';
+        
+        document.querySelectorAll('.cal-cell.is-selected').forEach(e => e.classList.remove('is-selected'));
+        
+        selectedDate  = dateStr;
+        selectedVisit = visitCount;
+        selectedMax   = maxCap;
+
+        // Auto-fill tanggal di modal Quick Check-in
+        const dateInput = document.getElementById('quickCheckinDate');
+        if (dateInput) dateInput.value = dateStr;
+        selectedMax   = maxCap;
+
+        const cell = document.getElementById('calday-' + dateStr);
+        if (cell) cell.classList.add('is-selected');
+
+        const parts = dateStr.split('-');
+        const DAYS = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+        const d = new Date(dateStr + 'T00:00:00');
+        
+        document.getElementById('selectedDateLabel').textContent = 'Terpilih: ' + DAYS[d.getDay()] + ', ' + parseInt(parts[2]) + ' ' + getMonthName(parseInt(parts[1])) + ' ' + parts[0];
+        
+        // Update Display & Slider
+        document.getElementById('quotaDisplay').textContent = maxCap;
+        document.getElementById('quotaSlider').value = maxCap;
+        document.getElementById('eventDescription').value = holidayName;
+        
+        document.getElementById('capText').textContent = visitCount + '/' + maxCap;
+        const pct = maxCap > 0 ? Math.min((visitCount / maxCap) * 100, 100) : 0;
+        document.getElementById('capBarFill').style.width = pct + '%';
+
+        // Fetch visits for this day
+        fetch("{% url 'tamu:api_get_visits_by_date' %}?date=" + dateStr)
+        .then(res => res.json())
+        .then(data => {
+            const container = document.getElementById('visitListContainer');
+            const badge = document.getElementById('visitCountBadge');
+            
+            if (data.success) {
+                badge.textContent = data.visits.length;
+                if (data.visits.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted small py-4">Tidak ada kunjungan pada tanggal ini.</div>';
+                } else {
+                    let html = '';
+                    data.visits.forEach(v => {
+                        html += `
+                            <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-bottom">
+                                <div>
+                                    <div class="fw-bold small">${v.tamu_name}</div>
+                                    <div class="text-muted" style="font-size: 11px;">${v.time} | ${v.instansi}</div>
+                                </div>
+                                <div>
+                                    <span class="badge bg-${v.status === 'completed' ? 'success' : (v.status === 'in_progress' ? 'warning' : 'secondary')} small">${v.status === 'completed' ? 'Selesai' : (v.status === 'in_progress' ? 'Bertamu' : (v.status === 'pending' ? 'Verifikasi' : (v.status === 'cancelled' ? 'Batal' : v.status)))}</span>
+                                    <button class="btn btn-sm btn-outline-primary ms-1" onclick="editVisit(${v.id}, '${v.tamu_name}', '${v.instansi}', '${v.time}', '${v.status}', '${v.purpose}')"><i class="fas fa-edit"></i></button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                }
+            } else {
+                container.innerHTML = '<div class="text-center text-danger small py-4">Gagal memuat data.</div>';
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            document.getElementById('visitListContainer').innerHTML = '<div class="text-center text-danger small py-4">Terjadi kesalahan.</div>';
+        });
+    }
+
+    // Handle Slider Input (Real-time Sync to Grid)
+    document.getElementById('quotaSlider').addEventListener('input', function(e) {
+        const val = parseInt(e.target.value);
+        document.getElementById('quotaDisplay').textContent = val;
+        
+        // 1. Update Kapasitas Harian display in right panel
+        document.getElementById('capText').textContent = selectedVisit + '/' + val;
+        const pct = val > 0 ? Math.min((selectedVisit / val) * 100, 100) : 0;
+        document.getElementById('capBarFill').style.width = pct + '%';
+
+        // 2. Sync to Calendar Grid Cell (Real-time visual)
+        const gridSlotText = document.getElementById('slot-text-' + selectedDate);
+        const gridBarFill = document.getElementById('slot-bar-' + selectedDate);
+        
+        if (gridSlotText && gridBarFill) {
+            if (selectedVisit >= val) {
+                gridSlotText.textContent = 'Slot Penuh';
+                gridSlotText.classList.add('full');
+                gridBarFill.classList.add('full');
+            } else {
+                gridSlotText.textContent = selectedVisit + '/' + val + ' Slot';
+                gridSlotText.classList.remove('full');
+                gridBarFill.classList.remove('full');
+            }
+            gridBarFill.style.width = pct + '%';
+        }
+
+        // 3. Sync to Table View input (if exists)
+        const tableInput = document.getElementById('table-quota-' + selectedDate);
+        if (tableInput) tableInput.value = val;
+    });
+
+    function saveQuota() {
+        if (!selectedDate) return;
+        const newQuota = document.getElementById('quotaSlider').value;
+        const quotaInt = parseInt(newQuota);
+        
+        const btn = document.getElementById('btnSaveQuota');
+        const origText = btn.innerHTML;
+        
+        // Show saving status in the status-indicator
+        const statusEl = document.getElementById('saveStatus');
+        statusEl.classList.remove('d-none');
+        statusEl.innerHTML = '<i class="fas fa-sync fa-spin me-1"></i> Menyinkronkan...';
+
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>';
+        btn.disabled = true;
+
+        fetch("{% url 'tamu:api_update_quota' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ 
+                date: selectedDate, 
+                quota: quotaInt,
+                holiday_name: document.getElementById('eventDescription').value
+            })
+        }).then(r => r.json()).then(d => {
+            if (d.success) {
+                btn.innerHTML = '<i class="fas fa-check me-2"></i> Tersimpan!';
+                btn.style.background = '#22c55e';
+                statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i> Data Berhasil Disinkronkan';
+                statusEl.style.color = '#22c55e';
+                
+                // Update grid cell color and badge dynamically
+                const cell = document.getElementById('calday-' + selectedDate);
+                const eventDesc = document.getElementById('eventDescription').value;
+                
+                if (cell) {
+                    cell.setAttribute('data-holiday', eventDesc);
+                    
+                    // Remove old badges if any
+                    const oldBadge = cell.querySelector('.holiday-badge-small, .event-badge-small');
+                    if (oldBadge) oldBadge.remove();
+                    
+                    const slotInfo = cell.querySelector('.slot-info');
+                    
+                    if (eventDesc && !cell.classList.contains('is-holiday') && !cell.classList.contains('is-weekend')) {
+                        cell.classList.add('has-event');
+                        
+                        // Create and append event badge
+                        const badge = document.createElement('span');
+                        badge.className = 'event-badge-small';
+                        badge.textContent = eventDesc;
+                        
+                        const cellNum = cell.querySelector('.cell-num');
+                        if (cellNum) {
+                            cellNum.after(badge);
+                        } else {
+                            cell.appendChild(badge);
+                        }
+                        
+                        if (slotInfo) slotInfo.style.display = 'none';
+                    } else if (!eventDesc) {
+                        cell.classList.remove('has-event');
+                        if (slotInfo) slotInfo.style.display = '';
+                    }
+                }
+                
+                setTimeout(() => {
+                    btn.innerHTML = origText;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                    statusEl.classList.add('d-none');
+                }, 1500);
+            } else {
+                alert('Gagal: ' + d.error);
+                btn.innerHTML = origText;
+                btn.disabled = false;
+                statusEl.classList.add('d-none');
+            }
+        });
+    }
+
+    function getMonthName(m) {
+        return ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][m];
+    }
+
+
+    function toggleHoliday() {
+        if (!selectedDate) return;
+        if (!confirm("Ubah status libur/tutup untuk tanggal ini?")) return;
+
+        fetch("{% url 'tamu:api_toggle_holiday' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ date: selectedDate })
+        }).then(r => r.json()).then(d => {
+            if (d.success) location.reload();
+            else alert('Gagal: ' + d.error);
+        });
+    }
+
+    function openDateAgain() {
+        if (!selectedDate) return;
+        if (!confirm("Buka kembali tanggal ini untuk kunjungan? (Menghapus status libur/acara)")) return;
+
+        fetch("{% url 'tamu:api_update_quota' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ 
+                date: selectedDate, 
+                is_holiday: false,
+                holiday_name: ""
+            })
+        }).then(r => r.json()).then(d => {
+            if (d.success) location.reload();
+            else alert('Gagal: ' + d.error);
+        });
+    }
+
+    function uploadExcelSchedule() {
+        const input = document.getElementById('excelImportInput');
+        if (!input.files || input.files.length === 0) return;
+        
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Visual feedback
+        const btn = document.querySelector('a[onclick*="excelImportInput"]') || document.querySelector('button[onclick*="excelImportInput"]');
+        const orig = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Mengimpor...';
+        }
+
+        fetch("{% url 'tamu:api_import_calendar_csv' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            body: formData
+        }).then(r => r.json()).then(d => {
+            if (d.success) {
+                alert(d.message);
+                location.reload();
+            } else {
+                alert('Gagal: ' + d.error);
+                if (btn) btn.innerHTML = orig;
+            }
+        }).catch(err => {
+            alert('Terjadi kesalahan saat mengunggah file.');
+            if (btn) btn.innerHTML = orig;
+        });
+    }
+
+    function uploadExcelVisits() {
+        const input = document.getElementById('visitImportInput');
+        if (!input.files || input.files.length === 0) return;
+        
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const btn = document.querySelector('.dropdown-toggle');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Mengimpor...';
+        btn.disabled = true;
+
+        fetch("{% url 'tamu:api_import_visits_excel' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            body: formData
+        }).then(r => r.json()).then(d => {
+            if (d.success) {
+                alert(d.message);
+                location.reload();
+            } else {
+                alert('Gagal: ' + d.error);
+                btn.innerHTML = orig;
+                btn.disabled = false;
+            }
+        }).catch(err => {
+            alert('Terjadi kesalahan saat mengunggah file.');
+            btn.innerHTML = orig;
+            btn.disabled = false;
+        });
+    }
+
+    function submitQuickCheckin() {
+        const form = document.getElementById('quickCheckinForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        data.date = data.date || selectedDate || new Date().toISOString().split('T')[0];
+
+        fetch("{% url 'tamu:api_quick_checkin' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify(data)
+        }).then(r => r.json()).then(d => {
+            if (d.success) {
+                alert('Tamu berhasil didaftarkan!');
+                location.reload();
+            } else {
+                alert('Gagal mendaftarkan tamu.');
+            }
+        }).catch(err => {
+            alert('Fitur ini akan segera aktif setelah integrasi database selesai.');
+            bootstrap.Modal.getInstance(document.getElementById('modalQuickCheckin')).hide();
+        });
+    }
+
+    function showLoader() {
+        document.getElementById('pageLoadingOverlay').classList.remove('d-none');
+    }
+
+    function switchView(view) {
+        const gridView = document.getElementById('calendarGridView');
+        const tableView = document.getElementById('calendarTableView');
+        const btns = document.querySelectorAll('#viewToggleContainer .vt-btn');
+        
+        if (view === 'grid') {
+            gridView.classList.remove('d-none');
+            tableView.classList.add('d-none');
+            btns[0].classList.add('active');
+            btns[1].classList.remove('active');
+        } else {
+            gridView.classList.add('d-none');
+            tableView.classList.remove('d-none');
+            btns[1].classList.add('active');
+            btns[0].classList.remove('active');
+        }
+    }
+
+    function syncTableToGrid(date, val) {
+        // Function to update hidden context if needed or just prepare for save
+    }
+
+    function syncHolidayToGrid(date, isChecked) {
+        // Same here
+    }
+
+    function saveSingleRow(date) {
+        const quota = document.getElementById('table-quota-' + date).value;
+        const isHoliday = document.getElementById('table-holiday-' + date).checked;
+        const desc = document.getElementById('table-desc-' + date).value;
+        
+        fetch("{% url 'tamu:api_update_quota' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ 
+                date: date, 
+                quota: parseInt(quota),
+                is_holiday: isHoliday,
+                holiday_name: desc
+            })
+        }).then(r => r.json()).then(d => {
+            if (d.success) {
+                // If it was supposed to be a holiday toggle, we might need a separate API or update model
+                // For now, let's just focus on quota
+                alert('Jadwal ' + date + ' berhasil diperbarui.');
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date();
+        const yy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayCell = document.getElementById('calday-' + yy + '-' + mm + '-' + dd);
+        if (todayCell) todayCell.click();
+
+        // Set slot bar width via JS to avoid linter errors in HTML
+        document.querySelectorAll('.slot-bar-fill').forEach(el => {
+            const pct = el.getAttribute('data-percentage');
+            if (pct) el.style.width = pct + '%';
+        });
+    });
+
+    window.editVisit = function(id, name, instansi, time, status, purpose) {
+        const form = document.getElementById('quickCheckinForm');
+        form.elements['name'].value = name;
+        form.elements['instansi'].value = instansi;
+        form.elements['time'].value = time;
+        form.elements['status'].value = status;
+        form.elements['purpose'].value = purpose;
+        
+        let visitIdInput = form.querySelector('input[name="visit_id"]');
+        if (!visitIdInput) {
+            visitIdInput = document.createElement('input');
+            visitIdInput.type = 'hidden';
+            visitIdInput.name = 'visit_id';
+            form.appendChild(visitIdInput);
+        }
+        visitIdInput.value = id;
+        
+        const modal = document.getElementById('modalQuickCheckin');
+        modal.querySelector('h5.fw-bold').innerHTML = '<i class="fas fa-edit me-2 text-primary"></i>Edit Jadwal Kunjungan';
+        modal.querySelector('button[onclick="submitQuickCheckin()"]').innerHTML = '<i class="fas fa-save me-2"></i>Simpan Perubahan';
+        
+        new bootstrap.Modal(modal).show();
+    };
+
+    window.resetQuickCheckinForm = function() {
+        const form = document.getElementById('quickCheckinForm');
+        form.reset();
+        const visitIdInput = form.querySelector('input[name="visit_id"]');
+        if (visitIdInput) visitIdInput.value = '';
+        
+        const modal = document.getElementById('modalQuickCheckin');
+        modal.querySelector('button[onclick="submitQuickCheckin()"]').innerHTML = '<i class="fas fa-check-circle me-2"></i>Daftarkan Sekarang';
+    };
+
+    window.openEventBaru = function() {
+        window.resetQuickCheckinForm();
+        const modal = document.getElementById('modalQuickCheckin');
+        modal.querySelector('h5.fw-bold').innerHTML = '<i class="fas fa-calendar-plus me-2 text-primary"></i>Tambah Jadwal Kunjungan';
+        modal.querySelector('p.text-muted.small').textContent = 'Formulir untuk menambahkan jadwal kunjungan tamu baru.';
+        document.querySelector('select[name="status"]').value = 'pending';
+    };
+
+    window.openQuickCheckin = function() {
+        window.resetQuickCheckinForm();
+        const modal = document.getElementById('modalQuickCheckin');
+        modal.querySelector('h5.fw-bold').innerHTML = '<i class="fas fa-bolt me-2 text-warning"></i>Quick Check-in';
+        modal.querySelector('p.text-muted.small').textContent = 'Pendaftaran cepat untuk tamu yang hadir langsung.';
+        document.querySelector('select[name="status"]').value = 'in_progress';
+    };
+
+    // Auto-polling untuk memperbarui statistik (Rata-rata & Slot Penuh)
+    setInterval(function() {
+        fetch(window.location.href)
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newStats = doc.getElementById('statsCardsRow');
+            const currentStats = document.getElementById('statsCardsRow');
+            if (newStats && currentStats) {
+                currentStats.innerHTML = newStats.innerHTML;
+            }
+        });
+    }, 10000); // Polling setiap 10 detik
+</script>
+
+<style>
+    .qc-val {
+        color: #fff; font-size: 3.5rem; font-weight: 900; line-height: 1;
+    }
+    
+    /* ── PREMIUM SLIDER ── */
+    .quota-slider-wrapper { margin-top: 0.5rem; }
+    .premium-slider {
+        -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 10px;
+        background: rgba(255,255,255,0.1); outline: none; transition: 0.2s;
+    }
+    .premium-slider::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none; width: 22px; height: 22px;
+        border-radius: 50%; background: #3b82f6; cursor: pointer;
+        border: 4px solid #1e293b; box-shadow: 0 0 15px rgba(59,130,246,0.5);
+        transition: all 0.2s;
+    }
+    .premium-slider::-webkit-slider-thumb:hover { transform: scale(1.1); background: #60a5fa; }
+    
+    .slider-marks { display: flex; justify-content: space-between; margin-top: 8px; color: #64748b; font-size: 0.65rem; font-weight: 800; }
+
+    /* ── TABLE VIEW CUSTOM ── */
+    .table-row-custom { background: #fff; transition: all 0.2s; }
+    .table-row-custom:hover { background: #f8fafc; }
+    .row-holiday { background: #fff1f2; }
+    .quota-input-table:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+
+    /* ── LOADING & ANIMATION ── */
+    .loading-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        z-index: 9999; transition: all 0.3s;
+    }
+    .spinner-premium {
+        width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #3b82f6;
+        border-radius: 50%; animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .status-indicator {
+        font-size: 0.7rem; font-weight: 800; color: #94a3b8; 
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(255,255,255,0.03); padding: 8px; border-radius: 10px;
+        transition: all 0.3s;
+    }
+    .status-indicator.saving { color: #3b82f6; background: rgba(59,130,246,0.1); }
+    .status-indicator.saved { color: #22c55e; background: rgba(34,197,94,0.1); }
+
+    .btn-action-blue, .btn-action-dark {
+        padding: 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; border: none; transition: 0.2s;
+    }
+    .btn-action-blue { background: #3b82f6; color: #fff; box-shadow: 0 4px 15px rgba(59,130,246,0.3); }
+    .btn-action-blue:hover { background: #2563eb; transform: translateY(-1px); }
+    .btn-action-dark { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
+    .btn-action-dark:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.2); }
+</style>
+{% endblock %}

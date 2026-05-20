@@ -1,0 +1,452 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tentang Kami - Buku Tamu Digital</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0a2558;
+            --secondary: #3b82f6;
+            --accent: #60a5fa;
+            --bg-light: #f8fafc;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* ── NAVBAR ── */
+        .navbar {
+            background: var(--primary);
+            padding: 1rem 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .navbar-brand {
+            font-weight: 800;
+            color: #fff !important;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 1.15rem;
+        }
+        .brand-icon-box {
+            background: #fff;
+            color: var(--primary);
+            width: 32px; height: 32px;
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin: 0 0.75rem;
+            transition: color 0.2s;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #fff !important;
+            font-weight: 700;
+        }
+        .btn-nav-masuk {
+            color: #fff !important;
+            border: 1.5px solid rgba(255,255,255,0.5);
+            border-radius: 8px;
+            padding: 0.4rem 1.1rem !important;
+            font-weight: 700;
+            font-size: 0.85rem;
+            margin-right: 0.5rem;
+        }
+        .btn-nav-masuk:hover {
+            background: #fff;
+            color: var(--primary) !important;
+        }
+        .btn-nav-daftar {
+            background: #fff;
+            color: var(--primary) !important;
+            border-radius: 8px;
+            padding: 0.4rem 1.2rem !important;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        /* ── HERO HEADER ── */
+        .about-hero {
+            background: linear-gradient(135deg, #0a2558 0%, #1e3a8a 100%);
+            padding: 8rem 0 6rem;
+            position: relative;
+            overflow: hidden;
+            color: #fff;
+            text-align: center;
+        }
+        .about-hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://images.unsplash.com/photo-1497366216548-37526070297c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover;
+            opacity: 0.1;
+            mix-blend-mode: overlay;
+        }
+        .hero-badge {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1.25rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .about-hero h1 {
+            font-size: clamp(2.5rem, 6vw, 3.5rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 1rem;
+        }
+        .about-hero p {
+            font-size: 1.1rem;
+            opacity: 0.8;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* ── PROFIL SECTION ── */
+        .section-padding { padding: 7rem 0; }
+        .profil-image-wrap {
+            position: relative;
+            padding-right: 2rem;
+            padding-bottom: 2rem;
+        }
+        .main-img {
+            width: 100%;
+            border-radius: 32px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 2;
+        }
+        .img-accent-box {
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 80%; height: 80%;
+            background: var(--secondary);
+            border-radius: 32px;
+            z-index: 1;
+            opacity: 0.1;
+        }
+        .experience-card {
+            position: absolute;
+            bottom: 10%;
+            right: -5%;
+            background: #fff;
+            padding: 2rem;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            z-index: 5;
+            text-align: center;
+        }
+        .exp-num {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1;
+        }
+        .exp-text {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+
+        .section-label {
+            color: var(--secondary);
+            font-weight: 800;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+        .section-desc {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            line-height: 1.8;
+        }
+
+        /* ── VISI MISI CARDS ── */
+        .visi-misi-section { background: #fff; }
+        .vm-card {
+            background: var(--bg-light);
+            border-radius: 24px;
+            padding: 3rem;
+            height: 100%;
+            transition: all 0.3s;
+            border: 1px solid transparent;
+        }
+        .vm-card:hover {
+            background: #fff;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+            border-color: var(--secondary);
+            transform: translateY(-10px);
+        }
+        .vm-icon {
+            width: 60px; height: 60px;
+            background: #fff;
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem;
+            color: var(--secondary);
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.1);
+        }
+        .vm-card h3 {
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+        }
+        .misi-list {
+            list-style: none; padding: 0; margin: 0;
+        }
+        .misi-list li {
+            position: relative;
+            padding-left: 2rem;
+            margin-bottom: 1.25rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .misi-list li::before {
+            content: '\f058';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            left: 0; top: 2px;
+            color: var(--secondary);
+        }
+
+        /* ── VALUES ── */
+        .value-card {
+            text-align: center;
+            padding: 2rem;
+            border-radius: 24px;
+            background: #fff;
+            transition: all 0.3s;
+        }
+        .value-card:hover { transform: scale(1.05); }
+        .value-icon {
+            font-size: 2.5rem;
+            color: var(--secondary);
+            margin-bottom: 1.5rem;
+            display: block;
+        }
+        .value-card h4 { font-weight: 800; color: var(--primary); margin-bottom: 1rem; }
+
+        /* ── FOOTER ── */
+        .footer {
+            background: var(--primary);
+            padding: 5rem 0 2rem;
+            color: rgba(255,255,255,0.7);
+        }
+        .footer-logo { font-weight: 800; color: #fff; font-size: 1.25rem; }
+        .footer-links a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-left: 2rem;
+        }
+        .footer-links a:hover { color: #fff; }
+        .copyright {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.4);
+            text-align: center;
+        }
+
+        @media (max-width: 991px) {
+            .experience-card { position: static; margin-top: 2rem; }
+            .section-title { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg">
+    <div class="container">
+        <a class="navbar-brand" href="{% url 'tamu:landing' %}">
+            <div class="brand-icon-box"><i class="fas fa-university"></i></div>
+            Buku Tamu Digital
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMain">
+            <ul class="navbar-nav mx-auto">
+                <li class="nav-item"><a class="nav-link" href="{% url 'tamu:landing' %}">Beranda</a></li>
+                <li class="nav-item"><a class="nav-link active" href="{% url 'tamu:tentang_kami' %}">Tentang Kami</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan Privasi</a></li>
+            </ul>
+            <div class="d-flex align-items-center">
+                <a href="{% url 'tamu:login' %}" class="btn-nav-masuk">Masuk</a>
+                <a href="{% url 'tamu:register' %}" class="btn-nav-daftar">Daftar</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- HERO -->
+<header class="about-hero">
+    <div class="container">
+        <span class="hero-badge">Tentang Kami</span>
+        <h1>Membangun Ekosistem<br>Digital yang Terpercaya</h1>
+        <p>Inovasi pelayanan publik melalui digitalisasi data kunjungan yang transparan dan akuntabel.</p>
+    </div>
+</header>
+
+<!-- PROFIL -->
+<section class="section-padding">
+    <div class="container">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-6">
+                <div class="profil-image-wrap">
+                    <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80" alt="Office" class="main-img">
+                    <div class="img-accent-box"></div>
+                    <div class="experience-card">
+                        <div class="exp-num">100%</div>
+                        <div class="exp-text">Digitalisasi<br>Pelayanan</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <span class="section-label">Profil Institusi</span>
+                <h2 class="section-title">Diskominfosatik: Penggerak Utama Transformasi Digital</h2>
+                <p class="section-desc mb-4">
+                    Dinas Komunikasi, Informatika, Statistik dan Persandian (Diskominfosatik) berkomitmen untuk memodernisasi infrastruktur informasi pemerintahan. Kami percaya bahwa teknologi adalah kunci untuk meningkatkan kualitas pelayanan publik.
+                </p>
+                <p class="section-desc">
+                    E-Guestbook Digital merupakan langkah strategis kami untuk memastikan setiap interaksi fisik di kantor kami tercatat secara digital, memudahkan pemantauan, dan menjaga standar keamanan data yang tinggi bagi seluruh pengunjung.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- VISI MISI -->
+<section class="section-padding visi-misi-section">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="vm-card">
+                    <div class="vm-icon"><i class="fas fa-bullseye"></i></div>
+                    <h3>Visi Kami</h3>
+                    <p class="section-desc" style="font-style: italic;">
+                        "Menjadi pusat akselerasi teknologi informasi yang unggul untuk mewujudkan tata kelola pemerintahan yang transparan dan cerdas demi kesejahteraan masyarakat."
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="vm-card">
+                    <div class="vm-icon"><i class="fas fa-rocket"></i></div>
+                    <h3>Misi Strategis</h3>
+                    <ul class="misi-list">
+                        <li>Mengembangkan sistem informasi terintegrasi antar lembaga pemerintahan.</li>
+                        <li>Meningkatkan standar keamanan siber dan perlindungan data publik.</li>
+                        <li>Menyajikan basis data statistik yang akurat untuk mendukung pengambilan kebijakan.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- NILAI -->
+<section class="section-padding">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">Nilai Layanan</span>
+            <h2 class="section-title">Prinsip Kerja Kami</h2>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-3">
+                <div class="value-card">
+                    <i class="fas fa-fingerprint value-icon"></i>
+                    <h4>Integritas</h4>
+                    <p class="section-desc" style="font-size: 0.9rem;">Menjaga kejujuran dan standar etika tinggi dalam setiap pengelolaan data.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="value-card">
+                    <i class="fas fa-bolt value-icon"></i>
+                    <h4>Inovasi</h4>
+                    <p class="section-desc" style="font-size: 0.9rem;">Terus beradaptasi dengan teknologi terkini untuk solusi yang lebih baik.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="value-card">
+                    <i class="fas fa-handshake value-icon"></i>
+                    <h4>Kolaborasi</h4>
+                    <p class="section-desc" style="font-size: 0.9rem;">Membangun sinergi antar pihak untuk hasil yang maksimal.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="value-card">
+                    <i class="fas fa-shield-alt value-icon"></i>
+                    <h4>Keamanan</h4>
+                    <p class="section-desc" style="font-size: 0.9rem;">Memastikan privasi dan keamanan data tamu tetap terjaga.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <div class="footer-logo">Diskominfosatik</div>
+                <p class="section-desc mt-2" style="font-size: 0.85rem;">Membangun masa depan digital Indonesia yang lebih baik.</p>
+            </div>
+            <div class="col-md-8 text-md-end footer-links">
+                <a href="{% url 'tamu:landing' %}">Beranda</a>
+                <a href="{% url 'tamu:tentang_kami' %}">Tentang</a>
+                <a href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan</a>
+                <a href="#">Bantuan</a>
+            </div>
+        </div>
+        <div class="copyright">
+            © 2024 Diskominfosatik E-Guestbook. Seluruh hak cipta dilindungi.
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

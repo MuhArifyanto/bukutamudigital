@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Kartu Pengunjung — {{ kunjungan.tamu.name }}</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: #f1f5f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            width: 650px;
+            min-height: 380px; /* Dinaikkan dari 350px agar tidak kepotong */
+            background: #fff;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.15);
+            overflow: hidden;
+            display: flex;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            position: relative;
+        }
+        
+        /* Bagian Kiri (Informasi) */
+        .card-left {
+            flex: 1.6;
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+        .header-text {
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: #0f172a;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin: 0;
+        }
+        .sub-header {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 600;
+            margin-top: 0.25rem;
+            margin-bottom: 2rem;
+        }
+        .info-item {
+            margin-bottom: 1.5rem;
+        }
+        .info-item label {
+            font-size: 0.65rem;
+            font-weight: 800;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        .info-item .value {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .info-item .sub-value {
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.25rem;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .grid-item label {
+            font-size: 0.6rem;
+            font-weight: 800;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .grid-item div {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #334155;
+            margin-top: 1px;
+        }
+
+        /* Bagian Kanan (Foto/Avatar & Logo) */
+        .card-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+            border-left: 1px solid #f1f5f9;
+        }
+        .card-right.dinas {
+            background: #C3B091 !important; /* Coklat Khaki untuk Dinas */
+            color: #0f172a !important; /* Teks Gelap agar terbaca di background khaki */
+        }
+        .card-right.dinas .watermark {
+            color: rgba(15, 23, 42, 0.1) !important; /* Watermark Gelap untuk Background Kuning */
+        }
+        .card-right.pribadi {
+            background: #1b3564 !important; /* Biru Tua untuk Pribadi */
+            color: #fff !important;
+        }
+        .card-right::before {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 150px; height: 150px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), transparent);
+            border-radius: 0 0 0 100%;
+        }
+        
+        /* Gaya untuk Foto Profil Asli */
+        .avatar-img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #fff;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            margin-bottom: 1.5rem;
+            z-index: 1;
+        }
+        
+        /* Gaya untuk Avatar Inisial */
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: #fff;
+            color: #0f172a;
+            font-size: 2.5rem;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            margin-bottom: 1.5rem;
+            z-index: 1;
+        }
+        
+        .logo-img {
+            width: 70px;
+            opacity: 0.9;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+            z-index: 1;
+        }
+        
+        .watermark {
+            position: absolute;
+            bottom: 1rem;
+            right: 1.5rem;
+            font-size: 3rem; /* Ukuran dikecilkan agar tidak terpotong */
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.08); /* Sedikit lebih jelas */
+            user-select: none;
+            z-index: 0;
+        }
+
+        .footer-text {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            font-weight: 600;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 1rem;
+            margin-top: auto;
+        }
+
+        /* Print & Button Styles */
+        @media print {
+            body { background: #fff; }
+            .card {
+                box-shadow: none;
+                border: 1px solid #cbd5e1;
+                page-break-inside: avoid;
+            }
+            .no-print { display: none; }
+            @page { size: landscape; margin: 0; }
+            
+            /* Memaksa background color dan image muncul saat diprint/download PDF */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+        
+        .btn-print {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #0f172a;
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .btn-print:hover {
+            background: #1e293b;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <!-- SISI KIRI: INFORMASI -->
+        <div class="card-left">
+            <div>
+                <div class="header-text">KARTU PENGUNJUNG</div>
+                <div class="sub-header">{{ instansi.nama|default:"Diskominfosantik Kabupaten Bekasi" }}</div>
+                
+                <!-- Nomor Urut & Nomor Unik -->
+                <div style="display: flex; gap: 1rem; margin: 0.5rem 0 1rem 0; font-size: 0.85rem; color: #64748b; font-weight: 700;">
+                    <div>No. Urut: <span style="color: #1e3a8a; font-size: 1rem;">{{ nomor_urut|default:"01" }}</span></div>
+                    <div>Kode: <span style="color: #1e3a8a; font-size: 1rem;">{{ nomor_unik|default:"ABC12345" }}</span></div>
+                </div>
+                
+                <div class="info-item">
+                    <label>Nama Pengunjung</label>
+                    <div class="value">{{ kunjungan.tamu.profile.name|default:kunjungan.tamu.name }}</div>
+                    <div class="sub-value">{{ kunjungan.tamu.instansi|default:"Pribadi" }}</div>
+                </div>
+                
+                <div class="info-grid">
+                    <div class="grid-item">
+                        <label>Pegawai Dituju</label>
+                        <div>{{ kunjungan.pegawai.name|default:"–" }}</div>
+                    </div>
+                    <div class="grid-item">
+                        <label>Bidang/Bagian</label>
+                        <div>{{ kunjungan.pegawai.department_rel.nama|default:kunjungan.pegawai.department|default:"Umum" }}</div>
+                    </div>
+                    <div class="grid-item">
+                        <label>Waktu Masuk</label>
+                        <div>{{ kunjungan.arrival_time|date:"H:i" }} WIB</div>
+                    </div>
+                    <div class="grid-item">
+                        <label>Tanggal</label>
+                        <div>{{ kunjungan.arrival_time|date:"d M Y" }}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-text">
+                Berlaku hanya pada tanggal yang tertera. Harap kembalikan kartu ini saat keluar.
+            </div>
+        </div>
+        
+        <!-- SISI KANAN: FOTO/AVATAR & LOGO -->
+        <div class="card-right {% if 'dinas' in kunjungan.purpose|lower or kunjungan.tamu.instansi %}dinas{% else %}pribadi{% endif %}">
+            <!-- Munculkan Foto Profil jika ada, jika tidak gunakan Inisial -->
+            {% if kunjungan.tamu.profile_picture %}
+                <img src="{{ kunjungan.tamu.profile_picture.url }}" alt="Foto Profil" class="avatar-img">
+            {% else %}
+                <div class="avatar" id="avatar">
+                    {{ kunjungan.tamu.name|slice:":2"|upper }}
+                </div>
+            {% endif %}
+            
+            <!-- Logo Instansi -->
+            <img src="/static/images/logo-diskominfosantik.png" alt="Logo" class="logo-img" onerror="this.style.display='none'">
+            
+            <div class="watermark">{% if 'dinas' in kunjungan.purpose|lower or kunjungan.tamu.instansi %}DINAS{% else %}PRIBADI{% endif %}</div>
+        </div>
+    </div>
+
+    <button class="btn-print no-print" onclick="window.print()">
+        <i class="fas fa-print"></i> Cetak Kartu
+    </button>
+
+    <script>
+        // Generate random color for avatar background (jika tidak ada foto)
+        const avatarElem = document.getElementById('avatar');
+        if (avatarElem) {
+            const name = "{{ kunjungan.tamu.name }}";
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const h = Math.abs(hash % 360);
+            avatarElem.style.background = `linear-gradient(135deg, hsl(${h}, 75%, 60%) 0%, hsl(${h}, 75%, 45%) 100%)`;
+            avatarElem.style.color = `#fff`;
+        }
+
+        // Auto print on load
+        window.onload = function() {
+            setTimeout(() => {
+                window.print();
+            }, 500);
+        };
+    </script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</body>
+</html>

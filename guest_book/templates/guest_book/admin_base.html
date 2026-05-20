@@ -1,0 +1,760 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Admin Portal - Buku Tamu Digital Diskominfosantik Kabupaten Bekasi">
+    <title>Admin Portal | {% block title %}Buku Tamu Digital{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'images/logo-diskominfosantik.png' %}?v=2">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 6 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* ══════════════════════════════════════════
+           CSS VARIABLES
+        ══════════════════════════════════════════ */
+        :root {
+            --sidebar-w:        280px;
+            --sidebar-bg:       #0b1d3a;
+            --sidebar-border:   rgba(255,255,255,0.07);
+            --accent:           #3b82f6;
+            --accent-glow:      rgba(59,130,246,0.30);
+            --accent-hover:     #2563eb;
+            --page-bg:          #f0f4ff;
+            --card-bg:          #ffffff;
+            --text-primary:     #0f172a;
+            --text-secondary:   #64748b;
+            --topbar-h:         72px;
+            --radius-sm:        10px;
+            --radius-md:        14px;
+            --radius-lg:        20px;
+            --shadow-sm:        0 2px 8px rgba(15,23,42,0.06);
+            --shadow-md:        0 4px 24px rgba(15,23,42,0.10);
+            --transition:       all 0.25s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        /* ══════════════════════════════════════════
+           RESET & BASE
+        ══════════════════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--page-bg);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* ══════════════════════════════════════════
+           SIDEBAR
+        ══════════════════════════════════════════ */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: var(--sidebar-w);
+            height: 100vh;
+            background: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            z-index: 1050;
+            transition: var(--transition);
+            border-right: 1px solid var(--sidebar-border);
+            overflow: hidden;
+        }
+
+        /* Sidebar decorative gradient blob */
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: -60px; left: -60px;
+            width: 260px; height: 260px;
+            background: radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* ── Brand Header ── */
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            padding: 1.6rem 1.5rem 1.2rem;
+            border-bottom: 1px solid var(--sidebar-border);
+        }
+        .brand-logo {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--accent), #6366f1);
+            border-radius: var(--radius-sm);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.15rem; color: #fff;
+            box-shadow: 0 6px 20px var(--accent-glow);
+            flex-shrink: 0;
+        }
+        .brand-text h3 {
+            font-size: 1rem; font-weight: 800;
+            color: #fff; margin: 0; line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+        .brand-text p {
+            font-size: 0.68rem; font-weight: 500;
+            color: rgba(255,255,255,0.45); margin: 0;
+            letter-spacing: 0.04em; text-transform: uppercase;
+        }
+
+        /* ── Nav Menu ── */
+        .nav-section-label {
+            font-size: 0.62rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 1.4rem 1.5rem 0.4rem;
+        }
+
+        .nav-menu { list-style: none; padding: 0 0.75rem; flex: 1; }
+        .nav-menu li { margin-bottom: 2px; }
+
+        .nav-link-custom {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            padding: 0.72rem 0.9rem;
+            color: rgba(255,255,255,0.55);
+            text-decoration: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: var(--transition);
+            position: relative;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        .nav-link-custom .nav-icon {
+            width: 34px; height: 34px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            transition: var(--transition);
+        }
+        .nav-link-custom:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.07);
+        }
+        .nav-link-custom:hover .nav-icon {
+            background: rgba(59,130,246,0.2);
+            color: var(--accent);
+        }
+        .nav-link-custom.active {
+            color: #fff;
+            background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(99,102,241,0.15));
+            box-shadow: inset 0 0 0 1px rgba(59,130,246,0.3);
+        }
+        .nav-link-custom.active .nav-icon {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+        /* Active left bar indicator */
+        .nav-link-custom.active::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 20%; height: 60%;
+            width: 3px;
+            background: var(--accent);
+            border-radius: 0 3px 3px 0;
+        }
+
+        /* ── Sidebar Footer ── */
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 1rem 1rem 1rem;
+            border-top: 1px solid var(--sidebar-border);
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            background: rgba(0,0,0,0.15);
+        }
+        .admin-avatar-sidebar {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 2px solid rgba(255,255,255,0.12);
+            flex-shrink: 0;
+        }
+        .admin-info { overflow: hidden; flex: 1; }
+        .admin-info .name {
+            font-size: 0.82rem; font-weight: 700; color: #fff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin: 0;
+        }
+        .admin-info .role {
+            font-size: 0.68rem; color: rgba(255,255,255,0.4);
+            margin: 0;
+        }
+        .logout-btn {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px;
+            color: rgba(255,255,255,0.35);
+            background: rgba(255,255,255,0.05);
+            transition: var(--transition);
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+        .logout-btn:hover { background: rgba(239,68,68,0.2); color: #ef4444; }
+
+        /* ══════════════════════════════════════════
+           MAIN CONTENT
+        ══════════════════════════════════════════ */
+        .main-content {
+            margin-left: var(--sidebar-w);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ══════════════════════════════════════════
+           TOP BAR
+        ══════════════════════════════════════════ */
+        .top-bar {
+            position: sticky; top: 0;
+            z-index: 100;
+            height: var(--topbar-h);
+            background: rgba(240,244,255,0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(15,23,42,0.07);
+            display: flex; align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            gap: 1rem;
+        }
+
+        /* Mobile toggle (hidden on desktop) */
+        .sidebar-toggle-btn {
+            display: none;
+            width: 40px; height: 40px;
+            border: none; background: var(--card-bg);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 1rem; color: var(--text-secondary);
+            align-items: center; justify-content: center;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+        .sidebar-toggle-btn:hover { background: var(--accent); color: #fff; }
+
+        /* Page Title Area */
+        .page-title-area { flex: 1; }
+        .page-title-area h4 {
+            font-size: 1.1rem; font-weight: 700;
+            color: var(--text-primary); margin: 0; line-height: 1;
+        }
+        .page-title-area p {
+            font-size: 0.75rem; color: var(--text-secondary);
+            margin: 2px 0 0;
+        }
+
+        /* Search Box */
+        .search-box {
+            display: flex; align-items: center; gap: 0.6rem;
+            background: var(--card-bg);
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            width: 280px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid rgba(15,23,42,0.06);
+            transition: var(--transition);
+        }
+        .search-box:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .search-box i { color: var(--text-secondary); font-size: 0.85rem; }
+        .search-box input {
+            border: none; outline: none; background: transparent;
+            font-size: 0.85rem; font-family: inherit;
+            color: var(--text-primary); width: 100%;
+        }
+        .search-box input::placeholder { color: var(--text-secondary); }
+
+        /* Top Actions */
+        .top-actions { display: flex; align-items: center; gap: 0.6rem; }
+
+        .icon-btn {
+            width: 40px; height: 40px;
+            background: var(--card-bg);
+            border: 1px solid rgba(15,23,42,0.06);
+            border-radius: var(--radius-sm);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            position: relative;
+            box-shadow: var(--shadow-sm);
+        }
+        .icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        .notif-badge {
+            position: absolute; top: -5px; right: -5px;
+            background: #ef4444; color: #fff;
+            font-size: 0.6rem; font-weight: 800;
+            padding: 2px 5px; border-radius: 20px;
+            border: 2px solid var(--page-bg);
+            line-height: 1.2;
+        }
+
+        /* Admin Chip */
+        .admin-chip {
+            display: flex; align-items: center; gap: 0.6rem;
+            background: var(--card-bg);
+            border: 1px solid rgba(15,23,42,0.06);
+            border-radius: var(--radius-lg);
+            padding: 0.35rem 0.9rem 0.35rem 0.35rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .admin-chip img {
+            width: 30px; height: 30px;
+            border-radius: 50%; object-fit: cover;
+        }
+        .admin-chip span {
+            font-size: 0.8rem; font-weight: 700;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        /* ══════════════════════════════════════════
+           PAGE CONTENT
+        ══════════════════════════════════════════ */
+        .page-content {
+            flex: 1;
+            padding: 2rem 2.5rem;
+        }
+
+        /* ── Alert Messages ── */
+        .alert { border-radius: var(--radius-md); border: none; }
+
+        /* ══════════════════════════════════════════
+           SIDEBAR OVERLAY (mobile)
+        ══════════════════════════════════════════ */
+        .sidebar-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 1040;
+            backdrop-filter: blur(2px);
+        }
+        .sidebar-overlay.show { display: block; }
+
+        /* ══════════════════════════════════════════
+           RESPONSIVE
+        ══════════════════════════════════════════ */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+                box-shadow: 0 0 60px rgba(0,0,0,0.4);
+            }
+            .main-content { margin-left: 0; }
+            .sidebar-toggle-btn { display: flex; }
+            .search-box { width: 200px; }
+            .page-content { padding: 1.5rem; }
+        }
+
+        @media (max-width: 576px) {
+            .search-box { display: none; }
+            .top-bar { padding: 0 1rem; }
+            .admin-chip span { display: none; }
+            .page-content { padding: 1rem; }
+        }
+
+        /* ══════════════════════════════════════════
+           SCROLL STYLE
+        ══════════════════════════════════════════ */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.3); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+    </style>
+
+    <!-- Extra CSS block (placed OUTSIDE <style> to avoid linting errors) -->
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <!-- SIDEBAR OVERLAY (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ══════════════ SIDEBAR ══════════════ -->
+    <aside class="sidebar" id="sidebar">
+        <!-- Brand -->
+        <div class="sidebar-brand">
+            <div class="brand-logo" style="background: #ffffff; padding: 4px;">
+                <img src="{% static 'images/logo-diskominfosantik.png' %}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png'">
+            </div>
+            <div class="brand-text">
+                <h3>Buku Tamu Digital</h3>
+                <p>Admin Portal</p>
+            </div>
+        </div>
+
+        <!-- Nav Label -->
+        <p class="nav-section-label">Menu Utama</p>
+
+        <!-- Navigation -->
+        <nav>
+            <ul class="nav-menu">
+                <li>
+                    <a href="{% url 'tamu:admin_dashboard' %}"
+                       class="nav-link-custom {% if active_page == 'dashboard' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-th-large"></i></span>
+                        Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'tamu:admin_statistik' %}"
+                       class="nav-link-custom {% if active_page == 'statistik' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
+                        Statistik &amp; Jadwal
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'tamu:admin_kunjungan_list' %}"
+                       class="nav-link-custom {% if active_page == 'kunjungan' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-list-ul"></i></span>
+                        Daftar Kunjungan
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'tamu:admin_kalender' %}"
+                       class="nav-link-custom {% if active_page == 'kalender' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-calendar-alt"></i></span>
+                        Kalender Kunjungan
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'tamu:admin_chat' %}"
+                       class="nav-link-custom {% if active_page == 'chat' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-comments"></i></span>
+                        Chat Admin
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{% url 'tamu:admin_profil' %}"
+                       class="nav-link-custom {% if active_page == 'profil' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-user-circle"></i></span>
+                        Profil Administrator
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Sidebar Footer -->
+        <div class="sidebar-footer">
+            <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}"
+                 class="admin-avatar-sidebar" alt="Avatar Admin">
+            <div class="admin-info">
+                <p class="name">{{ admin_name }}</p>
+                <p class="role">Administrator</p>
+            </div>
+            <a href="{% url 'tamu:logout' %}" class="logout-btn" title="Logout">
+                <i class="fas fa-sign-out-alt"></i>
+            </a>
+        </div>
+    </aside>
+
+    <!-- ══════════════ MAIN CONTENT ══════════════ -->
+    <div class="main-content">
+
+        <!-- TOP BAR -->
+        <header class="top-bar">
+            <!-- Mobile toggle -->
+            <button class="sidebar-toggle-btn" id="sidebarToggle" aria-label="Toggle sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <!-- Page Title -->
+            <div class="page-title-area">
+                <h4>{% block page_title %}Dashboard{% endblock %}</h4>
+                <p>{% block page_subtitle %}Selamat datang di Admin Portal{% endblock %}</p>
+            </div>
+
+            <!-- Search -->
+            <form action="{% url 'tamu:admin_kunjungan_list' %}" method="GET" class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" id="globalSearch"
+                       placeholder="{% block search_placeholder %}Cari data...{% endblock %}"
+                       aria-label="Global search"
+                       value="{{ request.GET.q|default:'' }}">
+            </form>
+
+            <!-- Actions -->
+            <div class="top-actions">
+                <!-- Notification Bell -->
+                <div class="notif-container" style="position: relative;">
+                    <a href="#" class="icon-btn" id="notifBtn" aria-label="Notifikasi">
+                        <i class="fas fa-bell"></i>
+                        {% if unread_notifications_count > 0 %}
+                        <span class="notif-badge" id="globalNotifBadge">{{ unread_notifications_count }}</span>
+                        {% endif %}
+                    </a>
+                    <!-- Dropdown -->
+                    <div class="notif-dropdown" id="notifDropdown" style="display: none; position: absolute; right: 0; top: 40px; width: 320px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000; border: 1px solid #e2e8f0;">
+                        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <h6 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b;">Notifikasi</h6>
+                        </div>
+                        <div id="notifList" style="max-height: 250px; overflow-y: auto;">
+                            <p style="color: #64748b; font-size: 0.85rem; padding: 1rem; text-align: center; margin: 0;">Memuat...</p>
+                        </div>
+                        <div style="text-align: center; border-top: 1px solid #e2e8f0; padding: 0.5rem;">
+                            <a href="{% url 'tamu:notifications' %}" style="font-size: 0.85rem; color: #3b82f6; text-decoration: none; font-weight: 500;">Lihat Semua</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Chip -->
+                <div class="admin-chip">
+                    <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}"
+                         alt="Avatar">
+                    <span>{{ admin_name }}</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Django Messages -->
+        {% if messages %}
+        <div style="padding: 1rem 2.5rem 0;">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {% if message.tags == 'success' %}
+                <i class="fas fa-check-circle me-2"></i>
+                {% elif message.tags == 'warning' %}
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                {% elif message.tags == 'danger' or message.tags == 'error' %}
+                <i class="fas fa-exclamation-circle me-2"></i>
+                {% else %}
+                <i class="fas fa-info-circle me-2"></i>
+                {% endif %}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Page Content -->
+        <main class="page-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        /* ── Sidebar Toggle ── */
+        const sidebar        = document.getElementById('sidebar');
+        const sidebarToggle  = document.getElementById('sidebarToggle');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        function openSidebar() {
+            sidebar.classList.add('open');
+            sidebarOverlay.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+            });
+        }
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', closeSidebar);
+        }
+
+        /* ── Avatar Colorization ── */
+        function initAvatars() {
+            document.querySelectorAll('.initials-avatar').forEach(avatar => {
+                const name = avatar.getAttribute('data-name') || 'User';
+                let hash = 0;
+                for (let i = 0; i < name.length; i++) {
+                    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const h = Math.abs(hash) % 360;
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            initAvatars();
+            
+            // Dropdown Notifikasi
+            const notifBtn = document.getElementById('notifBtn');
+            const notifDropdown = document.getElementById('notifDropdown');
+            const notifList = document.getElementById('notifList');
+            
+            if (notifBtn && notifDropdown) {
+                notifBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const isHidden = notifDropdown.style.display === 'none';
+                    notifDropdown.style.display = isHidden ? 'block' : 'none';
+                    
+                    if (isHidden) {
+                        fetch("{% url 'tamu:api_get_recent_notifications' %}")
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.notifications && data.notifications.length > 0) {
+                                    notifList.innerHTML = data.notifications.map(n => {
+                                        let url = "{% url 'tamu:notifications' %}";
+                                        if (n.notification_type === 'message_received' || n.notification_type === 'message_replied') {
+                                            url = "{% url 'tamu:admin_chat' %}?guest=" + n.related_object_id;
+                                        } else if (n.notification_type === 'visit_registered') {
+                                            if (n.related_object_id && !['null', 'undefined', 'none'].includes(String(n.related_object_id).toLowerCase())) {
+                                                url = "/admin-portal/kunjungan/" + n.related_object_id + "/";
+                                            } else {
+                                                url = "{% url 'tamu:admin_kunjungan_list' %}";
+                                            }
+                                        } else if (n.notification_type === 'quota_reached') {
+                                            url = "{% url 'tamu:admin_kalender' %}";
+                                        }
+                                        return `
+                                            <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; text-align: left;" onclick="location.href='${url}'">
+                                                <div style="font-weight: 600; font-size: 0.85rem; color: #1e293b;">${n.title}</div>
+                                                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">${n.message}</div>
+                                                <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">${n.created_at}</div>
+                                            </div>
+                                        `;
+                                    }).join('');
+                                } else {
+                                    notifList.innerHTML = '<p style="color: #64748b; font-size: 0.85rem; padding: 1rem; text-align: center; margin: 0;">Tidak ada notifikasi baru.</p>';
+                                }
+                            });
+                    }
+                });
+                
+                // Tutup jika klik di luar
+                document.addEventListener('click', function(e) {
+                    if (!notifBtn.contains(e.target) && !notifDropdown.contains(e.target)) {
+                        notifDropdown.style.display = 'none';
+                    }
+                });
+            }
+        });
+
+        /* ── Real-time Notification WebSocket ── */
+        const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+        const notificationSocket = new WebSocket(
+            `${wsScheme}://${window.location.host}/ws/notifications/`
+        );
+
+        notificationSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            console.log("Notifikasi Baru:", data);
+
+            // 1. Mainkan bunyi
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.play().catch(err => console.log('Autoplay diblokir browser:', err));
+
+            // 2. Update Konten Toast
+            document.getElementById('toastTitle').innerText = data.title || "Notifikasi Baru";
+            document.getElementById('toastBody').innerText = data.message;
+            document.getElementById('toastTime').innerText = data.created_at || "Baru saja";
+
+            // 3. Tentukan URL tujuan
+            let url = "{% url 'tamu:notifications' %}";
+            if (data.notification_type === 'message_received' || data.notification_type === 'message_replied') {
+                url = "{% url 'tamu:admin_chat' %}?guest=" + data.related_object_id;
+            } else if (data.notification_type === 'visit_registered') {
+                if (data.related_object_id && !['null', 'undefined', 'none'].includes(String(data.related_object_id).toLowerCase())) {
+                    url = "/admin-portal/kunjungan/" + data.related_object_id + "/";
+                } else {
+                    url = "{% url 'tamu:admin_kunjungan_list' %}";
+                }
+            } else if (data.notification_type === 'quota_reached') {
+                url = "{% url 'tamu:admin_kalender' %}";
+            }
+
+            // Simpan URL di element toast
+            const toastEl = document.getElementById('liveToast');
+            toastEl.setAttribute('data-url', url);
+
+            // Tampilkan toast
+            const toast = new bootstrap.Toast(toastEl);
+            toast.show();
+
+            // 4. Update Badge Count
+            let badge = document.getElementById('globalNotifBadge');
+            if (data.unread_count > 0) {
+                if (badge) {
+                    badge.innerText = data.unread_count;
+                } else {
+                    const btn = document.getElementById('notifBtn');
+                    if (btn) {
+                        badge = document.createElement('span');
+                        badge.id = 'globalNotifBadge';
+                        badge.className = 'notif-badge';
+                        badge.innerText = data.unread_count;
+                        btn.appendChild(badge);
+                    }
+                }
+            } else if (badge) {
+                badge.remove();
+            }
+        };
+
+        notificationSocket.onclose = function(e) {
+            console.error('Koneksi notifikasi real-time terputus.');
+        };
+        
+        // Handler untuk klik pada toast
+        document.addEventListener('DOMContentLoaded', () => {
+            const toastEl = document.getElementById('liveToast');
+            if (toastEl) {
+                toastEl.addEventListener('click', function(e) {
+                    // Jangan redirect jika yang diklik adalah tombol close
+                    if (e.target.classList.contains('btn-close')) return;
+                    
+                    const url = this.getAttribute('data-url');
+                    if (url) {
+                        location.href = url;
+                    }
+                });
+            }
+        });
+    </script>
+
+    <!-- Toast Container untuk Pop-up Notifikasi -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+        <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" style="cursor: pointer; border-radius: 12px; border: 1px solid rgba(15,23,42,0.1); box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
+            <div class="toast-header" style="border-bottom: 1px solid #f1f5f9;">
+                <i class="fas fa-bell me-2 text-primary"></i>
+                <strong class="me-auto" id="toastTitle">Notifikasi</strong>
+                <small id="toastTime" style="color: #94a3b8;">Baru saja</small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toastBody" style="font-size: 0.85rem; color: #475569;">
+                Pesan notifikasi.
+            </div>
+        </div>
+    </div>
+
+    <!-- Extra JS block (placed OUTSIDE <script> to avoid linting errors) -->
+    {% block extra_js %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,165 @@
+{% extends 'guest_book/tamu_base.html' %}
+{% load static %}
+
+{% block title %}Riwayat Kunjungan Saya{% endblock %}
+
+{% block page_title %}Aktifitas{% endblock %}
+{% block page_subtitle %}Riwayat Kunjungan Saya{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
+    <!-- PAGE HEADER -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+        <div>
+            <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem;">
+                <a href="{% url 'tamu:dashboard' %}" style="color: #64748b; text-decoration: none;">BukuTamu DG</a> &gt; <span>Riwayat Kunjungan saya</span>
+            </div>
+            <h1 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem;">Riwayat Kunjungan Saya</h1>
+            <p style="font-size: 0.85rem; color: #64748b;">Daftar arsip seluruh kunjungan resmi Anda ke Dinas Komunikasi, Informatika, Statistik, dan Persandian.</p>
+        </div>
+        <div class="d-flex gap-2 w-100 w-md-auto">
+            <button class="btn flex-grow-1 flex-md-grow-0" data-bs-toggle="collapse" data-bs-target="#filterPanel" style="background: #eff6ff; color: #1e40af; font-weight: 600; border-radius: 8px; font-size: 0.85rem; padding: 0.6rem 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                <i class="fas fa-filter"></i> Filter Lanjutan
+            </button>
+            <a href="{% url 'tamu:tamu_kunjungan_cetak_pdf' %}?status={{ request.GET.status|default:'' }}&q={{ request.GET.q|default:'' }}&date={{ request.GET.date|default:'' }}" class="btn flex-grow-1 flex-md-grow-0" style="background: #0f172a; color: #fff; font-weight: 600; border-radius: 8px; font-size: 0.85rem; padding: 0.6rem 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none;">
+                <i class="fas fa-file-export"></i> Ekspor Riwayat
+            </a>
+        </div>
+    </div>
+
+    <!-- STATS CARDS -->
+    <div class="row g-3 mb-4">
+        <!-- Card 1 -->
+        <div class="col-12 col-md-4">
+            <div style="background: #fff; height: 100%; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="color: #3b82f6; margin-bottom: 1rem; font-size: 1.2rem;"><i class="far fa-calendar"></i></div>
+                <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">TOTAL KUNJUNGAN SAYA</div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: #0f172a;">{{ stats.total|default:0 }}</div>
+            </div>
+        </div>
+        <!-- Card 2 -->
+        <div class="col-12 col-md-4">
+            <div style="background: #fff; height: 100%; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="color: #64748b; margin-bottom: 1rem; font-size: 1.2rem;"><i class="far fa-hourglass"></i></div>
+                <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">SEDANG MENUNGGU</div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: #0f172a;">{{ stats.pending|default:0 }}</div>
+            </div>
+        </div>
+        <!-- Card 3 -->
+        <div class="col-12 col-md-4">
+            <div style="background: #fff; height: 100%; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="color: #ef4444; margin-bottom: 1rem; font-size: 1.2rem;"><i class="far fa-times-circle"></i></div>
+                <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">DIBATALKAN</div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: #0f172a;">{{ stats.cancelled|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div id="filterPanel" class="collapse {% if request.GET.status or request.GET.q or request.GET.date %}show{% endif %}" style="background: #fff; border-radius: 12px; padding: 1rem; border: 1px solid #e2e8f0; margin-bottom: 1.5rem;">
+        <form method="get" class="d-flex flex-column flex-md-row gap-2 align-items-stretch align-items-md-center">
+            <div style="flex: 1; position: relative;">
+                <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                <input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Cari berdasarkan keperluan atau petugas..." style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.5rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; outline: none; background: #f8fafc;">
+            </div>
+            
+            <select name="status" onchange="this.form.submit()" style="padding: 0.6rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #475569; background: #f8fafc; outline: none;">
+                <option value="">Semua Status</option>
+                <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Menunggu</option>
+                <option value="in_progress" {% if request.GET.status == 'in_progress' %}selected{% endif %}>Berlangsung</option>
+                <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Selesai</option>
+                <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>Dibatalkan</option>
+            </select>
+
+            <input type="date" name="date" style="padding: 0.6rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #475569; background: #f8fafc; outline: none;">
+            
+            <button type="submit" class="btn btn-primary" style="background: #0f172a; color: #fff; border-radius: 8px; font-size: 0.85rem; padding: 0.6rem 1.25rem; border: none; cursor: pointer;">Cari</button>
+            
+            {% if request.GET.status or request.GET.q or request.GET.date %}
+            <a href="{% url 'tamu:riwayat' %}" class="btn" style="color: #64748b; font-size: 0.85rem; text-decoration: none; border: 1px solid #e2e8f0; border-radius: 8px;">Reset</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-responsive" style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.5rem;">
+        <table class="table mb-0" style="width: 100%; border-collapse: collapse; text-align: left; min-width: 800px;">
+            <thead>
+                <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <th style="padding: 1rem; font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em; border:none;">WAKTU & TANGGAL</th>
+                    <th style="padding: 1rem; font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em; border:none;">TUJUAN / KEPERLUAN</th>
+                    <th style="padding: 1rem; font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em; border:none;">PETUGAS PENERIMA</th>
+                    <th style="padding: 1rem; font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em; border:none;">STATUS</th>
+                    <th style="padding: 1rem; font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.05em; text-align: center; border:none;">DETAIL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for k in kunjungan_list %}
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 1rem; border:none; vertical-align: middle;">
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">{{ k.arrival_time|date:"d M Y" }}</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">{{ k.arrival_time|date:"H:i" }} WIB</div>
+                    </td>
+                    <td style="padding: 1rem; border:none; vertical-align: middle;">
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem; white-space: normal; min-width: 200px;">{{ k.purpose|truncatechars:40 }}</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">{{ k.pegawai.department|default:"Umum" }}</div>
+                    </td>
+                    <td style="padding: 1rem; border:none; vertical-align: middle;">
+                        <div style="font-weight: 600; color: #0f172a; font-size: 0.85rem;">{{ k.pegawai.name|default:"-" }}</div>
+                    </td>
+                    <td style="padding: 1rem; border:none; vertical-align: middle;">
+                        {% if k.status == 'completed' %}
+                        <span style="background: #e0f2fe; color: #0369a1; font-size: 0.65rem; font-weight: 800; padding: 0.35rem 0.6rem; border-radius: 99px; display: inline-block;">SELESAI</span>
+                        {% elif k.status == 'pending' %}
+                        <span style="background: #f1f5f9; color: #475569; font-size: 0.65rem; font-weight: 800; padding: 0.35rem 0.6rem; border-radius: 99px; display: inline-block;">MENUNGGU</span>
+                        {% elif k.status == 'cancelled' %}
+                        <span style="background: #fee2e2; color: #991b1b; font-size: 0.65rem; font-weight: 800; padding: 0.35rem 0.6rem; border-radius: 99px; display: inline-block;">DIBATALKAN</span>
+                        {% else %}
+                        <span style="background: #fef08a; color: #854d0e; font-size: 0.65rem; font-weight: 800; padding: 0.35rem 0.6rem; border-radius: 99px; display: inline-block;">{{ k.get_status_display|upper }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 1rem; text-align: center; border:none; vertical-align: middle;">
+                        <a href="{% url 'tamu:kunjungan_detail' k.pk %}" style="color: #64748b; font-size: 1.1rem; background: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid #e2e8f0; display: inline-block; transition: all 0.2s;"><i class="far fa-eye"></i></a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="padding: 3rem 2rem; text-align: center; color: #64748b; font-size: 0.85rem; border:none;">
+                        <i class="far fa-folder-open mb-3" style="font-size: 2.5rem; opacity: 0.3; display: block;"></i>
+                        Tidak ada riwayat kunjungan.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- PAGINATION -->
+    {% if is_paginated %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; font-size: 0.8rem; color: #64748b;">
+        <div>Menampilkan {{ page_obj.start_index }}-{{ page_obj.end_index }} dari {{ page_obj.paginator.count }} kunjungan Anda</div>
+        <div style="display: flex; gap: 0.5rem;">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" style="width: 32px; height: 32px; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none;"><i class="fas fa-chevron-left"></i></a>
+            {% endif %}
+            
+            <span style="width: 32px; height: 32px; background: #0f172a; color: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700;">{{ page_obj.number }}</span>
+            
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" style="width: 32px; height: 32px; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none;"><i class="fas fa-chevron-right"></i></a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- FOOTER -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; font-size: 0.75rem; color: #94a3b8;">
+        <div>© 2026 DISKOMINFOSATIK - DIGITAL DIPLOMAT SYSTEM</div>
+        <div style="display: flex; gap: 1.5rem;">
+            <a href="#" style="color: #94a3b8; text-decoration: none;">SYARAT & KETENTUAN</a>
+            <a href="#" style="color: #94a3b8; text-decoration: none;">KEBIJAKAN PRIVASI</a>
+            <a href="#" style="color: #94a3b8; text-decoration: none;">BANTUAN TEKNIS</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
