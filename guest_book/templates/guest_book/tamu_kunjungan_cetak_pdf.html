@@ -4,16 +4,33 @@
 <head>
     <meta charset="UTF-8">
     <title>Riwayat Kunjungan Saya - {{ tamu.name }}</title>
+    <!-- Premium Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <style>
+        /* CSS Reset & Variable */
+        :root {
+            --primary: #0f172a;
+            --primary-light: #1e293b;
+            --accent: #2563eb;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --border-color: #cbd5e1;
+            --bg-light: #f8fafc;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+
         body { 
-            font-family: 'Times New Roman', Times, serif; 
+            font-family: 'Plus Jakarta Sans', Arial, sans-serif; 
             font-size: 12px; 
-            color: #000;
+            color: var(--text-main);
             background: #fff;
             margin: 0;
-            padding: 20px;
+            padding: 30px;
+            line-height: 1.5;
         }
         
         /* KOP SURAT / LETTERHEAD */
@@ -21,148 +38,279 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 3px solid #000;
-            padding-bottom: 10px;
+            padding-bottom: 12px;
             margin-bottom: 2px;
             position: relative;
         }
-        .kop-surat::after {
-            content: '';
-            position: absolute;
-            bottom: -5px;
-            left: 0;
-            width: 100%;
-            border-bottom: 1px solid #000;
-        }
         
         .logo-kiri {
-            width: 100px;
+            width: 90px;
             flex-shrink: 0;
             display: flex;
             justify-content: flex-start;
-            align-self: flex-start;
         }
         .logo-kiri img {
-            width: auto;
-            max-width: 100px;
+            width: 100%;
             height: auto;
-            max-height: 95px;
+            max-height: 85px;
             object-fit: contain;
         }
         
         .kop-text {
             flex: 1;
             text-align: center;
-            padding: 0 15px;
+            padding: 0 20px;
         }
         .kop-text h1 {
             margin: 0 0 2px 0;
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--primary-light);
+            letter-spacing: 0.5px;
             text-transform: uppercase;
         }
         .kop-text h2 {
-            margin: 0 0 5px 0;
-            font-size: 22px;
-            font-weight: bold;
+            margin: 0 0 6px 0;
+            font-size: 19px;
+            font-weight: 800;
+            color: var(--primary);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            line-height: 1.2;
         }
         .kop-text p {
             margin: 0 0 2px 0;
-            font-size: 12px;
-            line-height: 1.3;
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
         }
         
-        /* CONTENT */
-        .report-title {
-            text-align: center;
-            margin-top: 30px;
-            margin-bottom: 20px;
+        .kop-divider-thick {
+            border-bottom: 3px solid #000;
+            margin-top: 5px;
         }
-        .report-title h3 {
+        .kop-divider-thin {
+            border-bottom: 1px solid #000;
+            margin-top: 2px;
+            margin-bottom: 25px;
+        }
+
+        /* HEADER INFO GRID */
+        .info-header-container {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 25px;
+        }
+
+        .report-info {
+            flex: 1;
+        }
+        .report-info h3 {
             font-size: 16px;
-            font-weight: bold;
-            margin: 0;
-            text-decoration: underline;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 0 0 12px 0;
             text-transform: uppercase;
-        }
-        .report-title p {
-            margin: 5px 0 0;
-            font-size: 12px;
+            letter-spacing: 0.5px;
+            border-left: 4px solid var(--accent);
+            padding-left: 10px;
         }
         
+        /* 3-column Grid for perfectly aligned colons */
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: 140px 10px 1fr;
+            row-gap: 6px;
+            font-size: 11.5px;
+        }
+        .metadata-label {
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .metadata-colon {
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .metadata-value {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+        
+        /* FORMAL TABLE STYLING (GOVERNMENT STYLE) */
         table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-bottom: 30px; 
-            font-family: Arial, sans-serif; 
+            margin-bottom: 35px; 
+            margin-top: 15px;
         }
-        th, td { 
-            border: 1px solid #000; 
-            padding: 8px 10px; 
-            text-align: left; 
-            vertical-align: top;
-        }
-        th { 
-            background-color: #f2f2f2; 
-            font-weight: bold;
-            text-transform: uppercase;
+        thead th { 
+            background-color: #f1f5f9; /* Light grey background for formal look */
+            color: #000000;
             font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 8px;
+            text-align: left;
+            border: 1px solid #475569; /* Solid grid lines */
+        }
+        thead th.text-center {
             text-align: center;
+        }
+        tbody td { 
+            padding: 10px 8px; 
+            border: 1px solid #475569; /* Solid grid lines */
+            vertical-align: middle;
+            font-size: 11px;
+            background-color: #ffffff !important; /* Pure white background for all rows */
         }
         .text-center { text-align: center; }
         
-        .footer-signature {
+        /* FOOTER SIGNATURE & VERIFICATION SECTION */
+        .report-footer-section {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
+            align-items: flex-end; /* Align bottom edges */
             margin-top: 40px;
             page-break-inside: avoid;
         }
+
+        .verification-box {
+            display: flex;
+            align-items: center;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 12px;
+            gap: 15px;
+            width: 290px;
+            flex-shrink: 0;
+        }
+        .qr-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px;
+            flex-shrink: 0;
+        }
+        .qr-container canvas, .qr-container img {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .verif-details {
+            display: flex;
+            flex-direction: column;
+        }
+        .verif-status {
+            font-size: 9px;
+            font-weight: 800;
+            color: #16a34a;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .verif-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .verif-code {
+            font-size: 10px;
+            font-family: monospace;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
         .signature-box {
             text-align: center;
-            width: 250px;
-            font-family: Arial, sans-serif;
+            width: 220px;
         }
-        .signature-box p { margin: 0 0 5px; }
-        .signature-space { height: 80px; }
-        .signature-name { font-weight: bold; text-decoration: underline; }
-        
-        .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-            display: inline-block;
-            border: 1px solid #000; 
+        .signature-box p { 
+            margin: 0; 
+            font-size: 11.5px;
         }
-        .badge-completed { background-color: #dcfce7; color: #15803d; border-color: #15803d; }
-        .badge-pending { background-color: #fef9c3; color: #a16207; border-color: #a16207; }
-        .badge-cancelled { background-color: #fee2e2; color: #b91c1c; border-color: #b91c1c; }
+        .signature-date {
+            color: var(--text-muted);
+            margin-bottom: 5px !important;
+        }
+        .signature-space { 
+            height: 70px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .signature-seal {
+            position: absolute;
+            font-size: 45px;
+            color: rgba(37, 99, 235, 0.08);
+            transform: rotate(-12deg);
+        }
+        .signature-name { 
+            font-weight: 700; 
+            color: var(--primary);
+            border-top: 1px dotted var(--text-muted);
+            padding-top: 5px;
+            margin-top: 5px !important;
+        }
         
+        /* PRINT STYLING */
         @media print {
-            .no-print { display: none; }
-            body { margin: 0; padding: 0; }
-            .kop-surat { border-bottom: 3px solid #000 !important; }
-            .badge {
+            .no-print { display: none !important; }
+            body { 
+                margin: 0; 
+                padding: 15mm 15mm; 
+                background: #ffffff;
+            }
+            thead th {
+                background-color: #f1f5f9 !important;
+                color: #000000 !important;
+                border: 1px solid #475569 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            tbody td {
+                background-color: #ffffff !important;
+                border: 1px solid #475569 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .verification-box {
+                background: #f8fafc !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
         }
+        
+        @page {
+            size: A4;
+            margin: 0; 
+        }
     </style>
 </head>
-<body onload="window.print()">
-    <div class="no-print" style="margin-bottom: 20px; text-align: right; background: #f1f5f9; padding: 15px; border-radius: 8px; font-family: 'Plus Jakarta Sans', sans-serif;">
-        <p style="margin: 0 0 10px 0; text-align: left; font-size: 13px; color: #334155;">
-            <i class="fas fa-info-circle"></i> Ini adalah halaman pratinjau cetak. Silakan simpan sebagai PDF atau cetak langsung.
-        </p>
-        <button onclick="window.print()" style="padding: 10px 20px; background: #0f172a; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-            <i class="fas fa-print"></i> Cetak Sekarang / Simpan PDF
-        </button>
-        <a href="{% url 'tamu:riwayat' %}" style="padding: 10px 20px; background: #fff; color: #475569; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; cursor: pointer; text-decoration: none; margin-left: 0.5rem;">
-            Kembali
-        </a>
+<body>
+    <!-- PREVIEW BAR -->
+    <div class="no-print" style="margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 15px 20px; border-radius: 12px; border: 1px solid #e2e8f0; font-family: 'Plus Jakarta Sans', sans-serif; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="background: #e0f2fe; color: #0369a1; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                <i class="fas fa-file-pdf"></i>
+            </div>
+            <div>
+                <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Pratinjau Cetak PDF</h4>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">Silakan pilih printer "Save as PDF" untuk menyimpan dokumen secara digital.</p>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="window.print()" style="padding: 8px 16px; background: #0f172a; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s;">
+                <i class="fas fa-print"></i> Cetak / Simpan PDF
+            </button>
+            <a href="{% url 'tamu:riwayat' %}" style="padding: 8px 16px; background: #fff; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: 0.2s;">
+                <i class="fas fa-arrow-left"></i> Kembali
+            </a>
+        </div>
     </div>
 
     <!-- KOP SURAT -->
@@ -177,70 +325,122 @@
             <p>Sukamahi, Kec. Cikarang Pusat, Kabupaten Bekasi, Jawa Barat 17530, Indonesia.</p>
             <p>Email: diskominfo@bekasikab.go.id | Website: bekasikab.go.id</p>
         </div>
-        
-        <div style="width: 100px;"></div>
+        <div style="width: 90px;"></div> <!-- Spacer balancing logo -->
+    </div>
+    
+    <div class="kop-divider-thick"></div>
+    <div class="kop-divider-thin"></div>
+
+    <!-- HEADER INFO GRID -->
+    <div class="info-header-container">
+        <div class="report-info">
+            <h3>Laporan Riwayat Kunjungan</h3>
+            <div class="metadata-grid">
+                <span class="metadata-label">Nama Pengunjung</span>
+                <span class="metadata-colon">:</span>
+                <span class="metadata-value">{{ tamu.name }}</span>
+                
+                <span class="metadata-label">NIK / Identitas</span>
+                <span class="metadata-colon">:</span>
+                <span class="metadata-value">{{ tamu.nik|default:"-" }}</span>
+                
+                <span class="metadata-label">Instansi Asal</span>
+                <span class="metadata-colon">:</span>
+                <span class="metadata-value">{{ tamu.instansi|default:"-" }}</span>
+                
+                <span class="metadata-label">Tanggal Cetak</span>
+                <span class="metadata-colon">:</span>
+                <span class="metadata-value">{% now "d F Y H:i" %} WIB</span>
+            </div>
+        </div>
     </div>
 
-    <div class="report-title">
-        <h3>Riwayat Kunjungan Saya</h3>
-        <p><strong>Nama Tamu:</strong> {{ tamu.name }}</p>
-        <p>Tanggal Cetak: {% now "d F Y H:i" %}</p>
-    </div>
-
+    <!-- FORMAL TABLE -->
     <table>
         <thead>
             <tr>
-                <th style="width: 5%" class="text-center">No</th>
-                <th style="width: 25%">Waktu & Tanggal</th>
+                <th style="width: 6%" class="text-center">No</th>
+                <th style="width: 24%">Waktu & Tanggal</th>
                 <th style="width: 35%">Tujuan / Keperluan</th>
                 <th style="width: 20%">Petugas Penerima</th>
-                <th style="width: 15%">Status</th>
+                <th style="width: 15%" class="text-center">Status</th>
             </tr>
         </thead>
         <tbody>
             {% for item in kunjungan_list %}
             <tr>
-                <td class="text-center">{{ forloop.counter }}</td>
+                <td class="text-center" style="font-weight: 600;">{{ forloop.counter }}</td>
                 <td>
-                    <div style="font-weight: bold;">{{ item.arrival_time|date:"d M Y" }}</div>
-                    <div style="font-size: 11px; color: #475569;">{{ item.arrival_time|date:"H:i" }} WIB</div>
+                    <div style="font-weight: 700; color: #000000;">{{ item.arrival_time|date:"d M Y" }}</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+                        {{ item.arrival_time|date:"H:i" }} WIB
+                    </div>
                 </td>
                 <td>
-                    <div style="font-weight: bold;">{{ item.purpose }}</div>
-                    <div style="font-size: 11px; color: #475569;">{{ item.pegawai.department|default:"Umum" }}</div>
+                    <div style="font-weight: 700; color: #000000;">{{ item.purpose }}</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+                        Bagian: {{ item.pegawai.department|default:"Umum" }}
+                    </div>
                 </td>
                 <td>
-                    {{ item.pegawai.name|default:"-" }}
+                    <div style="font-weight: 600; color: #000000;">{{ item.pegawai.name|default:"-" }}</div>
+                    {% if item.pegawai.jabatan %}
+                    <div style="font-size: 10px; color: var(--text-muted);">{{ item.pegawai.jabatan }}</div>
+                    {% endif %}
                 </td>
-                <td class="text-center">
+                <td class="text-center" style="font-weight: 700; font-size: 10.5px;">
                     {% if item.status == 'completed' %}
-                        <span class="badge badge-completed">Selesai</span>
+                        <span style="color: #166534;">SELESAI</span>
                     {% elif item.status == 'pending' %}
-                        <span class="badge badge-pending">Menunggu</span>
+                        <span style="color: #475569;">MENUNGGU</span>
                     {% elif item.status == 'cancelled' %}
-                        <span class="badge badge-cancelled">Ditolak</span>
+                        <span style="color: #991b1b;">DITOLAK</span>
                     {% else %}
-                        <span class="badge">{{ item.get_status_display }}</span>
+                        <span>{{ item.get_status_display|upper }}</span>
                     {% endif %}
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5" class="text-center" style="padding: 30px;">
-                    Belum ada data kunjungan yang tercatat.
+                <td colspan="5" class="text-center" style="padding: 40px; color: var(--text-muted); font-style: italic;">
+                    Belum ada data kunjungan yang tercatat untuk tamu ini.
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <div class="footer-signature">
+    <!-- FOOTER SECTION (Verification Box on Bottom Left, Signature Box on Bottom Right) -->
+    <div class="report-footer-section" style="justify-content: flex-end;">
+        <!-- Signature Box (Bottom Right) -->
         <div class="signature-box">
-            <p>Bekasi, {% now "d F Y" %}</p>
-            <p>Tamu,</p>
-            <div class="signature-space"></div>
+            <p class="signature-date">Bekasi, {% now "d F Y" %}</p>
+            <p>Pengunjung / Tamu,</p>
+            <div class="signature-space">
+                <i class="fas fa-shield-alt signature-seal"></i>
+            </div>
             <p class="signature-name">{{ tamu.name }}</p>
         </div>
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+
+            // Simpan title dokumen asli
+            const originalTitle = document.title;
+            
+            // Set document.title agar menjadi nama default saat PDF di-download
+            document.title = "Laporan Kunjungan saya di Diskominfosantik Kabupaten Bekasi";
+
+            // Beri sedikit jeda waktu (300ms) agar browser selesai merender QR code ke canvas 
+            // sebelum dialog print memblokir rendering halaman.
+            setTimeout(function() {
+                window.print();
+                
+                // Kembalikan document.title asli setelah print dialog ditutup
+                document.title = originalTitle;
+            }, 300);
+        });
+    </script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 {% extends 'guest_book/admin_base.html' %}
-{% load static %}
+{% load static custom_filters %}
 
 {% block title %}Chat Manajemen{% endblock %}
 {% block page_title %}MANAJEMEN CHAT & PESAN{% endblock %}
@@ -325,8 +325,16 @@
             </div>
         </div>
 
-        <div class="message-area" id="messageArea" style="flex: 1 !important; padding: 2rem !important; overflow-y: auto !important; display: flex !important; flex-direction: column !important; gap: 1.25rem !important; background: #f8fafc !important; min-height: 0 !important;">
+        <div class="message-area" id="messageArea" style="flex: 1 !important; padding: 2rem !important; overflow-y: auto !important; display: flex !important; flex-direction: column !important; gap: 1.25rem !important; background-color: #f8fafc !important; background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') !important; background-repeat: repeat !important; background-size: 400px !important; min-height: 0 !important;">
             {% for msg in first_conv.messages %}
+            
+            <!-- DATE SEPARATOR -->
+            {% ifchanged msg.created_at.date %}
+            <div style="text-align: center; margin: 1.5rem 0; position: relative; z-index: 1;">
+                <span style="background: #eff6ff; color: #1e40af; font-size: 0.65rem; font-weight: 800; padding: 0.35rem 0.85rem; border-radius: 99px; letter-spacing: 0.05em; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">{{ msg.created_at|smart_date }}</span>
+            </div>
+            {% endifchanged %}
+
             <div class="msg-group {% if msg.sender_type == 'admin' %}sent{% else %}received{% endif %}" data-id="{{ msg.id }}" data-created-at="{{ msg.created_at|date:'c' }}">
                 <div class="msg-bubble">
                     {% if msg.message_type == 'deleted' %}
@@ -395,22 +403,6 @@
 
 {% block extra_js %}
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAsJCzp8DUY5PyQ4u7MgO2hppYQ8o4UjlU",
-      authDomain: "bukutamudigital-43ae7.firebaseapp.com",
-      projectId: "bukutamudigital-43ae7",
-      storageBucket: "bukutamudigital-43ae7.firebasestorage.app",
-      messagingSenderId: "304828413385",
-      appId: "1:304828413385:web:798cc84081a335c8d1e418",
-      measurementId: "G-PP2M3Z4NHL"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const storage = getStorage(app);
-
     let activeSession = "{% if conversations %}{{ conversations.0.guest.id }}{% endif %}";
     let lastMsgId = "{% if conversations %}{% with last=conversations.0.messages.last %}{{ last.id }}{% endwith %}{% endif %}";
     let chatSocket;
@@ -546,26 +538,34 @@
                         messageType = 'image';
                     }
 
-                    // Upload to Firebase Storage
-                    const storageRef = ref(storage, 'chat_attachments/' + Date.now() + '_' + file.name);
-                    
-                    uploadBytes(storageRef, file).then((snapshot) => {
-                        getDownloadURL(snapshot.ref).then((downloadURL) => {
+                    // Upload to Local Django Server
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    fetch('/api/chat/upload/', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if(data.success) {
                             // Kirim pesan via WebSocket
                             chatSocket.send(JSON.stringify({
                                 'action': 'create',
-                                'message': file.name, // Gunakan nama file sebagai content
+                                'message': data.file_name, // Gunakan nama file sebagai content
                                 'sender_id': 'admin',
                                 'sender_type': 'admin',
-                                'message_type': messageType,
-                                'file_url': downloadURL,
-                                'file_path': snapshot.ref.fullPath // Path di Firebase
+                                'message_type': data.message_type,
+                                'file_url': data.file_url,
+                                'file_path': data.file_path // Path lokal di server
                             }));
-                        });
+                        } else {
+                            alert('Gagal mengunggah file: ' + data.error);
+                        }
                     })
                     .catch(err => {
                         console.error(err);
-                        alert('Gagal mengunggah file ke Firebase.');
+                        alert('Terjadi kesalahan saat menghubungi server.');
                     })
                     .finally(() => {
                         btnAttach.innerHTML = '<i class="fas fa-paperclip"></i>';

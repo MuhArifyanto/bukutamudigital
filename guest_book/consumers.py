@@ -45,6 +45,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if not message or not sender_id or not sender_type:
                 return
 
+            # Backend file extension validation
+            if message_type in ['file', 'image'] and message:
+                allowed_extensions = ['doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'svg']
+                ext = message.split('.')[-1].lower() if '.' in message else ''
+                if ext not in allowed_extensions:
+                    await self.send(text_data=json.dumps({
+                        'action': 'error',
+                        'message': 'Format file ditolak oleh server karena alasan keamanan.'
+                    }))
+                    return
+
             # Save message to database
             msg = await self.save_message(sender_id, sender_type, message, message_type, file_path)
 
@@ -52,8 +63,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if sender_type == 'tamu':
                 await self.create_notification(sender_id, message)
             elif sender_type == 'admin':
-                from .models import Notification
-                await database_sync_to_async(Notification.objects.create)(
+                from .utils import send_notification
+                await database_sync_to_async(send_notification)(
                     recipient_id=self.session_id,
                     recipient_type='tamu',
                     notification_type='message_replied',
@@ -154,11 +165,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def create_notification(self, sender_id, message):
-        from .models import Notification, Tamu
-        tamu = Tamu.objects.filter(id=sender_id).first()
+        from .models import Tamu
+        from .utils import send_notification
+        
+        tamu = None
+        try:
+            import uuid
+            # Handle if sender_id is a valid UUID or session string
+            uuid_obj = uuid.UUID(str(sender_id))
+            tamu = Tamu.objects.filter(id=uuid_obj).first()
+        except (ValueError, TypeError):
+            pass
+            
         tamu_name = tamu.name if tamu else "Tamu"
         
-        Notification.objects.create(
+        send_notification(
             recipient_id='admin',
             recipient_type='admin',
             notification_type='message_received',
@@ -190,9 +211,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
         import uuid
         try:
             msg = ChatMessage.objects.get(id=uuid.UUID(message_id), sender_id=sender_id)
+            old_content = msg.content
             msg.content = "Pesan ini telah dihapus"
             msg.message_type = 'deleted'
             msg.save()
+            
+            if sender_id == 'admin':
+                from .views.base import record_audit_log
+                record_audit_log(
+                    user_id='admin',
+                    user_type='admin',
+                    action='delete',
+                    table_name='chat_message',
+                    record_id=str(msg.id),
+                    old_value=f"Menghapus chat: {old_content[:50]}...",
+                    ip_address='WebSocket'
+                )
+                
             return True
         except (ChatMessage.DoesNotExist, ValueError):
             return False

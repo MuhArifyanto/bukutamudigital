@@ -1,5 +1,5 @@
 {% extends 'guest_book/tamu_base.html' %}
-{% load static %}
+{% load static custom_filters %}
 
 {% block title %}Pesan Warga{% endblock %}
 
@@ -104,9 +104,11 @@
         <!-- CHAT HEADER -->
         <div class="chat-header-mobile" style="padding: 1.25rem 2rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fff;">
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 40px; height: 40px; background: #eff6ff; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #1e40af;">
-                    <i class="fas fa-comments"></i>
-                </div>
+                {% if admin_user and admin_user.profile_picture %}
+                    <img src="{{ admin_user.profile_picture.url }}" style="width: 42px; height: 42px; border-radius: 12px; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.05);" alt="Admin">
+                {% else %}
+                    <img src="/static/images/logo-diskominfosantik.png" style="width: 42px; height: 42px; border-radius: 12px; object-fit: contain; background: #eff6ff; padding: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);" alt="Admin">
+                {% endif %}
                 <div>
                     <h6 style="margin: 0; font-weight: 700; color: #0f172a;">Konsultasi Layanan Tamu</h6>
                     <span style="font-size: 0.75rem; color: #64748b;">Nomor Tiket: #GS-2023-0092</span>
@@ -119,24 +121,19 @@
         </div>
 
         <!-- MESSAGE AREA -->
-        <div class="message-area" id="messageArea" style="flex: 1; padding: 2rem; overflow-y: auto; background: #fff; display: flex; flex-direction: column; gap: 1.5rem;">
-            <!-- DATE SEPARATOR -->
-            <div style="text-align: center; margin: 1rem 0; position: relative;">
-                <span style="background: #eff6ff; color: #1e40af; font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 99px; letter-spacing: 0.05em;">HARI INI</span>
-            </div>
-
+        <div class="message-area" id="messageArea" style="flex: 1; padding: 2rem; overflow-y: auto; background-color: #f8fafc; background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-repeat: repeat; background-size: 400px; display: flex; flex-direction: column; gap: 1.5rem;">
             {% for msg in messages_list %}
+            
+            <!-- DATE SEPARATOR -->
+            {% ifchanged msg.created_at.date %}
+            <div style="text-align: center; margin: 1rem 0; position: relative;">
+                <span style="background: #eff6ff; color: #1e40af; font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 99px; letter-spacing: 0.05em;">{{ msg.created_at|smart_date }}</span>
+            </div>
+            {% endifchanged %}
+
             <div class="msg-wrapper {% if msg.sender_type == 'tamu' %}sent{% else %}received{% endif %}" data-id="{{ msg.id }}" data-created-at="{{ msg.created_at|date:'c' }}">
                 
-                <!-- AVATAR (If received) -->
-                {% if msg.sender_type != 'tamu' %}
-                    {% if msg.sender_obj.profile_picture %}
-                        <img src="{{ msg.sender_obj.profile_picture.url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="Avatar">
-                    {% else %}
-                        <!-- Gunakan Logo Instansi sebagai pengganti foto Admin -->
-                        <img src="/static/images/logo-diskominfosantik.png" style="width: 32px; height: 32px; border-radius: 50%; object-fit: contain; background: #eff6ff; padding: 2px; flex-shrink: 0;" alt="Avatar">
-                    {% endif %}
-                {% endif %}
+
 
                 <!-- BUBBLE -->
                 <div class="msg-bubble-container">
@@ -160,16 +157,7 @@
                     </span>
                 </div>
 
-                <!-- AVATAR (If sent) -->
-                {% if msg.sender_type == 'tamu' %}
-                    {% if msg.sender_obj.profile_picture %}
-                        <img src="{{ msg.sender_obj.profile_picture.url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="Avatar">
-                    {% else %}
-                        <div style="width: 32px; height: 32px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #fff; flex-shrink: 0;">
-                            {{ tamu.name|slice:":2"|upper }}
-                        </div>
-                    {% endif %}
-                {% endif %}
+
             </div>
             {% empty %}
             <div class="text-center my-auto opacity-50">
@@ -206,31 +194,17 @@
 
 {% block extra_js %}
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAsJCzp8DUY5PyQ4u7MgO2hppYQ8o4UjlU",
-      authDomain: "bukutamudigital-43ae7.firebaseapp.com",
-      projectId: "bukutamudigital-43ae7",
-      storageBucket: "bukutamudigital-43ae7.firebasestorage.app",
-      messagingSenderId: "304828413385",
-      appId: "1:304828413385:web:798cc84081a335c8d1e418",
-      measurementId: "G-PP2M3Z4NHL"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const storage = getStorage(app);
-
+    let sessionId = "{{ request.session.tamu_id }}";
+    let chatSocket;
+    let editingMessageId = null;
     const msgArea = document.getElementById('messageArea');
     const chatForm = document.getElementById('chatForm');
     const chatInput = document.getElementById('chatInput');
-    const sessionId = "{{ session_id }}";
     
     msgArea.scrollTop = msgArea.scrollHeight;
 
     const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const chatSocket = new WebSocket(
+    chatSocket = new WebSocket(
         `${wsScheme}://${window.location.host}/ws/chat/${sessionId}/`
     );
 
@@ -250,9 +224,6 @@
         }
         
         const isSent = type === 'sent';
-        const avatarHtml = isSent 
-            ? `<div style="width: 32px; height: 32px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #fff; flex-shrink: 0;">{{ tamu.name|slice:":2"|upper }}</div>`
-            : `<div style="width: 32px; height: 32px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #475569; flex-shrink: 0;"><i class="fas fa-user"></i></div>`;
             
         let actionButtons = '';
         if (isSent && messageType !== 'deleted') {
@@ -263,17 +234,15 @@
         }
 
         wrapper.innerHTML = `
-            ${!isSent ? avatarHtml : ''}
             <div class="msg-bubble-container">
                 <div class="msg-bubble">
                     ${bubbleContent}
                 </div>
                 <span style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.25rem; display: flex; gap: 0.5rem; align-items: center;">
-                    <span>${!isSent ? 'Sarah • ' : ''}${time} WIB</span>
+                    <span>${!isSent ? 'Admin • ' : ''}${time} WIB</span>
                     ${actionButtons}
                 </span>
             </div>
-            ${isSent ? avatarHtml : ''}
         `;
         
         msgArea.appendChild(wrapper);
@@ -427,26 +396,34 @@
                 messageType = 'image';
             }
 
-            // Upload to Firebase Storage
-            const storageRef = ref(storage, 'chat_attachments/' + Date.now() + '_' + file.name);
-            
-            uploadBytes(storageRef, file).then((snapshot) => {
-                getDownloadURL(snapshot.ref).then((downloadURL) => {
+            // Upload to Local Django Server
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/chat/upload/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
                     // Kirim pesan via WebSocket
                     chatSocket.send(JSON.stringify({
                         'action': 'create',
-                        'message': file.name, // Gunakan nama file sebagai content
+                        'message': data.file_name, // Gunakan nama file sebagai content
                         'sender_id': sessionId,
                         'sender_type': 'tamu',
-                        'message_type': messageType,
-                        'file_url': downloadURL,
-                        'file_path': snapshot.ref.fullPath // Path di Firebase
+                        'message_type': data.message_type,
+                        'file_url': data.file_url,
+                        'file_path': data.file_path // Path lokal di server
                     }));
-                });
+                } else {
+                    alert('Gagal mengunggah file: ' + data.error);
+                }
             })
             .catch(err => {
                 console.error(err);
-                alert('Gagal mengunggah file ke Firebase.');
+                alert('Terjadi kesalahan saat menghubungi server.');
             })
             .finally(() => {
                 btnAttach.innerHTML = '<i class="fas fa-paperclip"></i>';

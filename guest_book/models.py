@@ -63,6 +63,11 @@ class Tamu(models.Model):
         ('google_sso', 'Google SSO'),
     ]
     
+    ADMIN_ROLE_CHOICES = [
+        ('super_admin', 'Super Admin'),
+        ('operator', 'Operator'),
+    ]
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
@@ -77,6 +82,7 @@ class Tamu(models.Model):
     google_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
     profile_picture = models.FileField(upload_to='profiles/', null=True, blank=True)
     is_admin = models.BooleanField(default=False)
+    admin_role = models.CharField(max_length=20, choices=ADMIN_ROLE_CHOICES, default='operator')
     nip = models.CharField(max_length=50, null=True, blank=True)
     jabatan = models.CharField(max_length=100, null=True, blank=True)
     

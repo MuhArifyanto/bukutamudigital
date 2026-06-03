@@ -4,6 +4,7 @@
 
 # Google API Credentials (Old JSON file)
 google_credentials.json
+firebase_credentials.json
 
 # Python
 __pycache__/
@@ -19,3 +20,8 @@ staticfiles/
 
 # Node
 node_modules/
+
+# Temp Files
+downloaded_captcha/
+static/images/captcha/
+test_traffic_light_*.jpg

@@ -3,24 +3,29 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Laporan Data Kunjungan - {{ instansi.nama|default:"Diskominfosantik Kabupaten Bekasi" }}</title>
+    <title>Laporan Aktivitas Sistem - {{ instansi.nama|default:"Diskominfosantik Kabupaten Bekasi" }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <style>
         body { 
-            font-family: 'Times New Roman', Times, serif; 
-            font-size: 12px; 
+            font-family: Arial, Helvetica, sans-serif; 
+            font-size: 11px; 
             color: #000;
             background: #fff;
             margin: 0;
             padding: 20px;
         }
         
+        @page {
+            size: A4 landscape;
+            margin: 0; /* Menghilangkan header/footer bawaan browser */
+        }
+        
         /* KOP SURAT / LETTERHEAD */
         .kop-surat {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: center; /* Center everything */
             border-bottom: 3px solid #000;
             padding-bottom: 10px;
             margin-bottom: 2px;
@@ -36,38 +41,23 @@
         }
         
         .logo-kiri {
-            width: 220px; /* Equal to logo-kanan for perfect centering of kop-text */
+            width: 120px;
             flex-shrink: 0;
             display: flex;
-            justify-content: flex-start;
-            align-self: flex-start;
+            justify-content: center;
         }
         .logo-kiri img {
             width: auto;
-            max-width: 100px;
+            max-width: 90px;
             height: auto;
-            max-height: 95px;
-            object-fit: contain;
-        }
-        
-        .logo-kanan {
-            width: 220px;
-            flex-shrink: 0;
-            display: flex;
-            justify-content: flex-end; /* Align right side of container */
-            align-self: flex-start;
-        }
-        .logo-kanan img {
-            max-width: 100%;
-            height: auto;
-            max-height: 85px; /* Give it more room to grow vertically */
+            max-height: 90px;
             object-fit: contain;
         }
         
         .kop-text {
             flex: 1;
             text-align: center;
-            padding: 0 15px;
+            padding: 0 10px;
         }
         .kop-text h1 {
             margin: 0 0 2px 0;
@@ -77,15 +67,19 @@
         }
         .kop-text h2 {
             margin: 0 0 5px 0;
-            font-size: 22px;
+            font-size: 20px; 
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .kop-text p {
             margin: 0 0 2px 0;
-            font-size: 12px;
+            font-size: 11px;
             line-height: 1.3;
+        }
+        
+        .logo-kanan {
+            width: 120px;
         }
         
         /* CONTENT */
@@ -114,9 +108,11 @@
         }
         th, td { 
             border: 1px solid #000; 
-            padding: 8px 10px; 
+            padding: 6px 8px; 
             text-align: left; 
-            vertical-align: top;
+            vertical-align: middle;
+            word-break: normal;
+            font-size: 11px;
         }
         th { 
             background-color: #f2f2f2; 
@@ -124,6 +120,7 @@
             text-transform: uppercase;
             font-size: 11px;
             text-align: center;
+            white-space: nowrap;
         }
         .text-center { text-align: center; }
         
@@ -154,20 +151,20 @@
         
         @media print {
             .no-print { display: none; }
-            body { margin: 0; padding: 0; }
+            body { margin: 0; padding: 1.5cm 2cm; } /* Memberi jarak agar konten tidak mepet ujung kertas */
             .kop-surat { border-bottom: 3px solid #000 !important; }
             .badge { border: 1px solid #000 !important; color: #000 !important; }
             
+            /* Mencegah tabel header terulang di halaman 2 */
             thead { display: table-row-group; }
+            
+            /* Mencegah isi baris terpotong secara horizontal di antara 2 halaman */
             tr { page-break-inside: avoid; break-inside: avoid; }
         }
     </style>
 </head>
 <body onload="window.print()">
     <div class="no-print" style="margin-bottom: 20px; text-align: right; background: #f1f5f9; padding: 15px; border-radius: 8px; font-family: 'Plus Jakarta Sans', sans-serif;">
-        <p style="margin: 0 0 10px 0; text-align: left; font-size: 13px; color: #334155;">
-            <i class="fas fa-info-circle"></i> <strong>Instruksi Logo:</strong> Pastikan Anda telah menyimpan 2 gambar logo yang Anda miliki ke dalam folder aplikasi Anda di <code>c:\bukudigital\static\images\</code> dengan nama <code>logo-bekasi.jpg</code> dan <code>logo-diskominfosantik.png</code> agar tampil di kop surat ini.
-        </p>
         <button onclick="window.print()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 5px rgba(59,130,246,0.3);">
             <i class="fas fa-print"></i> Cetak Sekarang / Simpan PDF
         </button>
@@ -188,12 +185,11 @@
             <p>Email: diskominfo@bekasikab.go.id | Website: bekasikab.go.id</p>
         </div>
         
-        <!-- Logo Kanan Dihapus sesuai permintaan user -->
         <div class="logo-kanan" style="width: 220px;"></div>
     </div>
 
     <div class="report-title">
-        <h3>Laporan Data Kunjungan Tamu</h3>
+        <h3>Laporan Rekam Jejak Aktivitas (Audit Log)</h3>
         <p>Tanggal Cetak: {% now "d F Y H:i" %}</p>
     </div>
 
@@ -201,53 +197,45 @@
         <thead>
             <tr>
                 <th style="width: 5%" class="text-center">No</th>
-                <th style="width: 20%">Data Pengunjung</th>
-                <th style="width: 18%">Waktu Kunjungan</th>
-                <th style="width: 25%">Tujuan & Bidang</th>
-                <th style="width: 15%">Status</th>
+                <th style="width: 13%">Waktu</th>
+                <th style="width: 22%">Pelaku</th>
+                <th style="width: 10%">Aksi</th>
+                <th style="width: 15%">Tabel</th>
+                <th style="width: 35%">Detail Perubahan</th>
             </tr>
         </thead>
         <tbody>
-            {% for item in kunjungan_all %}
+            {% for log in logs_all %}
             <tr>
                 <td class="text-center">{{ forloop.counter }}</td>
                 <td>
-                    <strong style="font-size: 13px;">{{ item.tamu.name }}</strong><br>
-                    <span style="font-size: 11px;">Instansi: {{ item.tamu.instansi|default:"Personal" }}</span>
+                    {{ log.timestamp|date:"d M Y" }}<br>
+                    <strong>{{ log.timestamp|date:"H:i:s" }} WIB</strong>
                 </td>
                 <td>
-                    <div style="margin-bottom: 4px;">
-                        <strong>Datang:</strong> {{ item.arrival_time|date:"d M Y H:i" }}
-                    </div>
-                    <div>
-                        <strong>Pulang:</strong> 
-                        {% if item.departure_time %}
-                            {{ item.departure_time|date:"d M Y H:i" }}
-                        {% else %}
-                            <span style="font-size: 10px; font-weight: bold;">Belum Pulang</span>
-                        {% endif %}
-                    </div>
+                    <strong style="word-break: break-all;">{% if log.user_name|length > 30 %}{{ log.user_name|truncatechars:20 }}{% else %}{{ log.user_name|default:log.user_id }}{% endif %}</strong><br>
+                    <span style="font-size: 10px;">Tipe: {{ log.get_user_type_display|default:log.user_type }}</span><br>
+                    <span style="font-size: 10px;">IP: {{ log.ip_address|default:"-" }}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge">{{ log.get_action_display|default:log.action }}</span>
+                </td>
+                <td class="text-center">
+                    {{ log.table_name }}
                 </td>
                 <td>
-                    <div style="margin-bottom: 4px;"><strong>{{ item.purpose }}</strong></div>
-                    <span style="font-size: 11px;">Menemui: {{ item.pegawai.name|default:"Umum" }} ({{ item.pegawai.department_rel.nama|default:"Internal" }})</span>
-                </td>
-                <td>
-                    {% if item.status == 'completed' %}
-                        <span class="badge">Selesai</span>
-                    {% elif item.status == 'pending' %}
-                        <span class="badge">Menunggu</span>
-                    {% elif item.status == 'cancelled' %}
-                        <span class="badge">Ditolak</span>
-                    {% else %}
-                        <span class="badge">{{ item.get_status_display }}</span>
+                    <div style="font-size: 10px; margin-bottom: 2px;"><strong>ID:</strong> {{ log.record_id }}</div>
+                    {% if log.new_value and log.action != 'delete' %}
+                        <div style="font-size: 10px; color: #444; border-top: 1px dashed #ccc; padding-top: 2px; max-height: 50px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {{ log.new_value|truncatechars:100 }}
+                        </div>
                     {% endif %}
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5" class="text-center" style="padding: 30px;">
-                    Belum ada data kunjungan yang tercatat.
+                <td colspan="6" class="text-center" style="padding: 30px;">
+                    Belum ada data aktivitas yang tercatat.
                 </td>
             </tr>
             {% endfor %}

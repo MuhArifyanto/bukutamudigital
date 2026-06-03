@@ -252,6 +252,22 @@
     <form method="post" action="{% url 'tamu:kunjungan_baru' %}" id="realKunjunganForm">
         {% csrf_token %}
         
+        {% if form.errors %}
+        <div class="alert alert-danger" style="border-radius: 8px; font-size: 0.9rem; padding: 1rem; margin-bottom: 1.5rem; background-color: #fee2e2; border: 1px solid #fca5a5; color: #991b1b;">
+            <h5 style="margin-top: 0; font-weight: 700; margin-bottom: 0.5rem;"><i class="fas fa-exclamation-triangle"></i> Gagal Mengirim Booking:</h5>
+            <ul style="margin-bottom: 0; padding-left: 1.25rem;">
+                {% for field in form %}
+                    {% for error in field.errors %}
+                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        
         <!-- Hidden input untuk digabungkan nanti -->
         <input type="hidden" name="arrival_time" id="id_arrival_time">
         <input type="hidden" name="purpose" id="id_purpose">

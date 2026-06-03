@@ -44,6 +44,8 @@
         ══════════════════════════════════════════ */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        html { font-size: 90%; }
+        
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background: var(--page-bg);
@@ -117,7 +119,26 @@
             padding: 1.4rem 1.5rem 0.4rem;
         }
 
-        .nav-menu { list-style: none; padding: 0 0.75rem; flex: 1; }
+        .nav-menu { 
+            list-style: none; 
+            padding: 0 0.75rem; 
+            flex: 1; 
+            overflow-y: auto;
+            /* Custom Scrollbar for nav-menu */
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.2) transparent;
+        }
+        .nav-menu::-webkit-scrollbar {
+            width: 4px;
+        }
+        .nav-menu::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .nav-menu::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+        
         .nav-menu li { margin-bottom: 2px; }
 
         .nav-link-custom {
@@ -458,6 +479,14 @@
                         Profil Administrator
                     </a>
                 </li>
+                
+                <li>
+                    <a href="{% url 'tamu:admin_audit_log' %}"
+                       class="nav-link-custom {% if active_page == 'audit_log' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-history"></i></span>
+                        Laporan Aktivitas
+                    </a>
+                </li>
             </ul>
         </nav>
 
@@ -514,13 +543,14 @@
                     <div class="notif-dropdown" id="notifDropdown" style="display: none; position: absolute; right: 0; top: 40px; width: 320px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000; border: 1px solid #e2e8f0;">
                         <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
                             <h6 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b;">Notifikasi</h6>
+                            {% if unread_notifications_count > 0 %}
+                            <span id="markAllReadBtn" style="font-size: 0.75rem; color: #3b82f6; cursor: pointer;" onclick="markAllRead()">Tandai dibaca</span>
+                            {% endif %}
                         </div>
                         <div id="notifList" style="max-height: 250px; overflow-y: auto;">
                             <p style="color: #64748b; font-size: 0.85rem; padding: 1rem; text-align: center; margin: 0;">Memuat...</p>
                         </div>
-                        <div style="text-align: center; border-top: 1px solid #e2e8f0; padding: 0.5rem;">
-                            <a href="{% url 'tamu:notifications' %}" style="font-size: 0.85rem; color: #3b82f6; text-decoration: none; font-weight: 500;">Lihat Semua</a>
-                        </div>
+
                     </div>
                 </div>
 
@@ -607,6 +637,32 @@
             const notifBtn = document.getElementById('notifBtn');
             const notifDropdown = document.getElementById('notifDropdown');
             const notifList = document.getElementById('notifList');
+            
+            window.markAllRead = function() {
+                fetch("{% url 'tamu:api_mark_all_notifications_read' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const badge = document.querySelector('#globalNotifBadge');
+                        if (badge) badge.remove();
+                        
+                        const markBtn = document.getElementById('markAllReadBtn');
+                        if (markBtn) markBtn.remove();
+                        
+                        if (notifList) {
+                            notifList.innerHTML = '<p style="color: #64748b; font-size: 0.85rem; padding: 1rem; text-align: center; margin: 0;">Semua notifikasi sudah dibaca.</p>';
+                        }
+                        if (notifDropdown) notifDropdown.style.display = 'none';
+                    }
+                })
+                .catch(err => console.error(err));
+            };
             
             if (notifBtn && notifDropdown) {
                 notifBtn.addEventListener('click', function(e) {

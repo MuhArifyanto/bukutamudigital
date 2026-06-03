@@ -9,7 +9,6 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="{% static 'images/logo-diskominfosantik.png' %}">
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <style>
         :root {
             --primary: #0a2558;
@@ -293,6 +292,49 @@
 
 
 
+        /* ── GRID CAPTCHA CSS ── */
+        .captcha-tile {
+            position: relative;
+            background-size: 400% 400%;
+            cursor: pointer;
+            transition: transform 0.1s ease-out;
+            overflow: hidden;
+        }
+        .captcha-tile:active {
+            transform: scale(0.95);
+        }
+        .captcha-tile.selected {
+            transform: scale(0.9);
+            box-shadow: 0 0 0 2px #3b82f6 inset;
+            border: 2px solid #3b82f6;
+            box-sizing: border-box;
+        }
+        .captcha-tile.selected::after {
+            content: '\f058';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            color: #3b82f6;
+            font-size: 1rem;
+            background: #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+        .captcha-shake {
+            animation: shake 0.4s ease-in-out;
+        }
         @media (max-width: 991px) {
             .register-card { flex-direction: column; }
             .register-info, .register-form-area { width: 100%; }
@@ -346,7 +388,27 @@
                 <h1 class="form-title">Daftar Akun Baru</h1>
                 <p class="form-subtitle">Lengkapi formulir di bawah untuk membuat identitas tamu resmi.</p>
 
-            <form method="post" action="{% url 'tamu:register' %}">
+                {% if messages %}
+                <div style="margin-bottom: 1.5rem;">
+                    {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert" style="border-radius: 12px; font-size: 0.85rem; padding: 0.75rem 1rem;">
+                        {% if message.tags == 'success' %}
+                        <i class="fas fa-check-circle me-2"></i>
+                        {% elif message.tags == 'warning' %}
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        {% elif message.tags == 'danger' or message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        {% else %}
+                        <i class="fas fa-info-circle me-2"></i>
+                        {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+            <form id="registerForm" method="post" action="{% url 'tamu:register' %}">
                 {% csrf_token %}
                 
                 <div class="row">
@@ -431,12 +493,54 @@
                     {% endfor %}
                 </div>
                 {% endif %}
-
-                <!-- Google reCAPTCHA -->
-                <div class="mb-3 d-flex justify-content-center">
-                    <div class="g-recaptcha" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></div>
+                              <!-- Custom Grid Selection Captcha Modal Overlay -->
+                <div id="captchaModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); z-index: 9999; align-items: center; justify-content: center; padding: 1rem;">
+                    <div id="captchaContainer" style="width: 336px; background: #fff; border: 1px solid var(--border-soft); border-radius: 16px; padding: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); position: relative; font-family: 'Inter', sans-serif;">
+                        <!-- Header with prompt and a close button -->
+                        <div id="captchaHeader" style="background: var(--primary); color: #fff; padding: 16px 36px 16px 16px; border-radius: 12px; margin-bottom: 12px; position: relative;">
+                            <button type="button" id="closeCaptchaBtn" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: rgba(255,255,255,0.8); cursor: pointer; font-size: 1.15rem; transition: color 0.2s; padding: 0; line-height: 1;" title="Tutup">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <div style="font-size: 0.8rem; font-weight: 500; opacity: 0.9;">Pilih semua gambar yang memuat</div>
+                            <div id="captchaPrompt" style="font-size: 1.35rem; font-weight: 800; line-height: 1.2; margin-top: 4px;">lampu lalu lintas</div>
+                            <div style="font-size: 0.75rem; font-weight: 500; opacity: 0.9; margin-top: 4px;">Jika tidak ada, klik lewati/verifikasi</div>
+                        </div>
+                        
+                        <!-- Grid 4x4 area wrapper -->
+                        <div id="gridWrapper" style="position: relative; width: 304px; height: 304px; border-radius: 8px; overflow: hidden; background: #f1f5f9; margin: 0 auto;">
+                            <div id="captchaGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 2px; width: 100%; height: 100%;">
+                                <!-- JS will generate 16 tiles here -->
+                            </div>
+                            <!-- Overlay success -->
+                            <div id="captchaSuccessOverlay" style="display: none; position: absolute; inset: 0; background: rgba(255,255,255,0.92); z-index: 10; flex-direction: column; align-items: center; justify-content: center; color: #065f46;">
+                                <i class="fas fa-check-circle" style="font-size: 3.5rem; margin-bottom: 0.5rem; color: #10b981;"></i>
+                                <div style="font-weight: 800; font-size: 1rem;">Verifikasi Berhasil!</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Footer bar with actions -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 4px 4px; border-top: 1px solid #f1f5f9; margin-top: 12px;">
+                            <div style="display: flex; gap: 12px; color: #64748b;">
+                                <button type="button" id="refreshCaptcha" style="background: none; border: none; padding: 4px; color: inherit; cursor: pointer; transition: color 0.2s;" title="Ganti Gambar">
+                                    <i class="fas fa-sync-alt" style="font-size: 1rem;"></i>
+                                </button>
+                                <button type="button" style="background: none; border: none; padding: 4px; color: inherit; cursor: not-allowed;" disabled>
+                                    <i class="fas fa-headphones" style="font-size: 1rem; opacity: 0.5;"></i>
+                                </button>
+                                <button type="button" style="background: none; border: none; padding: 4px; color: inherit; cursor: not-allowed;" disabled>
+                                    <i class="fas fa-info-circle" style="font-size: 1rem; opacity: 0.5;"></i>
+                                </button>
+                            </div>
+                            <button type="button" id="verifyCaptchaBtn" style="background: #3b82f6; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: background 0.2s; text-transform: uppercase;">
+                                Lewati
+                            </button>
+                        </div>
+                    </div>
                 </div>
-
+                <!-- Hidden inputs for backend submission -->
+                <input type="hidden" id="captchaPuzzleIndex" name="captcha_puzzle_index" value="-1">
+                <input type="hidden" id="captchaSelectedTiles" name="captcha_selected_tiles" value="[]">
+                <input type="hidden" id="captchaTrajectory" name="captcha_trajectory" value="[]">
                 <button type="submit" class="btn-submit" id="submitBtn">Daftarkan Sekarang</button>
             </form>
 
@@ -497,21 +601,207 @@
         }
     });
 
-    // Simple check for CAPTCHA before submit
-    document.querySelector('form').addEventListener('submit', function(e) {
-        var response = grecaptcha.getResponse();
-        if(response.length == 0) { 
-            e.preventDefault();
-            alert('Silakan centang reCAPTCHA terlebih dahulu untuk membuktikan Anda bukan robot.');
+    // Grid Captcha Script
+    window.puzzleSolved = false;
+    
+    const gridPuzzles = [
+        {
+            id: 0,
+            label: 'Lampu Lalu Lintas',
+            imgUrl: "{% static 'images/captcha/captcha_0.png' %}",
+            correct: [1, 2, 5, 6, 9, 10]
+        },
+        {
+            id: 1,
+            label: 'Penyeberangan Jalan (Zebra Cross)',
+            imgUrl: "{% static 'images/captcha/captcha_1.png' %}",
+            correct: [8, 9, 10, 11, 12, 13, 14, 15]
+        },
+        {
+            id: 2,
+            label: 'Sepeda',
+            imgUrl: "{% static 'images/captcha/captcha_2.png' %}",
+            correct: [5, 6, 7, 9, 10, 11, 13, 14]
+        },
+        {
+            id: 3,
+            label: 'Mobil',
+            imgUrl: "{% static 'images/captcha/captcha_3.png' %}",
+            correct: [5, 6, 7, 9, 10, 11, 13, 14]
+        },
+        {
+            id: 4,
+            label: 'Bus',
+            imgUrl: "{% static 'images/captcha/captcha_4.png' %}",
+            correct: [4, 5, 6, 8, 9, 10, 12, 13, 14]
+        },
+        {
+            id: 5,
+            label: 'Sepeda Motor',
+            imgUrl: "{% static 'images/captcha/captcha_5.png' %}",
+            correct: [5, 6, 7, 9, 10, 11, 13, 14]
+        },
+        {
+            id: 6,
+            label: 'Hidran Kebakaran',
+            imgUrl: "{% static 'images/captcha/captcha_6.png' %}",
+            correct: [5, 6, 9, 10, 13, 14]
+        },
+        {
+            id: 7,
+            label: 'Jembatan',
+            imgUrl: "{% static 'images/captcha/captcha_7.png' %}",
+            correct: [4, 5, 6, 7, 8, 9, 10, 11]
+        },
+        {
+            id: 8,
+            label: 'Tangga',
+            imgUrl: "{% static 'images/captcha/captcha_8.png' %}",
+            correct: [4, 5, 8, 9, 12, 13, 14]
+        },
+        {
+            id: 9,
+            label: 'Perahu',
+            imgUrl: "{% static 'images/captcha/captcha_9.png' %}",
+            correct: [9, 10, 11, 13, 14, 15]
+        },
+        {
+            id: 10,
+            label: 'Wanita Cantik',
+            imgUrl: "{% static 'images/captcha/captcha_10.png' %}",
+            correct: [2, 5, 6, 9, 10, 13, 14]
         }
+    ];
+
+    const captchaPrompt = document.getElementById('captchaPrompt');
+    const captchaGrid = document.getElementById('captchaGrid');
+    const verifyCaptchaBtn = document.getElementById('verifyCaptchaBtn');
+    const refreshCaptchaBtn = document.getElementById('refreshCaptcha');
+    const captchaContainer = document.getElementById('captchaContainer');
+    const captchaSuccessOverlay = document.getElementById('captchaSuccessOverlay');
+    
+    const captchaPuzzleIndexInput = document.getElementById('captchaPuzzleIndex');
+    const captchaSelectedTilesInput = document.getElementById('captchaSelectedTiles');
+    const captchaTrajectoryInput = document.getElementById('captchaTrajectory');
+
+    let activePuzzle = null;
+    let selectedTiles = [];
+    let trajectory = [];
+
+    function initCaptcha() {
+        window.puzzleSolved = false;
+        selectedTiles = [];
+        trajectory = [];
+        
+        captchaSuccessOverlay.style.display = 'none';
+        verifyCaptchaBtn.innerText = 'Lewati';
+        verifyCaptchaBtn.style.backgroundColor = '#3b82f6';
+        
+        // Pick random puzzle
+        activePuzzle = gridPuzzles[Math.floor(Math.random() * gridPuzzles.length)];
+        
+        captchaPrompt.innerText = activePuzzle.label;
+        captchaPuzzleIndexInput.value = activePuzzle.id;
+        captchaSelectedTilesInput.value = '[]';
+        captchaTrajectoryInput.value = '[]';
+
+        // Clear and rebuild grid
+        captchaGrid.innerHTML = '';
+        
+        for (let i = 0; i < 16; i++) {
+            const row = Math.floor(i / 4);
+            const col = i % 4;
+            const x_pct = (col / 3) * 100;
+            const y_pct = (row / 3) * 100;
+            
+            const tile = document.createElement('div');
+            tile.className = 'captcha-tile';
+            tile.dataset.index = i;
+            tile.style.backgroundImage = `url('${activePuzzle.imgUrl}')`;
+            tile.style.backgroundPosition = `${x_pct}% ${y_pct}%`;
+            
+            tile.addEventListener('click', (e) => {
+                handleTileClick(i, tile);
+            });
+            captchaGrid.appendChild(tile);
+        }
+    }
+
+    function handleTileClick(index, tile) {
+        if (window.puzzleSolved) return;
+        
+        // Record trajectory
+        trajectory.push({
+            i: index,
+            t: Date.now()
+        });
+
+        const selectedIdx = selectedTiles.indexOf(index);
+        if (selectedIdx > -1) {
+            selectedTiles.splice(selectedIdx, 1);
+            tile.classList.remove('selected');
+        } else {
+            selectedTiles.push(index);
+            tile.classList.add('selected');
+        }
+
+        // Update button action label
+        if (selectedTiles.length > 0) {
+            verifyCaptchaBtn.innerText = 'Verifikasi';
+            verifyCaptchaBtn.style.backgroundColor = '#1e3a8a';
+        } else {
+            verifyCaptchaBtn.innerText = 'Lewati';
+            verifyCaptchaBtn.style.backgroundColor = '#3b82f6';
+        }
+    }
+
+    function verifyCaptcha() {
+        if (window.puzzleSolved) return;
+        
+        // Sort arrays to check equality
+        const sortedSelected = [...selectedTiles].sort((a, b) => a - b);
+        const sortedCorrect = [...activePuzzle.correct].sort((a, b) => a - b);
+        
+        const isCorrect = JSON.stringify(sortedSelected) === JSON.stringify(sortedCorrect);
+        
+        if (isCorrect) {
+            // Success!
+            window.puzzleSolved = true;
+            captchaSuccessOverlay.style.display = 'flex';
+            
+            captchaPuzzleIndexInput.value = activePuzzle.id;
+            captchaSelectedTilesInput.value = JSON.stringify(selectedTiles);
+            captchaTrajectoryInput.value = JSON.stringify(trajectory);
+
+            // Tutup modal dan jalankan sisa proses pendaftaran setelah delay kecil
+            setTimeout(() => {
+                document.getElementById('captchaModal').style.display = 'none';
+                if (typeof window.proceedToRegister === 'function') {
+                    window.proceedToRegister();
+                }
+            }, 800);
+        } else {
+            // Failure shake animation
+            captchaContainer.classList.add('captcha-shake');
+            setTimeout(() => {
+                captchaContainer.classList.remove('captcha-shake');
+                initCaptcha(); // load new puzzle on fail
+            }, 500);
+        }
+    }
+
+    verifyCaptchaBtn.addEventListener('click', verifyCaptcha);
+    refreshCaptchaBtn.addEventListener('click', initCaptcha);
+
+    // Menutup modal captcha ketika tombol silang diklik
+    document.getElementById('closeCaptchaBtn').addEventListener('click', () => {
+        document.getElementById('captchaModal').style.display = 'none';
     });
 </script>
 <script type="module">
-    // Import the functions you need from the SDKs you need
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-    // Your web app's Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAsJCzp8DUY5PyQ4u7MgO2hppYQ8o4UjlU",
       authDomain: "bukutamudigital-43ae7.firebaseapp.com",
@@ -522,10 +812,151 @@
       measurementId: "G-PP2M3Z4NHL"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+
+    // Fungsi untuk melanjutkan pendaftaran ke Firebase & Django setelah captcha lolos
+    function proceedToRegister() {
+        const name = document.getElementById('id_name').value.trim();
+        const nik = document.getElementById('id_nik').value.trim();
+        const phone = document.getElementById('id_phone').value.trim();
+        const instansi = document.getElementById('id_instansi').value.trim();
+        const email = document.getElementById('id_email').value.trim();
+        const password = document.getElementById('id_password1').value;
+        const purpose = document.getElementById('id_purpose').value.trim();
+
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Memproses Pendaftaran...';
+
+        // Daftarkan di Firebase Auth
+        createUserWithEmailAndPassword(auth, email, password)
+            .then((userCredential) => {
+                const user = userCredential.user;
+                
+                // Dapatkan ID Token dari Firebase
+                user.getIdToken().then(idToken => {
+                    // Kirim ID Token dan data registrasi lengkap ke Django backend
+                    fetch("{% url 'tamu:api_firebase_login' %}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            id_token: idToken,
+                            name: name,
+                            nik: nik,
+                            phone: phone,
+                            instansi: instansi,
+                            purpose: purpose,
+                            registration_type: 'firebase_email',
+                            captcha_puzzle_index: document.getElementById('captchaPuzzleIndex').value,
+                            captcha_selected_tiles: document.getElementById('captchaSelectedTiles').value,
+                            captcha_trajectory: document.getElementById('captchaTrajectory').value
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(loginData => {
+                        if (loginData.success) {
+                            window.location.href = loginData.redirect_url;
+                        } else {
+                            alert(loginData.message || 'Gagal menyimpan data pendaftaran ke server.');
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = 'Daftarkan Sekarang';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error Django Registration:', error);
+                        alert('Terjadi kesalahan saat menyimpan data pendaftaran.');
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = 'Daftarkan Sekarang';
+                    });
+                });
+            })
+            .catch((firebaseError) => {
+                console.error('Firebase Auth Error:', firebaseError);
+                let errMsg = firebaseError.message;
+                if (firebaseError.code === 'auth/email-already-in-use') {
+                    errMsg = 'Email ini sudah terdaftar di Firebase.';
+                } else if (firebaseError.code === 'auth/weak-password') {
+                    errMsg = 'Password terlalu lemah. Minimal 6 karakter.';
+                } else if (firebaseError.code === 'auth/invalid-email') {
+                    errMsg = 'Format email tidak valid.';
+                }
+                alert('Gagal pendaftaran Firebase: ' + errMsg);
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Daftarkan Sekarang';
+            });
+    }
+
+    // Expose proceedToRegister ke window agar bisa dipanggil dari block script luar
+    window.proceedToRegister = proceedToRegister;
+
+    // Handle Email & Password Signup Form Submit
+    const registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const password = document.getElementById('id_password1').value;
+            const confirmPassword = document.getElementById('id_password2').value;
+            
+            if (password !== confirmPassword) {
+                alert('Password dan konfirmasi password tidak cocok.');
+                return;
+            }
+
+            // Jika captcha sudah lolos verifikasi, langsung jalankan pendaftaran
+            if (window.puzzleSolved) {
+                proceedToRegister();
+                return;
+            }
+            
+            const email = document.getElementById('id_email').value.trim();
+            const nik = document.getElementById('id_nik').value.trim();
+            
+            // Tampilkan loading state verifikasi
+            const submitBtn = document.getElementById('submitBtn');
+            const originalBtnText = submitBtn.innerText;
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Memverifikasi Data...';
+            
+            // 1. Validasi keunikan email & NIK di Django backend terlebih dahulu
+            fetch("{% url 'tamu:api_validate_register' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ email: email, nik: nik })
+            })
+            .then(res => res.json())
+            .then(valData => {
+                // Kembalikan tombol ke keadaan semula
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalBtnText;
+
+                if (!valData.success) {
+                    alert(valData.message);
+                    return;
+                }
+                
+                // Jika validasi sukses, inisialisasi captcha dan buka modal captcha
+                if (typeof window.initCaptcha === 'function') {
+                    window.initCaptcha();
+                }
+                document.getElementById('captchaModal').style.display = 'flex';
+            })
+            .catch(err => {
+                console.error('Error validation:', err);
+                alert('Terjadi kesalahan saat memvalidasi formulir.');
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalBtnText;
+            });
+        });
+    }
 
     // Handle Google Login Click (Popup Style)
     document.querySelector('.btn-google').addEventListener('click', () => {

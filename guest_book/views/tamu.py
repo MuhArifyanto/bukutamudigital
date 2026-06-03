@@ -35,14 +35,21 @@ def kebijakan_privasi_view(request):
 def dashboard_view(request, tamu):
     """View untuk Dashboard Tamu"""
     now = timezone.now()
-    kunjungan_qs = Kunjungan.objects.filter(tamu=tamu)
+    base_qs = Kunjungan.objects.filter(tamu=tamu)
     stats = {
-        'total': kunjungan_qs.count(),
-        'pending': kunjungan_qs.filter(status='pending').count(),
-        'in_progress': kunjungan_qs.filter(status='in_progress').count(),
-        'completed': kunjungan_qs.filter(status='completed').count(),
-        'bulan_ini': kunjungan_qs.filter(arrival_time__year=now.year, arrival_time__month=now.month).count(),
+        'total': base_qs.count(),
+        'pending': base_qs.filter(status='pending').count(),
+        'in_progress': base_qs.filter(status='in_progress').count(),
+        'completed': base_qs.filter(status='completed').count(),
+        'bulan_ini': base_qs.filter(arrival_time__year=now.year, arrival_time__month=now.month).count(),
     }
+    
+    q = request.GET.get('q', '').strip()
+    kunjungan_qs = base_qs
+    if q:
+        from django.db.models import Q
+        kunjungan_qs = kunjungan_qs.filter(Q(purpose__icontains=q) | Q(pegawai__name__icontains=q))
+        
     kunjungan_list = kunjungan_qs.select_related('pegawai').order_by('-created_at')[:5]
 
     ctx = base_context(tamu, 'dashboard')
@@ -259,13 +266,16 @@ def notifications_view(request, tamu):
     ctx = base_context(tamu, 'notifications')
     ctx['notifications'] = notifications
     return render(request, 'guest_book/tamu_notifications.html', ctx)
+
+# Trigger auto-reload
 @tamu_login_required
 def user_chat_view(request, tamu):
     """View untuk Chat Tamu ke Admin (WA Style)"""
-    from ..models import ChatMessage, Admin, Pegawai
+    from ..models import ChatMessage, Admin, Pegawai, Tamu
     session_id = str(tamu.pk)
-    messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('created_at')
+    messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at')[:50]
     messages_list = list(messages_qs)
+    messages_list.reverse()
     
     # Mark read messages from admin
     ChatMessage.objects.filter(session_id=session_id, sender_type='admin', is_read=False).update(is_read=True)
@@ -292,17 +302,13 @@ def user_chat_view(request, tamu):
     pegawais = {str(p.pk): p for p in Pegawai.objects.filter(pk__in=valid_pegawai_ids)}
     
     # Fallback untuk sender_id 'admin' (data lama/hardcoded)
-    from ..models import Admin
-    default_admin = Admin.objects.first()
+    admin_user = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
     
     for msg in messages_list:
         if msg.sender_type == 'tamu':
             msg.sender_obj = tamu
         elif msg.sender_type == 'admin':
-            if msg.sender_id == 'admin':
-                msg.sender_obj = default_admin
-            else:
-                msg.sender_obj = admins.get(msg.sender_id)
+            msg.sender_obj = admin_user
         elif msg.sender_type == 'pegawai':
             msg.sender_obj = pegawais.get(msg.sender_id)
             
@@ -310,6 +316,7 @@ def user_chat_view(request, tamu):
     ctx.update({
         'messages_list': messages_list,
         'session_id': session_id,
+        'admin_user': admin_user,
     })
     return render(request, 'guest_book/tamu_chat.html', ctx)
 

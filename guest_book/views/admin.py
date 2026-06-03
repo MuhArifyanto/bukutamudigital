@@ -8,7 +8,10 @@ from django.http import HttpResponse
 from django.db.models import Count, Q, Max
 from django.core.paginator import Paginator
 
-from .base import admin_login_required, get_admin_context
+from .base import (
+    admin_login_required, get_admin_context,
+    get_admin_name
+)
 from ..models import (
     Tamu, Kunjungan, Pegawai, Message, Instansi, Departemen, 
     Notification, CalendarSettings
@@ -691,11 +694,14 @@ def admin_chat_view(request):
             last_message = ChatMessage.objects.filter(session_id=sid).latest('created_at')
             unread_count = ChatMessage.objects.filter(session_id=sid, is_read=False, sender_type='tamu').count()
             
+            latest_messages = list(ChatMessage.objects.filter(session_id=sid).order_by('-created_at')[:50])
+            latest_messages.reverse()
+            
             conv_data = {
                 'guest': guest,
                 'last_message': last_message,
                 'unread_count': unread_count,
-                'messages': ChatMessage.objects.filter(session_id=sid).order_by('created_at')
+                'messages': latest_messages
             }
             
             if active_guest_id and str(guest.id) == active_guest_id:
@@ -795,13 +801,41 @@ def admin_instansi_view(request):
                 instansi.hari_kerja = hari_kerja
                 
             instansi.save()
+            
+            # Catat ke Audit Log
+            from .base import record_audit_log
+            admin_id = request.session.get('tamu_id', 'admin')
+            record_audit_log(
+                user_id=str(admin_id),
+                user_type='admin',
+                action='update',
+                table_name='instansi',
+                record_id=str(instansi.id),
+                new_value=f"Update nama: {instansi.nama}, kapasitas: {instansi.kapasitas_maksimal}",
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
             messages.success(request, "Data instansi berhasil diperbarui.")
             return redirect(request.META.get('HTTP_REFERER', 'tamu:admin_instansi'))
         
         elif action == 'add_departemen':
             nama = request.POST.get('nama')
             kode = request.POST.get('kode')
-            Departemen.objects.create(nama=nama, kode=kode)
+            dep = Departemen.objects.create(nama=nama, kode=kode)
+            
+            # Catat ke Audit Log
+            from .base import record_audit_log
+            admin_id = request.session.get('tamu_id', 'admin')
+            record_audit_log(
+                user_id=str(admin_id),
+                user_type='admin',
+                action='create',
+                table_name='departemen',
+                record_id=str(dep.id),
+                new_value=f"Menambahkan bidang baru: {nama}",
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
             messages.success(request, f"Departemen {nama} berhasil ditambahkan.")
             return redirect('tamu:admin_instansi')
 
@@ -905,3 +939,114 @@ def admin_kalender_download_template(request):
         
     wb.save(response)
     return response
+
+@admin_login_required
+def admin_audit_log_view(request):
+    """View untuk Laporan Aktivitas (Audit Log)"""
+    from ..models import AuditLog, Tamu, Admin
+    
+    # Filter
+    q_action = request.GET.get('action', '')
+    
+    logs_query = AuditLog.objects.all().order_by('-timestamp')
+    if q_action:
+        logs_query = logs_query.filter(action=q_action)
+        
+    # Paginator (20 per page)
+    paginator = Paginator(logs_query, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Enrich with names (optional, tapi bagus untuk UI)
+    for log in page_obj:
+        if log.user_type == 'admin':
+            if log.user_id == 'admin':
+                log.user_name = "Super Admin"
+            else:
+                try:
+                    admin_obj = Admin.objects.get(id=log.user_id)
+                    log.user_name = admin_obj.username
+                except:
+                    log.user_name = log.user_id
+        elif log.user_type == 'tamu':
+            try:
+                tamu_obj = Tamu.objects.get(id=log.user_id)
+                log.user_name = tamu_obj.name
+            except:
+                log.user_name = f"Tamu ({log.user_id[:8]})"
+        else:
+            log.user_name = log.user_id
+
+    ctx = get_admin_context(request)
+    ctx.update({
+        'active_page': 'audit_log',
+        'page_obj': page_obj,
+        'q_action': q_action,
+    })
+    return render(request, 'guest_book/admin_audit_log.html', ctx)
+
+@admin_login_required
+def admin_audit_log_cetak_pdf(request):
+    """View untuk mencetak PDF Laporan Aktivitas"""
+    from ..models import AuditLog, Tamu, Admin
+    
+    # Ambil semua data (bisa ditambah filter kalau butuh kedepannya)
+    logs_all = AuditLog.objects.all().order_by('-timestamp')
+    
+    # Enrich names
+    for log in logs_all:
+        if log.user_type == 'admin':
+            if log.user_id == 'admin':
+                log.user_name = "Super Admin"
+            else:
+                try:
+                    admin_obj = Admin.objects.get(id=log.user_id)
+                    log.user_name = admin_obj.username
+                except:
+                    log.user_name = log.user_id
+        elif log.user_type == 'tamu':
+            try:
+                tamu_obj = Tamu.objects.get(id=log.user_id)
+                log.user_name = tamu_obj.name
+            except:
+                log.user_name = f"Tamu ({log.user_id[:8]})"
+        else:
+            log.user_name = log.user_id
+
+    from ..models import Instansi
+    instansi = Instansi.objects.first()
+    
+    context = get_admin_context(request)
+    context.update({
+        'logs_all': logs_all,
+        'instansi': instansi,
+    })
+    return render(request, 'guest_book/admin_audit_log_cetak_pdf.html', context)
+
+@admin_login_required
+def admin_pengguna_view(request):
+    """Manajemen Pengguna (Blokir/Aktifkan Tamu)"""
+    from ..models import Tamu
+    from django.db.models import Count
+    
+    query = request.GET.get('q', '')
+    status_filter = request.GET.get('status', '')
+    
+    users = Tamu.objects.filter(is_admin=False).annotate(
+        total_visits=Count('kunjungan')
+    ).order_by('-registration_date')
+    
+    if query:
+        users = users.filter(name__icontains=query) | users.filter(email__icontains=query)
+        
+    if status_filter:
+        users = users.filter(account_status=status_filter)
+        
+    context = get_admin_context(request)
+    context.update({
+        'active_page': 'pengguna',
+        'users': users,
+        'query': query,
+        'status_filter': status_filter,
+    })
+    return render(request, 'guest_book/admin_pengguna.html', context)

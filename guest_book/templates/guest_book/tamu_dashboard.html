@@ -277,12 +277,12 @@
             <h5>Riwayat Kunjungan Terakhir</h5>
             <p>Monitoring aktivitas pengunjung secara real-time</p>
         </div>
-        <div class="d-flex gap-2">
-            <input type="text" class="search-input" placeholder="Cari kunjungan...">
+        <form method="get" class="d-flex gap-2" action="{% url 'tamu:dashboard' %}">
+            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="search-input" placeholder="Cari kunjungan..." oninput="debounceSubmit(this.form)">
             <a href="{% url 'tamu:kunjungan_baru' %}" class="btn btn-primary btn-sm d-flex align-items-center gap-1" style="border-radius: var(--radius-sm);">
                 <i class="fas fa-plus"></i> Buat Kunjungan
             </a>
-        </div>
+        </form>
     </div>
 
     <div class="table-responsive">
@@ -327,4 +327,38 @@
         </table>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+    let searchTimeout;
+    function debounceSubmit(form) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const url = new URL(form.action || window.location.href);
+            const formData = new FormData(form);
+            for (const [key, value] of formData.entries()) {
+                if (value) url.searchParams.set(key, value);
+                else url.searchParams.delete(key);
+            }
+            
+            fetch(url.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => res.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                const newTbody = doc.querySelector('.table-custom tbody');
+                const oldTbody = document.querySelector('.table-custom tbody');
+                if (newTbody && oldTbody) {
+                    oldTbody.innerHTML = newTbody.innerHTML;
+                }
+                
+                window.history.replaceState({}, '', url.toString());
+            });
+        }, 400);
+    }
+</script>
+{% endblock %}
 {% endblock %}

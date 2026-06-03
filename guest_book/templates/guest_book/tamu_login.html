@@ -345,7 +345,27 @@
                 <h1 class="form-title" style="font-size: 1.75rem; font-weight: 800; color: var(--primary); margin-bottom: 0.5rem;">Masuk ke Akun</h1>
                 <p class="form-subtitle" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 2.5rem;">Gunakan nomor NIK dan telepon yang sudah terdaftar.</p>
 
-            <form method="post" action="{% url 'tamu:login' %}">
+                {% if messages %}
+                <div style="margin-bottom: 1.5rem;">
+                    {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert" style="border-radius: 12px; font-size: 0.85rem; padding: 0.75rem 1rem;">
+                        {% if message.tags == 'success' %}
+                        <i class="fas fa-check-circle me-2"></i>
+                        {% elif message.tags == 'warning' %}
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        {% elif message.tags == 'danger' or message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        {% else %}
+                        <i class="fas fa-info-circle me-2"></i>
+                        {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+            <form id="loginForm" method="post" action="{% url 'tamu:login' %}">
                 {% csrf_token %}
                 
                 <label class="form-label" for="id_username">Nama Lengkap / Email</label>
@@ -439,11 +459,9 @@
     });
 </script>
 <script type="module">
-    // Import the functions you need from the SDKs you need
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-    // Your web app's Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAsJCzp8DUY5PyQ4u7MgO2hppYQ8o4UjlU",
       authDomain: "bukutamudigital-43ae7.firebaseapp.com",
@@ -454,10 +472,92 @@
       measurementId: "G-PP2M3Z4NHL"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+
+    // Handle Email & Password Login Form Submit
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const usernameInput = document.getElementById('id_username').value.trim();
+            const passwordInput = document.getElementById('id_password').value;
+            
+            const submitBtn = document.querySelector('.btn-continue');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Memproses Masuk...';
+            
+            // 1. Resolve username to email if it's name/NIK
+            fetch(`{% url "tamu:api_resolve_email" %}?username=${encodeURIComponent(usernameInput)}`)
+                .then(res => res.json())
+                .then(resData => {
+                    if (!resData.success) {
+                        alert(resData.message);
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                        return;
+                    }
+                    
+                    const resolvedEmail = resData.email;
+                    
+                    // 2. Sign in with resolved email & password via Firebase
+                    signInWithEmailAndPassword(auth, resolvedEmail, passwordInput)
+                        .then((userCredential) => {
+                            const user = userCredential.user;
+                            
+                            // 3. Get ID Token
+                            user.getIdToken().then(idToken => {
+                                // 4. Send ID Token to Django to authenticate session
+                                fetch("{% url 'tamu:api_firebase_login' %}", {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRFToken': '{{ csrf_token }}'
+                                    },
+                                    body: JSON.stringify({ id_token: idToken })
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        window.location.href = data.redirect_url;
+                                    } else {
+                                        alert(data.message || 'Login gagal.');
+                                        submitBtn.disabled = false;
+                                        submitBtn.innerHTML = originalBtnText;
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error:', error);
+                                    alert('Terjadi kesalahan saat menghubungi server.');
+                                    submitBtn.disabled = false;
+                                    submitBtn.innerHTML = originalBtnText;
+                                });
+                            });
+                        })
+                        .catch((firebaseError) => {
+                            console.error('Firebase Login Error:', firebaseError);
+                            let errMsg = firebaseError.message;
+                            if (firebaseError.code === 'auth/invalid-credential' || firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/user-not-found') {
+                                errMsg = 'Email atau password salah.';
+                            } else if (firebaseError.code === 'auth/invalid-email') {
+                                errMsg = 'Format email tidak valid.';
+                            }
+                            alert('Gagal masuk: ' + errMsg);
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnText;
+                        });
+                })
+                .catch(err => {
+                    console.error('Error resolving email:', err);
+                    alert('Terjadi kesalahan saat mencari akun.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                });
+        });
+    }
 
     // Handle Google Login Click
     document.querySelector('.btn-google').addEventListener('click', () => {

@@ -19,6 +19,25 @@ def api_mark_notification_read(request):
         except: pass
     return JsonResponse({'success': False}, status=400)
 
+def api_mark_all_notifications_read(request):
+    if request.method == 'POST':
+        try:
+            recipient_id = 'admin'
+            recipient_type = 'admin'
+            if request.session.get('tamu_id'):
+                recipient_id = str(request.session.get('tamu_id'))
+                recipient_type = 'tamu'
+            
+            Notification.objects.filter(
+                recipient_id=recipient_id,
+                recipient_type=recipient_type,
+                status='unread'
+            ).update(status='read', read_at=timezone.now())
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    return JsonResponse({'success': False, 'error': 'Invalid method'}, status=400)
+
 @admin_login_required
 def api_update_kunjungan_status(request):
     """API untuk update status kunjungan oleh Admin (Secure)"""
@@ -87,10 +106,20 @@ def api_get_recent_notifications(request):
         recipient_id = str(request.session.get('tamu_id'))
         recipient_type = 'tamu'
         
-    notifications = Notification.objects.filter(
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 5)
+        
+    qs = Notification.objects.filter(
         recipient_id=recipient_id, 
         recipient_type=recipient_type
-    ).order_by('-created_at')[:5]
+    ).order_by('-created_at')
+    
+    from django.core.paginator import Paginator
+    paginator = Paginator(qs, page_size)
+    try:
+        notifications = paginator.page(page)
+    except:
+        notifications = paginator.page(1)
     
     from django.utils import timezone
     data = []
@@ -105,7 +134,16 @@ def api_get_recent_notifications(request):
             'related_object_id': n.related_object_id
         })
         
-    return JsonResponse({'notifications': data})
+    return JsonResponse({
+        'notifications': data,
+        'pagination': {
+            'has_next': notifications.has_next(),
+            'has_previous': notifications.has_previous(),
+            'current_page': notifications.number,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count
+        }
+    })
 
 @admin_login_required
 def api_update_quota(request):
@@ -295,8 +333,9 @@ def api_send_chat_message(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
+@csrf_exempt
 def api_upload_chat_file(request):
-    """API untuk mengunggah file/gambar dalam chat (Shared)"""
+    """API untuk mengunggah file/gambar dalam chat ke Local Storage"""
     from django.http import JsonResponse
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
@@ -315,14 +354,26 @@ def api_upload_chat_file(request):
     if not file_obj:
         return JsonResponse({'success': False, 'error': 'No file uploaded'}, status=400)
         
+    # Validasi Ukuran (Max 5MB)
+    if file_obj.size > 5 * 1024 * 1024:
+        return JsonResponse({'success': False, 'error': 'Ukuran file melebihi 5 MB'}, status=400)
+        
+    # Validasi Ekstensi
+    ext = file_obj.name.split('.')[-1].lower() if '.' in file_obj.name else ''
+    allowed_extensions = ['doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'svg']
+    if ext not in allowed_extensions:
+        return JsonResponse({'success': False, 'error': 'Format file tidak diizinkan untuk alasan keamanan'}, status=400)
+        
     from django.core.files.storage import default_storage
     from django.conf import settings
+    import uuid
     
-    path = default_storage.save(f'chat_attachments/{file_obj.name}', file_obj)
+    # Generate random name to prevent collisions and execution
+    safe_name = f"{uuid.uuid4().hex[:10]}_{file_obj.name.replace(' ', '_')}"
+    path = default_storage.save(f'chat_attachments/{safe_name}', file_obj)
     file_url = f'{settings.MEDIA_URL}{path}'
     
-    ext = file_obj.name.split('.')[-1].lower()
-    if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+    if ext in ['jpg', 'jpeg', 'png', 'svg']:
         message_type = 'image'
     else:
         message_type = 'file'
@@ -339,22 +390,45 @@ def api_search_users(request):
     """API untuk mencari user (Tamu) untuk mulai chat baru"""
     from ..models import Tamu
     from django.http import JsonResponse
+    from django.core.paginator import Paginator
     
     query = request.GET.get('q', '')
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 10)
+    
     if not query:
         return JsonResponse({'success': True, 'users': []})
         
-    users = Tamu.objects.filter(name__icontains=query)[:10]
+    qs = Tamu.objects.filter(name__icontains=query)
+    paginator = Paginator(qs, page_size)
+    try:
+        users = paginator.page(page)
+    except:
+        users = paginator.page(1)
+        
     users_data = [{'id': str(u.id), 'name': u.name, 'email': u.email} for u in users]
     
-    return JsonResponse({'success': True, 'users': users_data})
+    return JsonResponse({
+        'success': True, 
+        'users': users_data,
+        'pagination': {
+            'has_next': users.has_next(),
+            'has_previous': users.has_previous(),
+            'current_page': users.number,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count
+        }
+    })
 
 @admin_login_required
 def api_get_chat_messages(request):
     """API untuk mengambil history chat terbaru"""
     from ..models import ChatMessage
+    from django.core.paginator import Paginator
     session_id = request.GET.get('session_id')
     last_id = request.GET.get('last_id')
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 50)
     
     if not session_id:
         return JsonResponse({'success': False, 'error': 'session_id required'}, status=400)
@@ -366,8 +440,16 @@ def api_get_chat_messages(request):
             qs = qs.filter(created_at__gt=last_msg.created_at)
         except: pass
         
+    qs = qs.order_by('-created_at')
+    paginator = Paginator(qs, page_size)
+    try:
+        page_obj = paginator.page(page)
+    except:
+        page_obj = paginator.page(1)
+        
     messages = []
-    for m in qs:
+    # Reverse to return chronological order
+    for m in reversed(page_obj.object_list):
         messages.append({
             'id': str(m.id),
             'content': m.content,
@@ -379,7 +461,17 @@ def api_get_chat_messages(request):
             m.is_read = True
             m.save()
             
-    return JsonResponse({'success': True, 'messages': messages})
+    return JsonResponse({
+        'success': True, 
+        'messages': messages,
+        'pagination': {
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+            'current_page': page_obj.number,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count
+        }
+    })
 
 @admin_login_required
 def api_quick_checkin(request):
@@ -490,12 +582,23 @@ def api_google_holidays(request, year):
 def api_get_visits_by_date(request):
     """API untuk mengambil daftar kunjungan berdasarkan tanggal"""
     date_str = request.GET.get('date')
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 50)
+    
     if not date_str:
         return JsonResponse({'success': False, 'error': 'Tanggal wajib diisi'}, status=400)
         
     try:
         from ..models import Kunjungan
-        visits = Kunjungan.objects.filter(arrival_time__date=date_str).order_by('arrival_time')
+        from django.core.paginator import Paginator
+        
+        qs = Kunjungan.objects.filter(arrival_time__date=date_str).order_by('arrival_time')
+        paginator = Paginator(qs, page_size)
+        try:
+            visits = paginator.page(page)
+        except:
+            visits = paginator.page(1)
+            
         data = []
         for v in visits:
             data.append({
@@ -506,7 +609,17 @@ def api_get_visits_by_date(request):
                 'status': v.status,
                 'purpose': v.purpose
             })
-        return JsonResponse({'success': True, 'visits': data})
+        return JsonResponse({
+            'success': True, 
+            'visits': data,
+            'pagination': {
+                'has_next': visits.has_next(),
+                'has_previous': visits.has_previous(),
+                'current_page': visits.number,
+                'total_pages': paginator.num_pages,
+                'total_items': paginator.count
+            }
+        })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
@@ -857,3 +970,132 @@ def api_debug_counts(request):
         'data': data
     })
 
+
+@csrf_exempt
+def api_webhook_delete_user(request):
+    """
+    Webhook API to delete user in MySQL when deleted from Firebase.
+    Triggered by Firebase Cloud Functions.
+    Secured by a Shared Secret Token in Authorization header.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    # 1. Verify webhook secret
+    from django.conf import settings
+    auth_header = request.headers.get('Authorization')
+    expected_token = getattr(settings, 'FIREBASE_WEBHOOK_SECRET', None)
+    
+    if not expected_token:
+        import os
+        expected_token = os.environ.get('FIREBASE_WEBHOOK_SECRET', 'super-secret-webhook-key-12345')
+
+    if not auth_header or auth_header != f"Bearer {expected_token}":
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        uid = data.get('uid')
+        email = data.get('email')
+
+        if not uid and not email:
+            return JsonResponse({'success': False, 'error': 'Missing uid or email'}, status=400)
+
+        deleted = False
+        from django.db.models import Q
+        tamu_qs = Tamu.objects.filter(Q(google_id=uid) | Q(email=email)) if uid or email else Tamu.objects.none()
+        
+        # Disconnect signal temporarily to avoid infinite deletion loop
+        from django.db.models.signals import post_delete
+        from ..signals import delete_firebase_user
+        
+        post_delete.disconnect(delete_firebase_user, sender=Tamu)
+        try:
+            count, _ = tamu_qs.delete()
+            if count > 0:
+                deleted = True
+        finally:
+            post_delete.connect(delete_firebase_user, sender=Tamu)
+
+        if deleted:
+            return JsonResponse({'success': True, 'message': 'User deleted from MySQL successfully'})
+        else:
+            return JsonResponse({'success': True, 'message': 'User not found in MySQL, no action taken'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@csrf_exempt
+def api_delete_chat_message(request, message_id):
+    """API untuk menghapus pesan obrolan (chat) oleh admin"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
+        
+    # Verifikasi admin
+    if not (request.user.is_authenticated and request.user.is_staff) and not request.session.get('tamu_id'):
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+        
+    try:
+        from ..models import ChatMessage
+        msg = ChatMessage.objects.get(id=message_id)
+        
+        # Log to audit trail
+        from .base import record_audit_log
+        admin_id = request.session.get('tamu_id', 'admin')
+        
+        content_excerpt = msg.content[:50] + '...' if len(msg.content) > 50 else msg.content
+        
+        record_audit_log(
+            user_id=str(admin_id),
+            user_type='admin',
+            action='delete',
+            table_name='chat_message',
+            record_id=str(msg.id),
+            old_value=f"Menghapus chat: {content_excerpt}",
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        msg.delete()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+@csrf_exempt
+def api_toggle_user_status(request, user_id):
+    """API untuk blokir/aktifkan tamu"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
+        
+    # Harus admin
+    if not (request.user.is_authenticated and request.user.is_staff) and not request.session.get('tamu_id'):
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+        
+    try:
+        from ..models import Tamu
+        tamu_obj = Tamu.objects.get(id=user_id)
+        
+        new_status = request.POST.get('status')
+        if new_status not in dict(Tamu.STATUS_CHOICES).keys():
+            return JsonResponse({'success': False, 'error': 'Status invalid'}, status=400)
+            
+        old_status = tamu_obj.account_status
+        tamu_obj.account_status = new_status
+        tamu_obj.save()
+        
+        # Log to audit trail
+        from .base import record_audit_log
+        admin_id = request.session.get('tamu_id', 'admin')
+        
+        record_audit_log(
+            user_id=str(admin_id),
+            user_type='admin',
+            action='update',
+            table_name='tamu',
+            record_id=str(tamu_obj.id),
+            old_value={'account_status': old_status},
+            new_value={'account_status': new_status, 'name': tamu_obj.name},
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        return JsonResponse({'success': True, 'new_status': new_status})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)

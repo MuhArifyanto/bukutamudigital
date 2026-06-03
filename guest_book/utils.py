@@ -36,7 +36,7 @@ def send_notification(recipient_id, recipient_type, notification_type, title, me
                 'data': {
                     'title': title,
                     'message': message,
-                    'created_at': timezone.localtime(notif.created_at).strftime('%H:%M') if hasattr(notif, 'created_at') else timezone.now().strftime('%H:%M'),
+                    'created_at': timezone.localtime(notif.created_at).strftime('%H:%M') if getattr(notif, 'created_at', None) else timezone.localtime(timezone.now()).strftime('%H:%M'),
                     'notification_type': notification_type,
                     'related_object_id': str(related_object_id) if related_object_id else None,
                     'unread_count': unread_count

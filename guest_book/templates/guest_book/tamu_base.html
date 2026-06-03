@@ -486,14 +486,7 @@
             {% block content %}{% endblock %}
         </main>
 
-        <!-- Footer -->
-        <footer style="padding: 1.5rem 2.5rem; border-top: 1px solid rgba(15,23,42,0.05); background: #ffffff; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #64748b;">
-            <div>© 2026 Diskominfosatik. Seluruh hak cipta dilindungi.</div>
-            <div style="display: flex; gap: 1rem;">
-                <a href="#" style="color: #64748b; text-decoration: none;">Syarat & Ketentuan</a>
-                <a href="#" style="color: #64748b; text-decoration: none;">Kebijakan Privasi</a>
-            </div>
-        </footer>
+
     </div>
 
     <!-- Bootstrap JS -->
@@ -588,8 +581,35 @@
         }
 
         function markAllRead() {
-            alert('Semua notifikasi ditandai dibaca.');
-            notifDropdownMenu.style.display = 'none';
+            fetch("{% url 'tamu:api_mark_all_notifications_read' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const badge = document.querySelector('.notif-badge');
+                    if (badge) badge.remove();
+                    
+                    const notifList = document.getElementById('tamuNotifList');
+                    if (notifList) {
+                        notifList.innerHTML = `
+                            <div style="padding: 2rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                                <i class="fas fa-bell-slash" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+                                <div>Semua notifikasi sudah dibaca</div>
+                            </div>
+                        `;
+                    }
+                    if (notifDropdownMenu) notifDropdownMenu.style.display = 'none';
+                    previousUnreadCount = 0;
+                } else {
+                    alert('Gagal menandai notifikasi dibaca.');
+                }
+            })
+            .catch(err => console.error(err));
         }
         if (sidebarOverlay) {
             sidebarOverlay.addEventListener('click', closeSidebar);

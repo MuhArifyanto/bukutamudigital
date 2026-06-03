@@ -1,0 +1,179 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block title %}Manajemen Pengguna{% endblock %}
+{% block page_title %}MANAJEMEN PENGGUNA{% endblock %}
+{% block page_subtitle %}Kelola akses dan status akun pengunjung (Tamu){% endblock %}
+
+{% block extra_css %}
+<style>
+    .top-search-bar {
+        background: #fff;
+        border-radius: 16px;
+        padding: 0.75rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        margin-bottom: 1.5rem;
+        border: 1px solid #f1f5f9;
+    }
+    .top-search-bar input {
+        border: none; outline: none; width: 100%;
+        font-size: 0.9rem; font-weight: 500; color: #1e293b;
+    }
+
+    .filter-card {
+        background: #fff; border-radius: 20px; padding: 1.5rem;
+        margin-bottom: 1.5rem; box-shadow: 0 4px 20px rgba(15,23,42,0.04);
+        border: 1px solid rgba(15,23,42,0.05);
+    }
+    .select-prem {
+        width: 100%; padding: 0.75rem 1rem; border-radius: 12px;
+        border: 1.5px solid #f1f5f9; background: #f8fafc;
+        font-size: 0.85rem; font-weight: 600; color: #334155;
+    }
+
+    .table-container {
+        background: #fff; border-radius: 24px;
+        box-shadow: 0 10px 40px rgba(15,23,42,0.06);
+        border: 1px solid rgba(15,23,42,0.05); overflow-x: auto;
+    }
+    .table-prem { width: 100%; min-width: 800px; border-collapse: separate; border-spacing: 0; }
+    .table-prem th {
+        background: #fafbff; padding: 1.25rem 1.5rem;
+        font-size: 0.72rem; font-weight: 800; color: #94a3b8;
+        text-transform: uppercase; letter-spacing: 0.08em; text-align: left;
+    }
+    .table-prem td { padding: 1.25rem 1.5rem; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+    
+    .status-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700;
+    }
+    .pill-active { background: #dcfce7; color: #15803d; }
+    .pill-suspended { background: #fee2e2; color: #b91c1c; }
+    .pill-inactive { background: #fef9c3; color: #a16207; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .action-btn {
+        padding: 0.5rem 1rem; border-radius: 10px; font-size: 0.8rem; font-weight: 700;
+        border: none; cursor: pointer; transition: 0.2s;
+    }
+    .btn-suspend { background: #fee2e2; color: #b91c1c; }
+    .btn-suspend:hover { background: #fca5a5; }
+    .btn-activate { background: #dcfce7; color: #15803d; }
+    .btn-activate:hover { background: #86efac; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="GET" class="top-search-bar w-100">
+    <i class="fas fa-search text-muted"></i>
+    <input type="text" name="q" placeholder="Cari nama atau email pengguna..." value="{{ query }}">
+    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+</form>
+
+<div class="filter-card">
+    <form method="GET" class="row g-3 align-items-end">
+        {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+        <div class="col-md-4">
+            <label style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">Status Akun</label>
+            <select name="status" class="select-prem" onchange="this.form.submit()">
+                <option value="">Semua Status</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Aktif</option>
+                <option value="suspended" {% if status_filter == 'suspended' %}selected{% endif %}>Diblokir</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+<div class="table-container">
+    <table class="table-prem">
+        <thead>
+            <tr>
+                <th>Pengguna</th>
+                <th>Tgl Mendaftar</th>
+                <th>Total Kunjungan</th>
+                <th>Status</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td>
+                    <div style="font-weight: 700; color: #0f172a;">{{ u.name }}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">{{ u.email }}</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">Instansi: {{ u.instansi|default:"Pribadi" }}</div>
+                </td>
+                <td style="font-size: 0.85rem; color: #334155; font-weight: 600;">
+                    {{ u.registration_date|date:"d M Y" }}
+                </td>
+                <td>
+                    <span style="background: #f1f5f9; padding: 4px 10px; border-radius: 8px; font-weight: 700; color: #0f172a;">
+                        {{ u.total_visits }} Kali
+                    </span>
+                </td>
+                <td>
+                    {% if u.account_status == 'active' %}
+                    <span class="status-pill pill-active"><span class="dot"></span>Aktif</span>
+                    {% elif u.account_status == 'suspended' %}
+                    <span class="status-pill pill-suspended"><span class="dot"></span>Diblokir</span>
+                    {% else %}
+                    <span class="status-pill pill-inactive"><span class="dot"></span>{{ u.account_status|title }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if u.account_status == 'active' %}
+                    <button type="button" class="action-btn btn-suspend" onclick="toggleUserStatus('{{ u.id }}', 'suspended')">
+                        <i class="fas fa-ban me-1"></i> Blokir
+                    </button>
+                    {% else %}
+                    <button type="button" class="action-btn btn-activate" onclick="toggleUserStatus('{{ u.id }}', 'active')">
+                        <i class="fas fa-check-circle me-1"></i> Aktifkan
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align:center; padding:4rem; color: #94a3b8; font-weight: 600;">
+                    Tidak ada data pengguna ditemukan.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleUserStatus(userId, newStatus) {
+    const actionText = newStatus === 'suspended' ? 'memblokir' : 'mengaktifkan kembali';
+    if (!confirm(`Apakah Anda yakin ingin ${actionText} pengguna ini?`)) return;
+
+    fetch(`/admin-portal/api/users/toggle-status/${userId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: `status=${newStatus}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Gagal mengubah status: ' + (data.error || 'Terjadi kesalahan'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Terjadi kesalahan koneksi.');
+    });
+}
+</script>
+{% endblock %}

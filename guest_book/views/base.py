@@ -32,9 +32,18 @@ def admin_login_required(view_func):
         if request.user.is_authenticated and request.user.is_staff:
             return view_func(request, *args, **kwargs)
         
+        # Check via session if using Tamu as admin
+        tamu_id = request.session.get('tamu_id')
+        if tamu_id:
+            from ..models import Tamu
+            tamu = Tamu.objects.filter(id=tamu_id, is_admin=True).first()
+            if tamu:
+                return view_func(request, *args, **kwargs)
+        
         messages.error(request, "Akses khusus Administrator. Silakan login.")
         return redirect('tamu:admin_login')
     return wrapper
+
 
 def get_admin_name(request):
     """Helper untuk mendapatkan nama admin yang sedang login."""
@@ -79,6 +88,7 @@ def get_admin_context(request):
         'admin_profile_picture': profile_pic_url,
         'instansi': instansi,
         'admin_user': admin_user,
+        'admin_nip': admin_user.nip if admin_user and hasattr(admin_user, 'nip') and admin_user.nip else None,
     }
 
 def record_audit_log(user_id, user_type, action, table_name, record_id, old_value=None, new_value=None, ip_address=None):

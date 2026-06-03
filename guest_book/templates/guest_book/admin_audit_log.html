@@ -1,0 +1,223 @@
+{% extends 'guest_book/admin_base.html' %}
+{% load static %}
+
+{% block page_title %}Laporan Aktivitas (Audit Log){% endblock %}
+{% block page_subtitle %}Rekam jejak seluruh aktivitas di dalam sistem{% endblock %}
+{% block search_placeholder %}Cari di log (tabel/aksi)...{% endblock %}
+
+{% block content %}
+<style>
+    .log-card {
+        background: var(--card-bg);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid rgba(15,23,42,0.06);
+        padding: 1.5rem;
+    }
+    
+    .table-container {
+        overflow-x: auto;
+    }
+    
+    .log-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.85rem;
+    }
+    
+    .log-table th {
+        background: #f8fafc;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .log-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        vertical-align: middle;
+    }
+    
+    .log-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .action-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.6rem;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .action-create {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .action-update {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+    }
+
+    .action-delete {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+    
+    .user-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 500;
+        color: #0f172a;
+    }
+    
+    .user-badge i {
+        color: #94a3b8;
+    }
+    
+    .filter-bar {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        align-items: center;
+    }
+    
+    .filter-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: white;
+        color: #64748b;
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    
+    .filter-btn:hover, .filter-btn.active {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+    }
+</style>
+
+<div class="log-card">
+    <div class="filter-bar" style="justify-content: space-between;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Filter Aktivitas:</span>
+            <a href="?action=" class="filter-btn {% if not q_action %}active{% endif %}">Semua</a>
+            <a href="?action=create" class="filter-btn {% if q_action == 'create' %}active{% endif %}">Baru Ditambahkan</a>
+            <a href="?action=update" class="filter-btn {% if q_action == 'update' %}active{% endif %}">Diubah</a>
+            <a href="?action=delete" class="filter-btn {% if q_action == 'delete' %}active{% endif %}">Dihapus</a>
+        </div>
+        <div>
+            <a href="{% url 'tamu:admin_audit_log_cetak_pdf' %}" target="_blank" class="btn btn-sm" style="background-color: #ef4444; color: white; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 600; text-decoration: none; border: none; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">
+                <i class="fas fa-file-pdf"></i> Cetak PDF
+            </a>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Waktu</th>
+                    <th>Aksi</th>
+                    <th>Tabel (Modul)</th>
+                    <th>Data Berubah</th>
+                    <th>Pelaku</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in page_obj %}
+                <tr>
+                    <td style="white-space: nowrap; color: #64748b;">
+                        {{ log.timestamp|date:"d M Y" }}<br>
+                        <span style="font-size: 0.75rem; font-weight: 600;">{{ log.timestamp|date:"H:i" }} WIB</span>
+                    </td>
+                    <td>
+                        <span class="action-badge action-{{ log.action|lower }}">
+                            {{ log.get_action_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <span style="font-family: monospace; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">{{ log.table_name }}</span>
+                    </td>
+                    <td style="max-width: 250px;">
+                        <span style="display: block; font-size: 0.75rem; color: #64748b;">Record ID: <span style="font-family: monospace;">{{ log.record_id|truncatechars:12 }}</span></span>
+                        {% if log.new_value and log.action != 'delete' %}
+                            <div style="margin-top: 4px; font-size: 0.75rem; background: #f8fafc; border-left: 2px solid #3b82f6; padding: 4px 8px; border-radius: 0 4px 4px 0; max-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                {{ log.new_value|truncatechars:50 }}
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="user-badge">
+                            {% if log.user_type == 'admin' %}
+                                <i class="fas fa-user-shield" style="color: #3b82f6;" title="Admin"></i>
+                            {% elif log.user_type == 'pegawai' %}
+                                <i class="fas fa-user-tie" style="color: #10b981;" title="Pegawai"></i>
+                            {% else %}
+                                <i class="fas fa-user" title="Tamu"></i>
+                            {% endif %}
+                            {{ log.user_name }}
+                        </div>
+                    </td>
+                    <td style="font-family: monospace; color: #64748b;">
+                        {{ log.ip_address|default:"-" }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 3rem; color: #94a3b8;">
+                        <i class="fas fa-box-open" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>Belum ada riwayat aktivitas yang tercatat.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; margin-top: 2rem;">
+        <nav aria-label="Page navigation">
+            <ul class="pagination pagination-sm m-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&action={{ q_action }}" style="color: var(--accent); border-radius: 8px 0 0 8px;"><i class="fas fa-chevron-left"></i></a>
+                </li>
+                {% endif %}
+                
+                {% for i in page_obj.paginator.page_range %}
+                    {% if page_obj.number == i %}
+                        <li class="page-item active"><span class="page-link" style="background-color: var(--accent); border-color: var(--accent);">{{ i }}</span></li>
+                    {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}&action={{ q_action }}" style="color: #475569;">{{ i }}</a></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&action={{ q_action }}" style="color: var(--accent); border-radius: 0 8px 8px 0;"><i class="fas fa-chevron-right"></i></a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
