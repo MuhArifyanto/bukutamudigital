@@ -188,6 +188,9 @@ def logout_view(request):
     messages.success(request, "Anda telah berhasil keluar.")
     return redirect('tamu:login')
 
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
 def api_firebase_login(request):
     """API untuk Login/Register via Firebase (Google SSO & Email/Password)"""
     from django.http import JsonResponse
@@ -198,6 +201,7 @@ def api_firebase_login(request):
     
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Hanya menerima metode POST.'})
+
         
     try:
         data = json.loads(request.body)
@@ -306,6 +310,7 @@ def api_firebase_login(request):
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Terjadi kesalahan: {str(e)}'})
 
+@csrf_exempt
 def api_validate_register(request):
     """API untuk memvalidasi keunikan email dan NIK di MySQL sebelum membuat user di Firebase"""
     from django.http import JsonResponse
@@ -313,6 +318,7 @@ def api_validate_register(request):
     
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Hanya menerima metode POST.'})
+
         
     try:
         data = json.loads(request.body)
