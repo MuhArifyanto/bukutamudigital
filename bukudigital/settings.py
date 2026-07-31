@@ -36,7 +36,7 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,.onrender.com,*'
 # CSRF Trusted Origins for HTTPS Deployment
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
-    'https://*.onrender.com,https://*.koyeb.app,https://*.railway.app,http://127.0.0.1,http://localhost'
+    'https://bukutamudigital.onrender.com,https://*.onrender.com,https://*.koyeb.app,https://*.railway.app,http://127.0.0.1,http://localhost'
 ).split(',')
 
 # Security Headers & Cookies
