@@ -103,6 +103,17 @@ DB_PASSWORD = os.getenv('DB_PASSWORD', '')
 DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
 DB_PORT = os.getenv('DB_PORT', '3306')
 
+DB_OPTIONS = {
+    'charset': 'utf8mb4',
+}
+
+if DB_HOST not in ('127.0.0.1', 'localhost'):
+    ca_path = '/etc/ssl/certs/ca-certificates.crt'
+    ssl_config = {}
+    if os.path.exists(ca_path):
+        ssl_config['ca'] = ca_path
+    DB_OPTIONS['ssl'] = ssl_config
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -111,9 +122,7 @@ DATABASES = {
         'PASSWORD': DB_PASSWORD,
         'HOST': DB_HOST,
         'PORT': DB_PORT,
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-        }
+        'OPTIONS': DB_OPTIONS,
     }
 }
 
