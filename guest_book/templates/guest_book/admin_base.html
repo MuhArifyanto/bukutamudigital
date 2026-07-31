@@ -407,7 +407,36 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.3); border-radius: 99px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-    </style>
+
+        /* ══════════════════════════════════════════
+           NOTIFICATION DROPDOWN
+        ══════════════════════════════════════════ */
+        .notif-dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + 8px);
+            width: 320px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            z-index: 2000;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+
+        /* Di HP: full-width dengan margin kanan sejajar icon */
+        @media (max-width: 576px) {
+            .notif-dropdown {
+                position: fixed;
+                right: 12px;
+                left: 12px;
+                top: auto;
+                width: auto;
+                max-width: 100%;
+            }
+        }
+</style>
 
     <!-- Extra CSS block (placed OUTSIDE <style> to avoid linting errors) -->
     {% block extra_css %}{% endblock %}
@@ -481,6 +510,13 @@
                 </li>
                 
                 <li>
+                    <a href="{% url 'tamu:admin_pengguna' %}"
+                       class="nav-link-custom {% if active_page == 'pengguna' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-users-cog"></i></span>
+                        Kelola Pengguna
+                    </a>
+                </li>
+                <li>
                     <a href="{% url 'tamu:admin_audit_log' %}"
                        class="nav-link-custom {% if active_page == 'audit_log' %}active{% endif %}">
                         <span class="nav-icon"><i class="fas fa-history"></i></span>
@@ -540,7 +576,7 @@
                         {% endif %}
                     </a>
                     <!-- Dropdown -->
-                    <div class="notif-dropdown" id="notifDropdown" style="display: none; position: absolute; right: 0; top: 40px; width: 320px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000; border: 1px solid #e2e8f0;">
+                    <div class="notif-dropdown" id="notifDropdown">
                         <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
                             <h6 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b;">Notifikasi</h6>
                             {% if unread_notifications_count > 0 %}
@@ -667,10 +703,17 @@
             if (notifBtn && notifDropdown) {
                 notifBtn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    const isHidden = notifDropdown.style.display === 'none';
-                    notifDropdown.style.display = isHidden ? 'block' : 'none';
+                    e.stopPropagation();
+                    const isHidden = notifDropdown.style.display === 'none' || notifDropdown.style.display === '';
                     
                     if (isHidden) {
+                        // Hitung posisi top untuk mode fixed (mobile)
+                        if (window.innerWidth <= 576) {
+                            const btnRect = notifBtn.getBoundingClientRect();
+                            notifDropdown.style.top = (btnRect.bottom + 8) + 'px';
+                        }
+                        notifDropdown.style.display = 'block';
+                        
                         fetch("{% url 'tamu:api_get_recent_notifications' %}")
                             .then(res => res.json())
                             .then(data => {
@@ -700,6 +743,8 @@
                                     notifList.innerHTML = '<p style="color: #64748b; font-size: 0.85rem; padding: 1rem; text-align: center; margin: 0;">Tidak ada notifikasi baru.</p>';
                                 }
                             });
+                    } else {
+                        notifDropdown.style.display = 'none';
                     }
                 });
                 
@@ -707,6 +752,14 @@
                 document.addEventListener('click', function(e) {
                     if (!notifBtn.contains(e.target) && !notifDropdown.contains(e.target)) {
                         notifDropdown.style.display = 'none';
+                    }
+                });
+
+                // Recalculate position on resize
+                window.addEventListener('resize', function() {
+                    if (notifDropdown.style.display === 'block' && window.innerWidth <= 576) {
+                        const btnRect = notifBtn.getBoundingClientRect();
+                        notifDropdown.style.top = (btnRect.bottom + 8) + 'px';
                     }
                 });
             }

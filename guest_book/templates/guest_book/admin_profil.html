@@ -10,17 +10,90 @@
     .rounded-4 { border-radius: 1rem !important; }
     .bg-dark-slate { background: #1e293b !important; }
     .text-secondary-light { color: #94a3b8 !important; }
-    
+
     /* Custom switches */
     .form-switch .form-check-input {
         width: 3rem;
         height: 1.5rem;
         cursor: pointer;
     }
-    
+
     /* Table hover effects */
     .table-borderless tbody tr:hover {
         background-color: #f8fafc;
+    }
+
+    /* ══ Log Aktivitas Mobile Cards ══ */
+    .log-mobile-list { display: none; }
+
+    .log-mobile-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .log-mobile-item:last-child { border-bottom: none; }
+
+    .log-icon-circle {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 0.8rem;
+    }
+
+    .log-mobile-body { flex: 1; min-width: 0; }
+
+    .log-mobile-title {
+        font-weight: 700;
+        font-size: 0.84rem;
+        color: #0f172a;
+        margin: 0 0 0.1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .log-mobile-sub {
+        font-size: 0.73rem;
+        color: #94a3b8;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .log-mobile-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.3rem;
+        flex-shrink: 0;
+    }
+
+    .log-mobile-time {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        white-space: nowrap;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .log-desktop-table { display: none !important; }
+        .log-mobile-list { display: block; }
+        .log-aktivitas-header { flex-wrap: wrap; gap: 0.5rem; }
+        .log-aktivitas-header h6 { font-size: 0.9rem; }
+    }
+
+    @media (max-width: 480px) {
+        .log-mobile-title { font-size: 0.8rem; }
+        .log-icon-circle { width: 34px; height: 34px; font-size: 0.75rem; }
     }
 </style>
 {% endblock %}
@@ -133,12 +206,17 @@
             <!-- Log Aktivitas Card -->
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h6 class="fw-bold mb-0 d-flex align-items-center"><i class="fas fa-history me-2 text-primary"></i>Log Aktivitas Terakhir</h6>
-                        <button class="btn btn-light btn-sm rounded-pill px-3 fw-bold text-secondary">LIHAT SEMUA</button>
+                    <div class="d-flex justify-content-between align-items-center mb-4 log-aktivitas-header">
+                        <h6 class="fw-bold mb-0 d-flex align-items-center">
+                            <i class="fas fa-history me-2 text-primary"></i>Log Aktivitas Terakhir
+                        </h6>
+                        <a href="{% url 'tamu:admin_audit_log' %}" class="btn btn-light btn-sm rounded-pill px-3 fw-bold text-secondary" style="font-size:0.75rem;">
+                            LIHAT SEMUA
+                        </a>
                     </div>
-                    
-                    <div class="table-responsive">
+
+                    <!-- ══ DESKTOP TABLE ══ -->
+                    <div class="table-responsive log-desktop-table">
                         <table class="table table-borderless align-middle mb-0">
                             <thead>
                                 <tr class="text-secondary small">
@@ -152,7 +230,7 @@
                                 <tr>
                                     <td>
                                         <div class="d-flex align-items-center gap-3">
-                                            <div class="{% if log.action == 'create' %}bg-success-subtle text-success{% elif log.action == 'update' %}bg-primary-subtle text-primary{% else %}bg-danger-subtle text-danger{% endif %} rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                            <div class="{% if log.action == 'create' %}bg-success-subtle text-success{% elif log.action == 'update' %}bg-primary-subtle text-primary{% else %}bg-danger-subtle text-danger{% endif %} rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; flex-shrink:0;">
                                                 <i class="fas {% if log.action == 'create' %}fa-plus{% elif log.action == 'update' %}fa-pen{% else %}fa-trash{% endif %}"></i>
                                             </div>
                                             <div>
@@ -162,7 +240,7 @@
                                         </div>
                                     </td>
                                     <td><span class="badge bg-success-subtle text-success rounded-pill px-3">SELESAI</span></td>
-                                    <td class="text-secondary small fw-bold">{{ log.timestamp|date:"d M, H:i" }}</td>
+                                    <td class="text-secondary small fw-bold" style="white-space:nowrap;">{{ log.timestamp|date:"d M, H:i" }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
@@ -172,6 +250,41 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- ══ MOBILE CARD LIST ══ -->
+                    <div class="log-mobile-list">
+                        {% for log in activity_logs %}
+                        <div class="log-mobile-item">
+                            <!-- Icon -->
+                            <div class="log-icon-circle {% if log.action == 'create' %}bg-success-subtle text-success{% elif log.action == 'update' %}bg-primary-subtle text-primary{% else %}bg-danger-subtle text-danger{% endif %}">
+                                <i class="fas {% if log.action == 'create' %}fa-plus{% elif log.action == 'update' %}fa-pen{% else %}fa-trash{% endif %}"></i>
+                            </div>
+
+                            <!-- Info -->
+                            <div class="log-mobile-body">
+                                <p class="log-mobile-title">{{ log.action|title }} di {{ log.table_name }}</p>
+                                <p class="log-mobile-sub">
+                                    <span><i class="fas fa-wifi" style="font-size:0.65rem;"></i> {{ log.ip_address|default:'-' }}</span>
+                                </p>
+                            </div>
+
+                            <!-- Right: Status + Waktu -->
+                            <div class="log-mobile-right">
+                                <span class="badge bg-success-subtle text-success rounded-pill" style="font-size:0.65rem; padding: 3px 8px;">SELESAI</span>
+                                <span class="log-mobile-time">
+                                    <i class="fas fa-clock" style="font-size:0.6rem;"></i>
+                                    {{ log.timestamp|date:"d M, H:i" }}
+                                </span>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-secondary py-3" style="font-size:0.85rem;">
+                            <i class="fas fa-inbox opacity-50 d-block mb-2" style="font-size:1.5rem;"></i>
+                            Belum ada aktivitas tercatat
+                        </div>
+                        {% endfor %}
+                    </div>
+
                 </div>
             </div>
     <!-- Modal Ganti Kata Sandi -->
