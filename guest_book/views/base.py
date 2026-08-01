@@ -11,7 +11,7 @@ def get_tamu_from_session(request):
         return None
     try:
         return Tamu.objects.get(pk=tamu_id, account_status='active')
-    except Tamu.DoesNotExist:
+    except Exception:
         return None
 
 def tamu_login_required(view_func):

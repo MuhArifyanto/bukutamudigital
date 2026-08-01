@@ -271,55 +271,61 @@ def notifications_view(request, tamu):
 @tamu_login_required
 def user_chat_view(request, tamu):
     """View untuk Chat Tamu ke Admin (WA Style)"""
-    from ..models import ChatMessage, Pegawai, Tamu
-    session_id = str(tamu.pk)
-    messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at')[:50]
-    messages_list = list(messages_qs)
-    messages_list.reverse()
-    
-    # Mark read messages from admin
-    ChatMessage.objects.filter(session_id=session_id, sender_type='admin', is_read=False).update(is_read=True)
-    
-    # Optimasi: Ambil semua sender yang terlibat
-    admin_ids = [msg.sender_id for msg in messages_list if msg.sender_type == 'admin']
-    pegawai_ids = [msg.sender_id for msg in messages_list if msg.sender_type == 'pegawai']
-    
-    # Validasi UUID agar tidak error jika ada data kotor (misal: "null")
-    import uuid
-    def is_valid_uuid(val):
-        if not val:
-            return False
-        try:
-            uuid.UUID(str(val))
-            return True
-        except (ValueError, AttributeError, TypeError):
-            return False
-            
-    valid_admin_ids = [uid for uid in admin_ids if is_valid_uuid(uid)]
-    valid_pegawai_ids = [uid for uid in pegawai_ids if is_valid_uuid(uid)]
-    
-    # Admin disimpan di tabel Tamu dengan is_admin=True
-    admins = {str(a.pk): a for a in Tamu.objects.filter(pk__in=valid_admin_ids, is_admin=True)}
-    pegawais = {str(p.pk): p for p in Pegawai.objects.filter(pk__in=valid_pegawai_ids)}
-    
-    # Fallback untuk sender_id 'admin' (data lama/hardcoded)
-    admin_user = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
-    
-    for msg in messages_list:
-        if msg.sender_type == 'tamu':
-            msg.sender_obj = tamu
-        elif msg.sender_type == 'admin':
-            msg.sender_obj = admin_user
-        elif msg.sender_type == 'pegawai':
-            msg.sender_obj = pegawais.get(msg.sender_id)
-            
-    ctx = base_context(tamu, 'chat')
-    ctx.update({
-        'messages_list': messages_list,
-        'session_id': session_id,
-        'admin_user': admin_user,
-    })
-    return render(request, 'guest_book/tamu_chat.html', ctx)
+    import traceback
+    try:
+        from ..models import ChatMessage, Pegawai, Tamu
+        session_id = str(tamu.pk)
+        messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at')[:50]
+        messages_list = list(messages_qs)
+        messages_list.reverse()
+        
+        # Mark read messages from admin
+        ChatMessage.objects.filter(session_id=session_id, sender_type='admin', is_read=False).update(is_read=True)
+        
+        # Optimasi: Ambil semua sender yang terlibat
+        admin_ids = [msg.sender_id for msg in messages_list if msg.sender_type == 'admin']
+        pegawai_ids = [msg.sender_id for msg in messages_list if msg.sender_type == 'pegawai']
+        
+        # Validasi UUID agar tidak error jika ada data kotor (misal: "null")
+        import uuid
+        def is_valid_uuid(val):
+            if not val:
+                return False
+            try:
+                uuid.UUID(str(val))
+                return True
+            except (ValueError, AttributeError, TypeError):
+                return False
+                
+        valid_admin_ids = [uid for uid in admin_ids if is_valid_uuid(uid)]
+        valid_pegawai_ids = [uid for uid in pegawai_ids if is_valid_uuid(uid)]
+        
+        # Admin disimpan di tabel Tamu dengan is_admin=True
+        admins = {str(a.pk): a for a in Tamu.objects.filter(pk__in=valid_admin_ids, is_admin=True)}
+        pegawais = {str(p.pk): p for p in Pegawai.objects.filter(pk__in=valid_pegawai_ids)}
+        
+        # Fallback untuk sender_id 'admin' (data lama/hardcoded)
+        admin_user = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
+        
+        for msg in messages_list:
+            if msg.sender_type == 'tamu':
+                msg.sender_obj = tamu
+            elif msg.sender_type == 'admin':
+                msg.sender_obj = admin_user
+            elif msg.sender_type == 'pegawai':
+                msg.sender_obj = pegawais.get(msg.sender_id)
+                
+        ctx = base_context(tamu, 'chat')
+        ctx.update({
+            'messages_list': messages_list,
+            'session_id': session_id,
+            'admin_user': admin_user,
+        })
+        return render(request, 'guest_book/tamu_chat.html', ctx)
+    except Exception as e:
+        from django.http import HttpResponse
+        error_details = traceback.format_exc()
+        return HttpResponse(f"<h3>Error in Chat View:</h3><pre>{error_details}</pre>", status=500)
 
 @tamu_login_required
 def tamu_kunjungan_cetak_pdf(request, tamu):
