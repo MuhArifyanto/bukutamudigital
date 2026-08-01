@@ -377,77 +377,94 @@ def admin_login_view(request):
     from django.contrib.auth import authenticate, login
     from django.contrib.auth.forms import AuthenticationForm
     from ..models import LoginAttempt, Tamu
-    
-    if request.user.is_authenticated and request.user.is_staff:
-        return redirect('tamu:admin_dashboard')
-        
-    if request.method == 'POST':
-        post_data = request.POST.copy()
-        raw_username = post_data.get('username', '').strip()
-        if raw_username and '@' in raw_username:
-            from django.contrib.auth.models import User
-            user_by_email = User.objects.filter(email__iexact=raw_username).first()
-            if user_by_email:
-                post_data['username'] = user_by_email.username
+    import traceback
+    from django.http import HttpResponse
 
-        form = AuthenticationForm(request, data=post_data)
-        if form.is_valid():
-            user = form.get_user()
-            if user.is_staff:
-                # Find the Tamu admin email to associate with this login attempt
-                tamu_admin = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
-                admin_email = tamu_admin.email if tamu_admin else user.email
-                if not admin_email:
-                    admin_email = "admin@bukudigital.local"
-                
-                # Record successful login attempt
-                LoginAttempt.objects.create(
-                    email=admin_email,
-                    user_type='admin',
-                    success=True,
-                    ip_address=request.META.get('REMOTE_ADDR')
-                )
-                
-                login(request, user)
-                messages.success(request, "Selamat datang kembali, Administrator!")
-                return redirect('tamu:admin_dashboard')
-            else:
-                # Record failed attempt (user is not staff/admin)
-                LoginAttempt.objects.create(
-                    email=user.email or user.username,
-                    user_type='admin',
-                    success=False,
-                    ip_address=request.META.get('REMOTE_ADDR')
-                )
-                messages.error(request, "Anda tidak memiliki akses ke halaman ini.")
-        else:
-            # Record failed login attempt (invalid credentials)
-            username = request.POST.get('username')
-            if username:
-                from django.contrib.auth.models import User
-                from django.db.models import Q
-                user_obj = User.objects.filter(Q(username=username) | Q(email=username)).first()
-                email = user_obj.email if user_obj else username
-                if not email or email == "":
-                    # Try to fall back to tamu admin email
-                    tamu_admin = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
-                    if tamu_admin and (username == tamu_admin.name or username == 'admin'):
-                        email = tamu_admin.email
-                
-                if not email:
-                    email = "admin@bukudigital.local"
-                
-                LoginAttempt.objects.create(
-                    email=email,
-                    user_type='admin',
-                    success=False,
-                    ip_address=request.META.get('REMOTE_ADDR')
-                )
+    try:
+        if request.user.is_authenticated and request.user.is_staff:
+            return redirect('tamu:admin_dashboard')
             
-    return render(request, 'guest_book/admin_login.html', {
-        'form': form,
-        'user_logged_in': False,
-    })
+        if request.method == 'POST':
+            post_data = request.POST.copy()
+            raw_username = post_data.get('username', '').strip()
+            if raw_username and '@' in raw_username:
+                from django.contrib.auth.models import User
+                user_by_email = User.objects.filter(email__iexact=raw_username).first()
+                if user_by_email:
+                    post_data['username'] = user_by_email.username
+
+            form = AuthenticationForm(request, data=post_data)
+            if form.is_valid():
+                user = form.get_user()
+                if user.is_staff:
+                    # Find the Tamu admin email to associate with this login attempt
+                    tamu_admin = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
+                    admin_email = tamu_admin.email if tamu_admin else user.email
+                    if not admin_email:
+                        admin_email = "admin@bukudigital.local"
+                    
+                    # Record successful login attempt
+                    try:
+                        LoginAttempt.objects.create(
+                            email=admin_email,
+                            user_type='admin',
+                            success=True,
+                            ip_address=request.META.get('REMOTE_ADDR')
+                        )
+                    except Exception:
+                        pass
+                    
+                    login(request, user)
+                    messages.success(request, "Selamat datang kembali, Administrator!")
+                    return redirect('tamu:admin_dashboard')
+                else:
+                    # Record failed attempt (user is not staff/admin)
+                    try:
+                        LoginAttempt.objects.create(
+                            email=user.email or user.username,
+                            user_type='admin',
+                            success=False,
+                            ip_address=request.META.get('REMOTE_ADDR')
+                        )
+                    except Exception:
+                        pass
+                    messages.error(request, "Anda tidak memiliki akses ke halaman ini.")
+            else:
+                # Record failed login attempt (invalid credentials)
+                username = request.POST.get('username')
+                if username:
+                    from django.contrib.auth.models import User
+                    from django.db.models import Q
+                    user_obj = User.objects.filter(Q(username=username) | Q(email=username)).first()
+                    email = user_obj.email if user_obj else username
+                    if not email or email == "":
+                        # Try to fall back to tamu admin email
+                        tamu_admin = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
+                        if tamu_admin and (username == tamu_admin.name or username == 'admin'):
+                            email = tamu_admin.email
+                    
+                    if not email:
+                        email = "admin@bukudigital.local"
+                    
+                    try:
+                        LoginAttempt.objects.create(
+                            email=email,
+                            user_type='admin',
+                            success=False,
+                            ip_address=request.META.get('REMOTE_ADDR')
+                        )
+                    except Exception:
+                        pass
+        else:
+            form = AuthenticationForm(request)
+                
+        return render(request, 'guest_book/admin_login.html', {
+            'form': form,
+            'user_logged_in': False,
+        })
+    except Exception as e:
+        error_details = traceback.format_exc()
+        return HttpResponse(f"<h3>Error in Admin Login View:</h3><pre>{error_details}</pre>", status=500)
 
 
 def tamu_password_reset_request(request):
