@@ -943,7 +943,7 @@ def admin_kalender_download_template(request):
 @admin_login_required
 def admin_audit_log_view(request):
     """View untuk Laporan Aktivitas (Audit Log)"""
-    from ..models import AuditLog, Tamu, Admin
+    from ..models import AuditLog, Tamu
     
     # Filter
     q_action = request.GET.get('action', '')
@@ -964,8 +964,8 @@ def admin_audit_log_view(request):
                 log.user_name = "Super Admin"
             else:
                 try:
-                    admin_obj = Admin.objects.get(id=log.user_id)
-                    log.user_name = admin_obj.username
+                    admin_obj = Tamu.objects.get(id=log.user_id, is_admin=True)
+                    log.user_name = admin_obj.name
                 except:
                     log.user_name = log.user_id
         elif log.user_type == 'tamu':
@@ -988,7 +988,7 @@ def admin_audit_log_view(request):
 @admin_login_required
 def admin_audit_log_cetak_pdf(request):
     """View untuk mencetak PDF Laporan Aktivitas"""
-    from ..models import AuditLog, Tamu, Admin
+    from ..models import AuditLog, Tamu
     
     # Ambil semua data (bisa ditambah filter kalau butuh kedepannya)
     logs_all = AuditLog.objects.all().order_by('-timestamp')
@@ -1000,8 +1000,8 @@ def admin_audit_log_cetak_pdf(request):
                 log.user_name = "Super Admin"
             else:
                 try:
-                    admin_obj = Admin.objects.get(id=log.user_id)
-                    log.user_name = admin_obj.username
+                    admin_obj = Tamu.objects.get(id=log.user_id, is_admin=True)
+                    log.user_name = admin_obj.name
                 except:
                     log.user_name = log.user_id
         elif log.user_type == 'tamu':
