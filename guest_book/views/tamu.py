@@ -267,28 +267,42 @@ def notifications_view(request, tamu):
     ctx['notifications'] = notifications
     return render(request, 'guest_book/tamu_notifications.html', ctx)
 
-# Trigger auto-reload
+def ensure_chat_table_exists():
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_message (
+                    id VARCHAR(36) NOT NULL PRIMARY KEY,
+                    session_id VARCHAR(255) NOT NULL,
+                    sender_id VARCHAR(255) NOT NULL,
+                    sender_type VARCHAR(20) NOT NULL,
+                    content LONGTEXT NOT NULL,
+                    attachment VARCHAR(255) NULL,
+                    message_type VARCHAR(20) NOT NULL DEFAULT 'text',
+                    is_read TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at DATETIME(6) NOT NULL,
+                    INDEX idx_chat_session_id (session_id)
+                );
+            """)
+    except Exception as e:
+        print(f"Error creating chat_message table: {e}")
+
 @tamu_login_required
 def user_chat_view(request, tamu):
     """View untuk Chat Tamu ke Admin (WA Style)"""
     import traceback
-    from django.db.utils import ProgrammingError, OperationalError
-    from django.core.management import call_command
     from django.http import HttpResponse
+
+    # Pastikan tabel chat_message selalu ada di DB (bahkan jika django_migrations out of sync)
+    ensure_chat_table_exists()
 
     try:
         from ..models import ChatMessage, Pegawai, Tamu
         session_id = str(tamu.pk)
         
-        try:
-            messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at')[:50]
-            messages_list = list(messages_qs)
-        except (ProgrammingError, OperationalError):
-            # Otomatis jalankan migrasi jika tabel belum dibuat di DB production
-            call_command('migrate', interactive=False)
-            messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at')[:50]
-            messages_list = list(messages_qs)
-
+        messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at')[:50]
+        messages_list = list(messages_qs)
         messages_list.reverse()
         
         # Mark read messages from admin
