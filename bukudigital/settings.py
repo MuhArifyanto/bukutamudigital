@@ -45,12 +45,18 @@ CSRF_TRUSTED_ORIGINS = [
 if os.getenv('CSRF_TRUSTED_ORIGINS'):
     CSRF_TRUSTED_ORIGINS.extend([x.strip() for x in os.getenv('CSRF_TRUSTED_ORIGINS').split(',') if x.strip()])
 
+# Proxy SSL & Header Configuration for Render / Cloudflare / Reverse Proxies
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
 # Security Headers & Cookies
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+
 
 
 
