@@ -381,8 +381,16 @@ def admin_login_view(request):
     if request.user.is_authenticated and request.user.is_staff:
         return redirect('tamu:admin_dashboard')
         
-    form = AuthenticationForm(request, data=request.POST or None)
     if request.method == 'POST':
+        post_data = request.POST.copy()
+        raw_username = post_data.get('username', '').strip()
+        if raw_username and '@' in raw_username:
+            from django.contrib.auth.models import User
+            user_by_email = User.objects.filter(email__iexact=raw_username).first()
+            if user_by_email:
+                post_data['username'] = user_by_email.username
+
+        form = AuthenticationForm(request, data=post_data)
         if form.is_valid():
             user = form.get_user()
             if user.is_staff:
