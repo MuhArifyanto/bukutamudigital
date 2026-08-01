@@ -271,7 +271,7 @@ def notifications_view(request, tamu):
 @tamu_login_required
 def user_chat_view(request, tamu):
     """View untuk Chat Tamu ke Admin (WA Style)"""
-    from ..models import ChatMessage, Admin, Pegawai, Tamu
+    from ..models import ChatMessage, Pegawai, Tamu
     session_id = str(tamu.pk)
     messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at')[:50]
     messages_list = list(messages_qs)
@@ -298,7 +298,8 @@ def user_chat_view(request, tamu):
     valid_admin_ids = [uid for uid in admin_ids if is_valid_uuid(uid)]
     valid_pegawai_ids = [uid for uid in pegawai_ids if is_valid_uuid(uid)]
     
-    admins = {str(a.pk): a for a in Admin.objects.filter(pk__in=valid_admin_ids)}
+    # Admin disimpan di tabel Tamu dengan is_admin=True
+    admins = {str(a.pk): a for a in Tamu.objects.filter(pk__in=valid_admin_ids, is_admin=True)}
     pegawais = {str(p.pk): p for p in Pegawai.objects.filter(pk__in=valid_pegawai_ids)}
     
     # Fallback untuk sender_id 'admin' (data lama/hardcoded)
