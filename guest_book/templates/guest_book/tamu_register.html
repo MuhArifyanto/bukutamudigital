@@ -337,9 +337,8 @@
         }
         @media (max-width: 991px) {
             .register-card { flex-direction: column; }
-            .register-info, .register-form-area { width: 100%; }
-            .register-info { min-height: 300px; }
-            .register-form-area { padding: 2.5rem 1.5rem; overflow-y: visible; max-height: none; }
+            .register-info { display: none; }
+            .register-form-area { width: 100%; padding: 2.5rem 1.5rem; overflow-y: visible; max-height: none; }
         }
     </style>
 </head>
@@ -604,75 +603,6 @@
     // Grid Captcha Script
     window.puzzleSolved = false;
     
-    const gridPuzzles = [
-        {
-            id: 0,
-            label: 'Lampu Lalu Lintas',
-            imgUrl: "{% static 'images/captcha/captcha_0.png' %}",
-            correct: [1, 2, 5, 6, 9, 10]
-        },
-        {
-            id: 1,
-            label: 'Penyeberangan Jalan (Zebra Cross)',
-            imgUrl: "{% static 'images/captcha/captcha_1.png' %}",
-            correct: [8, 9, 10, 11, 12, 13, 14, 15]
-        },
-        {
-            id: 2,
-            label: 'Sepeda',
-            imgUrl: "{% static 'images/captcha/captcha_2.png' %}",
-            correct: [5, 6, 7, 9, 10, 11, 13, 14]
-        },
-        {
-            id: 3,
-            label: 'Mobil',
-            imgUrl: "{% static 'images/captcha/captcha_3.png' %}",
-            correct: [5, 6, 7, 9, 10, 11, 13, 14]
-        },
-        {
-            id: 4,
-            label: 'Bus',
-            imgUrl: "{% static 'images/captcha/captcha_4.png' %}",
-            correct: [4, 5, 6, 8, 9, 10, 12, 13, 14]
-        },
-        {
-            id: 5,
-            label: 'Sepeda Motor',
-            imgUrl: "{% static 'images/captcha/captcha_5.png' %}",
-            correct: [5, 6, 7, 9, 10, 11, 13, 14]
-        },
-        {
-            id: 6,
-            label: 'Hidran Kebakaran',
-            imgUrl: "{% static 'images/captcha/captcha_6.png' %}",
-            correct: [5, 6, 9, 10, 13, 14]
-        },
-        {
-            id: 7,
-            label: 'Jembatan',
-            imgUrl: "{% static 'images/captcha/captcha_7.png' %}",
-            correct: [4, 5, 6, 7, 8, 9, 10, 11]
-        },
-        {
-            id: 8,
-            label: 'Tangga',
-            imgUrl: "{% static 'images/captcha/captcha_8.png' %}",
-            correct: [4, 5, 8, 9, 12, 13, 14]
-        },
-        {
-            id: 9,
-            label: 'Perahu',
-            imgUrl: "{% static 'images/captcha/captcha_9.png' %}",
-            correct: [9, 10, 11, 13, 14, 15]
-        },
-        {
-            id: 10,
-            label: 'Wanita Cantik',
-            imgUrl: "{% static 'images/captcha/captcha_10.png' %}",
-            correct: [2, 5, 6, 9, 10, 13, 14]
-        }
-    ];
-
     const captchaPrompt = document.getElementById('captchaPrompt');
     const captchaGrid = document.getElementById('captchaGrid');
     const verifyCaptchaBtn = document.getElementById('verifyCaptchaBtn');
@@ -696,35 +626,44 @@
         captchaSuccessOverlay.style.display = 'none';
         verifyCaptchaBtn.innerText = 'Lewati';
         verifyCaptchaBtn.style.backgroundColor = '#3b82f6';
-        
-        // Pick random puzzle
-        activePuzzle = gridPuzzles[Math.floor(Math.random() * gridPuzzles.length)];
-        
-        captchaPrompt.innerText = activePuzzle.label;
-        captchaPuzzleIndexInput.value = activePuzzle.id;
-        captchaSelectedTilesInput.value = '[]';
-        captchaTrajectoryInput.value = '[]';
+        captchaPrompt.innerText = 'Memuat gambar captcha...';
 
-        // Clear and rebuild grid
-        captchaGrid.innerHTML = '';
-        
-        for (let i = 0; i < 16; i++) {
-            const row = Math.floor(i / 4);
-            const col = i % 4;
-            const x_pct = (col / 3) * 100;
-            const y_pct = (row / 3) * 100;
-            
-            const tile = document.createElement('div');
-            tile.className = 'captcha-tile';
-            tile.dataset.index = i;
-            tile.style.backgroundImage = `url('${activePuzzle.imgUrl}')`;
-            tile.style.backgroundPosition = `${x_pct}% ${y_pct}%`;
-            
-            tile.addEventListener('click', (e) => {
-                handleTileClick(i, tile);
+        fetch("{% url 'tamu:api_refresh_captcha' %}")
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message || 'Gagal memuat captcha. Silakan coba lagi.');
+                    return;
+                }
+                activePuzzle = data;
+                captchaPrompt.innerText = data.label;
+                captchaSelectedTilesInput.value = '[]';
+                captchaTrajectoryInput.value = '[]';
+
+                // Clear and rebuild grid
+                captchaGrid.innerHTML = '';
+                for (let i = 0; i < 16; i++) {
+                    const row = Math.floor(i / 4);
+                    const col = i % 4;
+                    const x_pct = (col / 3) * 100;
+                    const y_pct = (row / 3) * 100;
+                    
+                    const tile = document.createElement('div');
+                    tile.className = 'captcha-tile';
+                    tile.dataset.index = i;
+                    tile.style.backgroundImage = `url('${data.imgUrl}')`;
+                    tile.style.backgroundPosition = `${x_pct}% ${y_pct}%`;
+                    
+                    tile.addEventListener('click', (e) => {
+                        handleTileClick(i, tile);
+                    });
+                    captchaGrid.appendChild(tile);
+                }
+            })
+            .catch(err => {
+                console.error('Error loading captcha:', err);
+                captchaPrompt.innerText = 'Gagal memuat captcha. Klik ganti gambar.';
             });
-            captchaGrid.appendChild(tile);
-        }
     }
 
     function handleTileClick(index, tile) {
@@ -757,37 +696,29 @@
 
     function verifyCaptcha() {
         if (window.puzzleSolved) return;
-        
-        // Sort arrays to check equality
-        const sortedSelected = [...selectedTiles].sort((a, b) => a - b);
-        const sortedCorrect = [...activePuzzle.correct].sort((a, b) => a - b);
-        
-        const isCorrect = JSON.stringify(sortedSelected) === JSON.stringify(sortedCorrect);
-        
-        if (isCorrect) {
-            // Success!
-            window.puzzleSolved = true;
-            captchaSuccessOverlay.style.display = 'flex';
-            
-            captchaPuzzleIndexInput.value = activePuzzle.id;
-            captchaSelectedTilesInput.value = JSON.stringify(selectedTiles);
-            captchaTrajectoryInput.value = JSON.stringify(trajectory);
 
-            // Tutup modal dan jalankan sisa proses pendaftaran setelah delay kecil
-            setTimeout(() => {
-                document.getElementById('captchaModal').style.display = 'none';
-                if (typeof window.proceedToRegister === 'function') {
-                    window.proceedToRegister();
-                }
-            }, 800);
-        } else {
-            // Failure shake animation
-            captchaContainer.classList.add('captcha-shake');
-            setTimeout(() => {
-                captchaContainer.classList.remove('captcha-shake');
-                initCaptcha(); // load new puzzle on fail
-            }, 500);
+        if (selectedTiles.length === 0) {
+            // User clicked 'Lewati' -> refresh puzzle
+            initCaptcha();
+            return;
         }
+
+        // Set form hidden inputs
+        captchaSelectedTilesInput.value = JSON.stringify(selectedTiles);
+        captchaTrajectoryInput.value = JSON.stringify(trajectory);
+
+        window.puzzleSolved = true;
+        captchaSuccessOverlay.style.display = 'flex';
+
+        setTimeout(() => {
+            document.getElementById('captchaModal').style.display = 'none';
+            if (typeof window.proceedToRegister === 'function') {
+                window.proceedToRegister();
+            } else {
+                const regForm = document.getElementById('registerForm');
+                if (regForm) regForm.submit();
+            }
+        }, 500);
     }
 
     verifyCaptchaBtn.addEventListener('click', verifyCaptcha);

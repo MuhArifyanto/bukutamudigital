@@ -18,8 +18,9 @@ urlpatterns = [
     path('keluar/', views.logout_view, name='logout'),
     path('api/auth/firebase/', views.api_firebase_login, name='api_firebase_login'),
     path('api/auth/validate-register/', views.api_validate_register, name='api_validate_register'),
-    path('api/auth/resolve-email/', views.api_resolve_email, name='api_resolve_email'),
+    path('api/auth/login/', views.api_tamu_login, name='api_tamu_login'),
     path('api/auth/webhook-delete-user/', views.api_webhook_delete_user, name='api_webhook_delete_user'),
+    path('api/auth/captcha-refresh/', views.api_refresh_captcha, name='api_refresh_captcha'),
     
     # Password Reset
     path('password_reset/', views.tamu_password_reset_request, name='password_reset'),
@@ -43,6 +44,9 @@ urlpatterns = [
     path('admin-portal/profil/', views.admin_profil_view, name='admin_profil'),
     path('admin-portal/instansi/', views.admin_instansi_view, name='admin_instansi'),
     path('admin-portal/pengguna/', views.admin_pengguna_view, name='admin_pengguna'),
+    path('admin-portal/pegawai/', views.admin_pegawai_view, name='admin_pegawai'),
+    path('admin-portal/pegawai/<uuid:pegawai_id>/role/', views.admin_pegawai_update_role, name='admin_pegawai_update_role'),
+    path('admin-portal/pegawai/<uuid:pegawai_id>/status/', views.admin_pegawai_update_status, name='admin_pegawai_update_status'),
     path('admin-portal/audit-log/', views.admin_audit_log_view, name='admin_audit_log'),
     path('admin-portal/audit-log/cetak-pdf/', views.admin_audit_log_cetak_pdf, name='admin_audit_log_cetak_pdf'),
     path('admin-portal/api/update-quota/', views.api_update_quota, name='api_update_quota'),
@@ -55,6 +59,7 @@ urlpatterns = [
     path('admin-portal/kalender/download-template/', views.admin_kalender_download_template, name='admin_kalender_download_template'),
     path('admin-portal/api/chat/send/', views.api_send_chat_message, name='api_send_chat_send'),
     path('admin-portal/api/chat/messages/', views.api_get_chat_messages, name='api_get_chat_messages'),
+    path('api/chat/messages/', views.api_get_chat_messages, name='api_chat_messages'),
     path('admin-portal/api/chat/delete/<uuid:message_id>/', views.api_delete_chat_message, name='api_delete_chat_message'),
     path('api/chat/upload/', views.api_upload_chat_file, name='api_upload_chat_file'),
     path('admin-portal/api/chat/search-users/', views.api_search_users, name='api_search_users'),
@@ -91,4 +96,16 @@ urlpatterns = [
     path('api/admin/recent-notifications/', views.api_get_recent_notifications, name='api_get_recent_notifications'),
     path('api/admin/visits-by-date/', views.api_get_visits_by_date, name='api_get_visits_by_date'),
     path('api/check-quota/', views.api_check_quota, name='api_check_quota'),
+
+    # ── Pegawai Portal ──────────────────────────────────────────────────────
+    path('pegawai-portal/login/',  views.pegawai_login_view,  name='pegawai_login'),
+    path('pegawai-portal/keluar/', views.pegawai_logout_view, name='pegawai_logout'),
+    path('pegawai-portal/',        views.pegawai_dashboard_view, name='pegawai_dashboard'),
+    path('pegawai-portal/kunjungan/', views.pegawai_kunjungan_list_view, name='pegawai_kunjungan_list'),
+    path('pegawai-portal/kunjungan/cetak-pdf/', views.pegawai_kunjungan_cetak_pdf_view, name='pegawai_kunjungan_cetak_pdf'),
+    path('pegawai-portal/kunjungan/<uuid:pk>/', views.pegawai_kunjungan_detail_view, name='pegawai_kunjungan_detail'),
+    path('pegawai-portal/chat/', views.pegawai_chat_view, name='pegawai_chat'),
+    path('pegawai-portal/profil/', views.pegawai_profile_view, name='pegawai_profile'),
+    # Tamu Chat with Pegawai
+    path('chat/pegawai/<uuid:kunjungan_id>/', views.tamu_chat_pegawai_view, name='tamu_chat_pegawai'),
 ]

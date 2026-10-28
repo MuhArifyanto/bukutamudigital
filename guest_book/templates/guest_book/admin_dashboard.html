@@ -595,8 +595,13 @@
             .catch(err => console.error('Error polling stats:', err));
         }
         
-        // Poll every 5 seconds
-        setInterval(updateDashboardStats, 5000);
+        // Poll setiap 20 detik hanya saat tab aktif
+        if (window.dashboardStatsInterval) {
+            clearInterval(window.dashboardStatsInterval);
+        }
+        window.dashboardStatsInterval = setInterval(() => {
+            if (!document.hidden) updateDashboardStats();
+        }, 20000);
 
         // Global Update Status Function
         window.updateStatus = function(id, status) {

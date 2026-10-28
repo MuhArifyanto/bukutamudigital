@@ -1,11 +1,11 @@
 # Package for guest_book views
-from .auth import login_view, register_view, logout_view, api_firebase_login, api_validate_register, api_resolve_email, admin_login_view, tamu_password_reset_request, tamu_password_reset_confirm
+from .auth import login_view, register_view, logout_view, api_firebase_login, api_validate_register, api_tamu_login, admin_login_view, tamu_password_reset_request, tamu_password_reset_confirm, pegawai_login_view, pegawai_logout_view, api_refresh_captcha
 from .tamu import (
     landing_view, tentang_kami_view, kebijakan_privasi_view,
     dashboard_view, kunjungan_baru_view, riwayat_view,
     kunjungan_detail_view, kunjungan_batal_view, pesan_baru_view,
     notifications_view, user_chat_view, tamu_kunjungan_cetak_pdf,
-    profil_view, tamu_cetak_kartu_view
+    profil_view, tamu_cetak_kartu_view, tamu_chat_pegawai_view
 )
 from .admin import (
     admin_dashboard_view, admin_statistik_view, admin_kunjungan_list_view,
@@ -14,7 +14,8 @@ from .admin import (
     admin_kalender_view, admin_chat_view, admin_profil_view,
     admin_instansi_view, admin_notifications_view, admin_kalender_download_template,
     admin_kunjungan_detail_view, admin_cetak_kartu_view,
-    admin_audit_log_view, admin_audit_log_cetak_pdf, admin_pengguna_view
+    admin_audit_log_view, admin_audit_log_cetak_pdf, admin_pengguna_view,
+    admin_pegawai_view, admin_pegawai_update_role, admin_pegawai_update_status
 )
 from .api import (
     api_mark_notification_read, api_mark_all_notifications_read, api_update_kunjungan_status,
@@ -36,3 +37,12 @@ from .api import (
     api_debug_counts,
     api_webhook_delete_user
 )
+from .pegawai import (
+    pegawai_dashboard_view,
+    pegawai_kunjungan_list_view,
+    pegawai_kunjungan_detail_view,
+    pegawai_kunjungan_cetak_pdf_view,
+    pegawai_chat_view,
+    pegawai_profile_view
+)
+from .error_handlers import custom_page_not_found_view, custom_server_error_view

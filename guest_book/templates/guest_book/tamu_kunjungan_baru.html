@@ -469,13 +469,14 @@
     // Check Quota on Load
     updateQuotaStatus(today);
 
-    // Poll quota every 5 seconds
+    // Poll quota setiap 30 detik hanya saat tab aktif
     setInterval(() => {
+        if (document.hidden) return;
         const selectedDate = document.getElementById('visit_date').value;
         if (selectedDate) {
             updateQuotaStatus(selectedDate);
         }
-    }, 5000);
+    }, 30000);
 
     // Verifikasi Nama (Tidak boleh mengandung angka atau simbol)
     const nameValue = "{{ tamu.name|escapejs }}";
@@ -507,19 +508,47 @@
     const selectPegawai = document.getElementById('id_pegawai');
     const originalOptions = Array.from(selectPegawai.options);
 
+    // Saat halaman pertama dimuat: kosongkan & disable dropdown pegawai
+    selectPegawai.innerHTML = '';
+    const initOpt = document.createElement('option');
+    initOpt.value = '';
+    initOpt.text = '— Pilih Bidang dahulu —';
+    selectPegawai.appendChild(initOpt);
+    selectPegawai.disabled = true;
+    selectPegawai.style.opacity = '0.5';
+    selectPegawai.style.cursor = 'not-allowed';
+
     selectBidang.addEventListener('change', function() {
         const deptId = this.value;
         selectPegawai.innerHTML = '';
-        
-        // Tambahkan opsi default
-        selectPegawai.appendChild(originalOptions[0]);
-        
-        originalOptions.forEach(opt => {
-            if (opt.value === '') return;
-            if (deptId === '' || opt.getAttribute('data-dept') === deptId) {
-                selectPegawai.appendChild(opt);
-            }
-        });
+
+        if (deptId === '') {
+            // Belum pilih bidang: tetap kosong & disabled
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.text = '— Pilih Bidang dahulu —';
+            selectPegawai.appendChild(defaultOpt);
+            selectPegawai.disabled = true;
+            selectPegawai.style.opacity = '0.5';
+            selectPegawai.style.cursor = 'not-allowed';
+        } else {
+            // Bidang sudah dipilih: tampilkan pegawai sesuai bidang
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.text = 'Pilih Pegawai';
+            selectPegawai.appendChild(defaultOpt);
+
+            originalOptions.forEach(opt => {
+                if (opt.value === '') return;
+                if (opt.getAttribute('data-dept') === deptId) {
+                    selectPegawai.appendChild(opt.cloneNode(true));
+                }
+            });
+
+            selectPegawai.disabled = false;
+            selectPegawai.style.opacity = '1';
+            selectPegawai.style.cursor = 'pointer';
+        }
     });
 
     // Handle Form Submit

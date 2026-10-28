@@ -106,13 +106,24 @@ class Pegawai(models.Model):
         ('suspended', 'Suspended'),
     ]
     
+    ROLE_CHOICES = [
+        ('staff', 'Staff'),
+        ('supervisor', 'Supervisor'),
+        ('manager', 'Manager'),
+        ('admin', 'Admin'),
+    ]
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    username = models.CharField(max_length=50, unique=True, null=True, blank=True, verbose_name='Username')
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20)
     department_rel = models.ForeignKey(Departemen, on_delete=models.SET_NULL, null=True, blank=True, related_name='pegawai_list', verbose_name='Bidang')
     department = models.CharField(max_length=255, null=True, blank=True)  # Legacy field, kept for compatibility for now
     password = models.CharField(max_length=255)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff', verbose_name='Role')
+    nip = models.CharField(max_length=50, null=True, blank=True, verbose_name='NIP')
+    jabatan = models.CharField(max_length=100, null=True, blank=True, verbose_name='Jabatan')
     account_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     last_login = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -120,9 +131,11 @@ class Pegawai(models.Model):
     class Meta:
         db_table = 'pegawai'
         indexes = [
+            models.Index(fields=['username']),
             models.Index(fields=['email']),
             models.Index(fields=['department']),
             models.Index(fields=['account_status']),
+            models.Index(fields=['role']),
         ]
     
     def __str__(self):
@@ -163,13 +176,58 @@ class Admin(models.Model):
 # VISIT MODELS (Kunjungan)
 # ============================================================================
 
+class KunjunganStatus:
+    """Konstanta status resmi Kunjungan untuk mencegah string typo."""
+    MENUNGGU_ADMIN = 'menunggu_admin'
+    MENUNGGU_PEGAWAI = 'menunggu_pegawai'
+    DISETUJUI_PEGAWAI = 'disetujui_pegawai'
+    DITOLAK_PEGAWAI = 'ditolak_pegawai'
+    DITOLAK_ADMIN = 'ditolak_admin'
+    DISETUJUI = 'disetujui'
+    IN_PROGRESS = 'in_progress'
+    COMPLETED = 'completed'
+    CANCELLED = 'cancelled'
+
+    PENDING_VERIFICATION = [
+        MENUNGGU_ADMIN,
+        MENUNGGU_PEGAWAI,
+        DISETUJUI_PEGAWAI,
+    ]
+
+    CANCELABLE = [
+        MENUNGGU_ADMIN,
+        MENUNGGU_PEGAWAI,
+        DISETUJUI_PEGAWAI,
+        DISETUJUI,
+    ]
+
+    ALL = [
+        MENUNGGU_ADMIN,
+        MENUNGGU_PEGAWAI,
+        DISETUJUI_PEGAWAI,
+        DITOLAK_PEGAWAI,
+        DITOLAK_ADMIN,
+        DISETUJUI,
+        IN_PROGRESS,
+        COMPLETED,
+        CANCELLED,
+    ]
+
+
 class Kunjungan(models.Model):
     """Model untuk Catatan Kunjungan"""
+    Status = KunjunganStatus
+
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
+        (KunjunganStatus.MENUNGGU_ADMIN, 'Menunggu Admin'),
+        (KunjunganStatus.MENUNGGU_PEGAWAI, 'Menunggu Pegawai'),
+        (KunjunganStatus.DISETUJUI_PEGAWAI, 'Disetujui Pegawai'),
+        (KunjunganStatus.DITOLAK_PEGAWAI, 'Ditolak Pegawai'),
+        (KunjunganStatus.DITOLAK_ADMIN, 'Ditolak Admin'),
+        (KunjunganStatus.DISETUJUI, 'Disetujui Admin (ACC)'),
+        (KunjunganStatus.IN_PROGRESS, 'Berjalan'),
+        (KunjunganStatus.COMPLETED, 'Selesai'),
+        (KunjunganStatus.CANCELLED, 'Batal'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -178,18 +236,24 @@ class Kunjungan(models.Model):
     arrival_time = models.DateTimeField()
     departure_time = models.DateTimeField(null=True, blank=True)
     purpose = models.CharField(max_length=500)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='menunggu_admin')
     notes = models.TextField(null=True, blank=True)
+    rejection_reason = models.TextField(null=True, blank=True, verbose_name='Alasan Penolakan')
+    admin_notes = models.TextField(null=True, blank=True, verbose_name='Catatan Admin Internal')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         db_table = 'kunjungan'
         indexes = [
-            models.Index(fields=['tamu', 'arrival_time']),
-            models.Index(fields=['pegawai', 'arrival_time']),
-            models.Index(fields=['status']),
-            models.Index(fields=['arrival_time']),
+            # Covering index untuk dashboard tamu: filter tamu + COUNT per status
+            models.Index(fields=['tamu', 'status'], name='idx_kunjungan_tamu_status'),
+            # Covering index untuk dashboard admin: filter arrival_time + status
+            models.Index(fields=['arrival_time', 'status'], name='idx_kunjungan_arrival_status'),
+            # Untuk query pegawai timeline
+            models.Index(fields=['pegawai', 'arrival_time'], name='idx_kunjungan_pegawai_arrival'),
+            # Filter bulan_ini: (tamu, arrival_time) agar YEAR/MONTH bisa manfaatkan range scan
+            models.Index(fields=['tamu', 'arrival_time'], name='idx_kunjungan_tamu_arrival'),
         ]
     
     def __str__(self):
@@ -204,6 +268,7 @@ class KunjunganStatusHistory(models.Model):
     new_status = models.CharField(max_length=20)
     changed_by_id = models.CharField(max_length=255)  # Bisa Pegawai atau Admin
     changed_by_type = models.CharField(max_length=20, choices=[('pegawai', 'Pegawai'), ('admin', 'Admin')])
+    notes = models.TextField(null=True, blank=True)
     changed_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -220,6 +285,7 @@ class KunjunganNote(models.Model):
     author_id = models.CharField(max_length=255)  # Bisa Pegawai atau Admin
     author_type = models.CharField(max_length=20, choices=[('pegawai', 'Pegawai'), ('admin', 'Admin')])
     content = models.TextField()
+    note_type = models.CharField(max_length=20, default='general')  # general, rejection, approval
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -299,9 +365,10 @@ class ChatMessage(models.Model):
     class Meta:
         db_table = 'chat_message'
         ordering = ['created_at']
-        # indexes = [
-        #     models.Index(fields=['session_id', 'created_at']),
-        # ]
+        indexes = [
+            # Index aktif untuk query history chat per sesi
+            models.Index(fields=['session_id', 'created_at'], name='idx_chat_session_created'),
+        ]
 
 
 
@@ -322,8 +389,8 @@ class CalendarSettings(models.Model):
     class Meta:
         db_table = 'calendar_settings'
         indexes = [
-            models.Index(fields=['date']),
-            models.Index(fields=['is_holiday']),
+            # (date) tidak perlu — unique=True sudah otomatis buat index
+            models.Index(fields=['is_holiday'], name='idx_calendar_is_holiday'),
         ]
     
     def __str__(self):
@@ -411,6 +478,13 @@ class Notification(models.Model):
     """Model untuk Notifikasi Pengguna"""
     TYPE_CHOICES = [
         ('visit_registered', 'Visit Registered'),
+        ('visit_forwarded', 'Visit Forwarded to Pegawai'),
+        ('visit_approved', 'Visit Approved by Pegawai'),
+        ('visit_rejected', 'Visit Rejected by Pegawai'),
+        ('visit_rejected_admin', 'Visit Rejected by Admin'),
+        ('visit_acc', 'Visit ACC by Admin'),
+        ('visit_in_progress', 'Visit In Progress'),
+        ('visit_completed', 'Visit Completed'),
         ('message_received', 'Message Received'),
         ('message_replied', 'Message Replied'),
         ('quota_reached', 'Quota Reached'),
@@ -436,6 +510,8 @@ class Notification(models.Model):
     class Meta:
         db_table = 'notification'
         indexes = [
-            models.Index(fields=['recipient_id', 'created_at']),
-            models.Index(fields=['status']),
+            # Covering index untuk query badge & dropdown: filter recipient + type + status
+            models.Index(fields=['recipient_id', 'recipient_type', 'status'], name='idx_notif_recipient_status'),
+            # Untuk sort & pagination notifikasi terbaru
+            models.Index(fields=['recipient_id', 'created_at'], name='idx_notif_recipient_created'),
         ]

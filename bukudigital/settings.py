@@ -12,50 +12,116 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ── Environment Mode (Secure by Default) ─────────────────────────────────────
+# Nilai: 'local' (pengembangan HTTP) atau 'production' (server wajib HTTPS).
+# Jika variabel APP_ENV tidak diset, default otomatis ke 'production' (secure by default).
+APP_ENV = os.getenv('APP_ENV', 'production').strip().lower()
+IS_PRODUCTION = (APP_ENV == 'production')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# Nama tabel khusus untuk cache database di production
+CACHE_TABLE_NAME = 'app_cache_table'
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
-if not SECRET_KEY:
-    raise ValueError("No SECRET_KEY set for Django application")
+if IS_PRODUCTION:
+    # ── MODE PRODUCTION (Wajib HTTPS & Keamanan Penuh) ─────────────────────────
+    DEBUG = False  # DEBUG selalu False di production, tidak bisa di-override
+    
+    SECRET_KEY = os.getenv('SECRET_KEY')
+    if not SECRET_KEY:
+        raise ImproperlyConfigured("SECRET_KEY wajib diset di environment variable saat mode production!")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
+    allowed_hosts_raw = os.getenv('ALLOWED_HOSTS')
+    if not allowed_hosts_raw:
+        raise ImproperlyConfigured("ALLOWED_HOSTS wajib diset di environment variable saat mode production!")
+    ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_raw.split(',') if h.strip()]
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,.onrender.com,*').split(',')
+    csrf_origins_raw = os.getenv('CSRF_TRUSTED_ORIGINS')
+    if not csrf_origins_raw:
+        raise ImproperlyConfigured("CSRF_TRUSTED_ORIGINS wajib diset di environment variable saat mode production!")
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_origins_raw.split(',') if o.strip()]
 
-# CSRF Trusted Origins for HTTPS Deployment
-CSRF_TRUSTED_ORIGINS = [
-    'https://bukutamudigital.onrender.com',
-    'https://*.onrender.com',
-    'https://*.koyeb.app',
-    'https://*.railway.app',
-    'http://127.0.0.1',
-    'http://localhost',
-]
-if os.getenv('CSRF_TRUSTED_ORIGINS'):
-    CSRF_TRUSTED_ORIGINS.extend([x.strip() for x in os.getenv('CSRF_TRUSTED_ORIGINS').split(',') if x.strip()])
+    # Security Headers & Cookies (Wajib HTTPS)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '3600'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() in ('true', '1')
+    SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'False').lower() in ('true', '1')
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
 
-# Proxy SSL & Header Configuration for Render / Cloudflare / Reverse Proxies
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Reverse proxy header (aktif HANYA jika server berada di belakang reverse proxy seperti Nginx)
+    if os.getenv('USE_PROXY_SSL_HEADER', 'False').lower() in ('true', '1'):
+        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    else:
+        SECURE_PROXY_SSL_HEADER = None
+
+    # DatabaseCache di production: konsisten antar-worker Gunicorn tanpa perlu Redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': CACHE_TABLE_NAME,
+            'TIMEOUT': 86400,
+        }
+    }
+
+else:
+    # ── MODE LOCAL (Pengembangan HTTP Lokal) ───────────────────────────────────
+    DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
+
+    # Boleh memakai SECRET_KEY sementara khusus lokal
+    SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-local-dev-key-not-for-production-use-only-for-local-testing')
+
+    allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,testserver')
+    ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_raw.split(',') if h.strip()]
+    for host in ('127.0.0.1', 'localhost', 'testserver'):
+        if host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
+
+    CSRF_TRUSTED_ORIGINS = [
+        'http://127.0.0.1',
+        'http://localhost',
+        'http://testserver',
+    ]
+    if os.getenv('CSRF_TRUSTED_ORIGINS'):
+        CSRF_TRUSTED_ORIGINS.extend([o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS').split(',') if o.strip()])
+
+    # Dimatikan agar login via HTTP di http://localhost tetap berjalan lancar tanpa SSL
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SECURE_CONTENT_TYPE_NOSNIFF = False
+    X_FRAME_OPTIONS = 'SAMEORIGIN'
+    SECURE_PROXY_SSL_HEADER = None
+
+    # In-memory Cache untuk pengembangan lokal yang cepat
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'bukudigital-dev',
+            'TIMEOUT': 86400,
+        }
+    }
+
+# Common Security & Header Settings
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'Lax'
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
-# Security Headers & Cookies
-if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 
 
@@ -70,6 +136,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cloudinary_storage',
+    'cloudinary',
     'channels',
     'guest_book',
 ]
@@ -91,7 +159,7 @@ ASGI_APPLICATION = 'bukudigital.asgi.application'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -99,6 +167,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'guest_book.context_processors.notifications_context',
+                'guest_book.context_processors.pegawai_notifications_context',
             ],
         },
     },
@@ -136,14 +205,32 @@ DATABASES = {
         'HOST': DB_HOST,
         'PORT': DB_PORT,
         'OPTIONS': DB_OPTIONS,
+        'CONN_MAX_AGE': 60,  # Mempertahankan koneksi DB selama 60 detik (persistent connections)
     }
 }
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
+# Channel Layers:
+# InMemoryChannelLayer digunakan untuk single-instance (lokal maupun single container PaaS) & testing.
+# RedisChannelLayer digunakan jika USE_REDIS_CHANNEL_LAYER=true dan REDIS_URL diset (untuk multi-instance).
+USE_REDIS_CHANNEL_LAYER = os.getenv('USE_REDIS_CHANNEL_LAYER', 'False').lower() in ('true', '1') and bool(os.getenv('REDIS_URL'))
+
+if 'test' in sys.argv or not USE_REDIS_CHANNEL_LAYER:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [os.getenv('REDIS_URL')],
+            },
+        },
+    }
+
+
 
 
 # Password validation
@@ -191,10 +278,25 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Gunakan Cloudinary jika ada URL-nya (untuk production / PaaS)
+CLOUDINARY_URL = os.getenv('CLOUDINARY_URL')
+if CLOUDINARY_URL:
+    DEFAULT_FILE_STORAGE = 'guest_book.storage.DynamicMediaCloudinaryStorage'
+    CLOUDINARY_STORAGE = {
+        'SECURE': True,
+    }
+else:
+    if IS_PRODUCTION:
+        import logging
+        logging.getLogger(__name__).warning(
+            "PERINGATAN PRODUKSI: CLOUDINARY_URL belum diset. File media (foto profil dan lampiran chat) "
+            "akan disimpan sementara di disk lokal container dan akan hilang saat server restart/redeploy di PaaS!"
+        )
+
 # Session (stored in DB)
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 1 hari
-SESSION_SAVE_EVERY_REQUEST = True
+SESSION_SAVE_EVERY_REQUEST = False
 
 # Default primary key
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -213,4 +315,22 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER') # Ganti dengan email Gmail Anda
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD') # Ganti dengan 16 karakter App Password Gmail Anda
 
 # Firebase Webhook Configuration
-FIREBASE_WEBHOOK_SECRET = os.getenv('FIREBASE_WEBHOOK_SECRET', 'super-secret-webhook-key-12345')
+FIREBASE_WEBHOOK_SECRET = os.getenv('FIREBASE_WEBHOOK_SECRET')
+if IS_PRODUCTION and not FIREBASE_WEBHOOK_SECRET:
+    raise ImproperlyConfigured(
+        "FIREBASE_WEBHOOK_SECRET harus diset di environment variable saat production. "
+        "Generate secret yang kuat dan tambahkan ke file .env atau environment deployment Anda."
+    )
+
+# Firebase Auth (login password sisi server)
+# FIREBASE_API_KEY = "Web API Key" proyek Firebase (Project settings > General).
+# Jika kosong, login password dinonaktifkan dan endpoint membalas "layanan tidak tersedia" (bukan error 500).
+FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY', '').strip()
+FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'bukutamudigital-43ae7').strip()
+if IS_PRODUCTION and not FIREBASE_API_KEY:
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "PERINGATAN PRODUKSI: FIREBASE_API_KEY belum diset. Login email/NIK + password akan dinonaktifkan."
+    )
+
+

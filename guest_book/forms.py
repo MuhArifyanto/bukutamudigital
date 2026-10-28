@@ -5,13 +5,15 @@ import hashlib
 
 class TamuLoginForm(forms.Form):
     username = forms.CharField(
-        label="Nama Lengkap / Email",
-        widget=forms.TextInput(attrs={'placeholder': 'Masukkan nama atau email'})
+        label="Email / NIK",
+        widget=forms.TextInput(attrs={'placeholder': 'Masukkan email atau NIK 16 digit'})
     )
     password = forms.CharField(
         label="Password",
         widget=forms.PasswordInput(attrs={'placeholder': 'Masukkan password Anda'})
     )
+
+    GENERIC_ERROR = "Email/NIK atau password salah."
 
     def clean(self):
         cleaned = super().clean()
@@ -19,20 +21,22 @@ class TamuLoginForm(forms.Form):
         password = cleaned.get('password')
         
         if username and password:
-            try:
-                from django.db.models import Q
-                from django.contrib.auth.hashers import check_password
-                
-                tamu = Tamu.objects.get(
-                    Q(name=username) | Q(email=username),
-                    account_status='active'
-                )
-                if check_password(password, tamu.password):
-                    self.tamu = tamu
-                else:
-                    raise forms.ValidationError("Nama/Email atau Password salah.")
-            except Tamu.DoesNotExist:
-                raise forms.ValidationError("Nama/Email atau Password salah.")
+            from django.contrib.auth.hashers import check_password
+            from .security_utils import classify_identifier
+
+            kind, normalized = classify_identifier(username)
+            qs = Tamu.objects.filter(account_status='active')
+            if kind == 'email':
+                qs = qs.filter(email__iexact=normalized)
+            elif kind == 'nik':
+                qs = qs.filter(nik=normalized)
+            else:
+                qs = qs.none()
+            matches = list(qs[:2])
+            if len(matches) == 1 and check_password(password, matches[0].password):
+                self.tamu = matches[0]
+            else:
+                raise forms.ValidationError(self.GENERIC_ERROR)
         return cleaned
 
 
@@ -159,12 +163,12 @@ class KunjunganForm(forms.ModelForm):
     )
     arrival_time = forms.DateTimeField(
         label="Tanggal & Waktu Kedatangan",
-        input_formats=['%Y-%m-%dT%H:%M'],
+        input_formats=['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'],
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local'})
     )
     departure_time = forms.DateTimeField(
         label="Perkiraan Waktu Pulang",
-        input_formats=['%Y-%m-%dT%H:%M'],
+        input_formats=['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'],
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}),
         required=False,
     )
@@ -182,8 +186,27 @@ class KunjunganForm(forms.ModelForm):
         cleaned = super().clean()
         arrival = cleaned.get('arrival_time')
         departure = cleaned.get('departure_time')
-        if arrival and departure and departure <= arrival:
-            self.add_error('departure_time', "Waktu pulang harus setelah waktu kedatangan.")
+
+        if arrival:
+            from .validators import validate_kunjungan_schedule
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            try:
+                validate_kunjungan_schedule(
+                    arrival_time=arrival,
+                    departure_time=departure,
+                    instance=self.instance,
+                    is_admin=False,
+                    is_import=False
+                )
+            except DjangoValidationError as e:
+                if hasattr(e, 'error_dict'):
+                    for field, error_list in e.error_dict.items():
+                        for err in error_list:
+                            self.add_error(field, err)
+                elif hasattr(e, 'message'):
+                    self.add_error('arrival_time', e.message)
+                else:
+                    self.add_error('arrival_time', str(e))
         return cleaned
 
 
@@ -195,4 +218,169 @@ class PesanForm(forms.Form):
     content = forms.CharField(
         label="Isi Pesan",
         widget=forms.Textarea(attrs={'rows': 5, 'placeholder': 'Tulis pesan Anda di sini...'})
+    )
+
+
+# ============================================================================
+# APPROVAL WORKFLOW FORMS
+# ============================================================================
+
+class KunjunganCreateForm(forms.ModelForm):
+    """Form untuk Tamu membuat request kunjungan baru."""
+    
+    pegawai = forms.ModelChoiceField(
+        queryset=Pegawai.objects.filter(account_status='active').select_related('department_rel'),
+        label="Pegawai yang Dituju",
+        empty_label="-- Pilih Pegawai --",
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    purpose = forms.CharField(
+        max_length=500,
+        label="Keperluan / Tujuan",
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+            'class': 'form-control',
+            'placeholder': 'Jelaskan tujuan kunjungan Anda...'
+        })
+    )
+    
+    arrival_time = forms.DateTimeField(
+        label="Tanggal & Waktu Kedatangan",
+        input_formats=['%Y-%m-%dT%H:%M'],
+        widget=forms.DateTimeInput(attrs={
+            'type': 'datetime-local',
+            'class': 'form-control'
+        })
+    )
+    
+    class Meta:
+        model = Kunjungan
+        fields = ['pegawai', 'purpose', 'arrival_time']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Group pegawai by department dalam dropdown
+        self.fields['pegawai'].queryset = self.fields['pegawai'].queryset.order_by('department_rel__nama', 'name')
+    
+    def clean_arrival_time(self):
+        """Validasi arrival time harus di masa depan."""
+        from django.utils import timezone
+        arrival = self.cleaned_data.get('arrival_time')
+        if arrival and arrival < timezone.now():
+            raise forms.ValidationError("Waktu kedatangan harus di masa depan")
+        return arrival
+
+
+class PegawaiResponseForm(forms.Form):
+    """Form untuk Pegawai approve atau reject kunjungan."""
+    
+    ACTION_CHOICES = [
+        ('approve', 'Setujui'),
+        ('reject', 'Tolak'),
+        ('reschedule', 'Usulkan Jadwal Ulang'),
+    ]
+    
+    action = forms.ChoiceField(
+        choices=ACTION_CHOICES,
+        widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
+        label="Keputusan"
+    )
+    
+    rejection_reason = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+            'class': 'form-control',
+            'placeholder': 'Wajib diisi jika menolak atau jadwal ulang. Jelaskan alasan/pesan...'
+        }),
+        label="Alasan / Pesan"
+    )
+
+    reschedule_time = forms.DateTimeField(
+        required=False,
+        label="Usulan Waktu Baru",
+        input_formats=['%Y-%m-%dT%H:%M'],
+        widget=forms.DateTimeInput(attrs={
+            'type': 'datetime-local',
+            'class': 'form-control'
+        })
+    )
+    
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'class': 'form-control',
+            'placeholder': 'Catatan tambahan (opsional)'
+        }),
+        label="Catatan"
+    )
+    
+    def clean(self):
+        cleaned = super().clean()
+        action = cleaned.get('action')
+        rejection_reason = cleaned.get('rejection_reason', '').strip()
+        reschedule = cleaned.get('reschedule_time')
+        
+        if action in ['reject', 'reschedule'] and not rejection_reason:
+            self.add_error('rejection_reason', 'Alasan/pesan wajib diisi.')
+            
+        if action == 'reschedule' and not reschedule:
+            self.add_error('reschedule_time', 'Usulan waktu baru wajib diisi.')
+            
+        return cleaned
+
+class PegawaiReportForm(forms.Form):
+    """Form untuk Laporan/Catatan Hasil Pertemuan oleh Pegawai."""
+    content = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+            'class': 'form-control',
+            'placeholder': 'Tuliskan laporan hasil rapat atau pertemuan di sini...'
+        }),
+        label="Laporan Hasil Pertemuan"
+    )
+
+
+class AdminForwardForm(forms.Form):
+    """Form untuk Admin meneruskan kunjungan ke Pegawai."""
+    
+    pegawai = forms.ModelChoiceField(
+        queryset=Pegawai.objects.filter(account_status='active').select_related('department_rel'),
+        label="Teruskan ke Pegawai",
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    admin_notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'class': 'form-control',
+            'placeholder': 'Catatan internal untuk Admin (tidak terlihat oleh Tamu)'
+        }),
+        label="Catatan Admin"
+    )
+    
+    def __init__(self, *args, current_pegawai=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if current_pegawai:
+            self.fields['pegawai'].initial = current_pegawai
+        self.fields['pegawai'].queryset = self.fields['pegawai'].queryset.order_by('department_rel__nama', 'name')
+
+
+class AdminACCForm(forms.Form):
+    """Form untuk Admin memberikan ACC final."""
+    
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'class': 'form-control',
+            'placeholder': 'Catatan ACC (opsional)'
+        }),
+        label="Catatan"
     )

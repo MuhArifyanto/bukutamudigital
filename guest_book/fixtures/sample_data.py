@@ -62,9 +62,12 @@ def create_sample_data():
         phone="081111111111",
         department="Bagian Tamu",
         password="hashed_password_here",
+        role="supervisor",
+        nip="198501012010012001",
+        jabatan="Kepala Bagian Tamu",
         account_status="active"
     )
-    print(f"   ✓ Created Pegawai: {pegawai1.name} ({pegawai1.department})")
+    print(f"   ✓ Created Pegawai: {pegawai1.name} ({pegawai1.department}) - Role: {pegawai1.role}")
     
     pegawai2 = Pegawai.objects.create(
         name="Pak Hendra",
@@ -72,9 +75,12 @@ def create_sample_data():
         phone="082222222222",
         department="Bagian Administrasi",
         password="hashed_password_here",
+        role="staff",
+        nip="199003152015031002",
+        jabatan="Staff Administrasi",
         account_status="active"
     )
-    print(f"   ✓ Created Pegawai: {pegawai2.name} ({pegawai2.department})")
+    print(f"   ✓ Created Pegawai: {pegawai2.name} ({pegawai2.department}) - Role: {pegawai2.role}")
     
     # ============================================================================
     # Create Sample Admin

@@ -1,0 +1,651 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Portal Pegawai - Buku Tamu Digital Diskominfosantik Kabupaten Bekasi">
+    <title>Buku Tamu Digital | {% block title %}Dashboard Pegawai{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'images/logo-diskominfosantik.png' %}?v=2">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 6 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --sidebar-w:        280px;
+            --sidebar-bg:       #0f4c35;
+            --sidebar-border:   rgba(255,255,255,0.07);
+            --accent:           #34d399;
+            --accent-glow:      rgba(52,211,153,0.30);
+            --accent-hover:     #10b981;
+            --page-bg:          #f0fdf4;
+            --card-bg:          #ffffff;
+            --text-primary:     #1a2e22;
+            --text-secondary:   #6b7280;
+            --topbar-h:         72px;
+            --radius-sm:        10px;
+            --radius-md:        14px;
+            --radius-lg:        20px;
+            --shadow-sm:        0 2px 8px rgba(15,76,53,0.06);
+            --shadow-md:        0 4px 24px rgba(15,76,53,0.10);
+            --transition:       all 0.25s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--page-bg);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: var(--sidebar-w);
+            height: 100vh;
+            height: 100dvh;
+            background: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            z-index: 1050;
+            transition: var(--transition);
+            border-right: 1px solid var(--sidebar-border);
+            overflow: hidden;
+        }
+
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: -60px; left: -60px;
+            width: 260px; height: 260px;
+            background: radial-gradient(circle, rgba(52,211,153,0.18) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            padding: 1.4rem 1.5rem 1rem;
+            border-bottom: 1px solid var(--sidebar-border);
+            flex-shrink: 0;
+        }
+        .brand-logo {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--accent), #10b981);
+            border-radius: var(--radius-sm);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.15rem; color: #fff;
+            box-shadow: 0 6px 20px var(--accent-glow);
+            flex-shrink: 0;
+        }
+        .brand-text h3 {
+            font-size: 1rem; font-weight: 800;
+            color: #fff; margin: 0; line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+        .brand-text p {
+            font-size: 0.68rem; font-weight: 500;
+            color: rgba(255,255,255,0.45); margin: 0;
+            letter-spacing: 0.04em; text-transform: uppercase;
+        }
+
+        .nav-section-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 1.2rem 1.5rem 0.4rem;
+            flex-shrink: 0;
+        }
+
+        .sidebar-nav {
+            padding: 0.5rem 1rem 1rem;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.1) transparent;
+        }
+
+        .nav-link-custom {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            color: rgba(255,255,255,0.7);
+            padding: 0.85rem 1rem;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            transition: var(--transition);
+            position: relative;
+        }
+        .nav-link-custom i {
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+            transition: var(--transition);
+        }
+        .nav-link-custom:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.06);
+            transform: translateX(4px);
+        }
+        .nav-link-custom.active {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+            box-shadow: inset 3px 0 0 var(--accent);
+        }
+        .nav-link-custom.active i {
+            color: var(--accent);
+        }
+
+        .sidebar-footer {
+            padding: 0.85rem 1rem;
+            border-top: 1px solid var(--sidebar-border);
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            width: 100%;
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 0.75rem;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .logout-btn:hover {
+            background: #ef4444;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        /* MAIN CONTENT */
+        .main-content {
+            margin-left: var(--sidebar-w);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: var(--transition);
+        }
+
+        /* TOPBAR */
+        .topbar {
+            height: var(--topbar-h);
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(15,76,53,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .mobile-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            cursor: pointer;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin-left: auto;
+        }
+
+        /* User Profile Dropdown */
+        .user-dropdown {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.3rem 0.5rem;
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
+        }
+        .user-dropdown:hover {
+            background: rgba(15,76,53,0.04);
+        }
+        .user-avatar {
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            background: #d1fae5;
+            color: #059669;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 1rem;
+            border: 2px solid #fff;
+            box-shadow: var(--shadow-sm);
+            object-fit: cover;
+        }
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .user-name {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+        .user-role {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* CONTENT WRAPPER */
+        .content-wrapper {
+            padding: 2rem;
+            flex: 1;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.show { transform: translateX(0); box-shadow: 0 0 60px rgba(0,0,0,0.4); }
+            .main-content { margin-left: 0; }
+            .mobile-toggle { display: block; }
+            .content-wrapper { padding: 1.5rem 1.25rem; }
+        }
+
+        @media (max-width: 768px) {
+            .user-info { display: none; }
+            .topbar { padding: 0 1.25rem; }
+        }
+
+        @media (max-width: 576px) {
+            .content-wrapper { padding: 0.875rem; }
+            .topbar { padding: 0 1rem; }
+            .topbar-right { gap: 0.75rem; }
+        }
+
+        @media (max-width: 400px) {
+            .content-wrapper { padding: 0.75rem; }
+        }
+
+        /* Overlay Mobile */
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.4);
+            backdrop-filter: blur(4px);
+            z-index: 1040;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+        .sidebar-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Cards & Utilities */
+        .card-custom {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(15,76,53,0.06);
+            box-shadow: var(--shadow-sm);
+            padding: 1.5rem;
+            height: 100%;
+        }
+        
+        .badge-status {
+            padding: 0.35rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .badge-pending { background: #fef9c3; color: #854d0e; }
+        .badge-progress { background: #dbeafe; color: #1e40af; }
+        .badge-completed { background: #d1fae5; color: #065f46; }
+        .badge-cancelled { background: #fee2e2; color: #b91c1c; }
+        
+        /* Button styles */
+        .btn-custom {
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-primary-custom {
+            background: var(--sidebar-bg);
+            color: #fff;
+        }
+        .btn-primary-custom:hover {
+            background: #0a3526;
+            transform: translateY(-2px);
+            color: #fff;
+        }
+        .btn-outline-custom {
+            background: transparent;
+            border: 1px solid var(--sidebar-bg);
+            color: var(--sidebar-bg);
+        }
+        .btn-outline-custom:hover {
+            background: var(--sidebar-bg);
+            color: #fff;
+        }
+
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-logo">
+                <i class="fas fa-building"></i>
+            </div>
+            <div class="brand-text">
+                <h3>Portal Pegawai</h3>
+                <p>Diskominfosantik</p>
+            </div>
+        </div>
+
+        <div class="nav-section-label">Menu Utama</div>
+        <nav class="sidebar-nav">
+            <a href="{% url 'tamu:pegawai_dashboard' %}" class="nav-link-custom {% if active_page == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-chart-pie"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="{% url 'tamu:pegawai_kunjungan_list' %}" class="nav-link-custom {% if active_page == 'kunjungan' %}active{% endif %}">
+                <i class="fas fa-list-alt"></i>
+                <span>Kunjungan</span>
+            </a>
+            <a href="{% url 'tamu:pegawai_chat' %}" class="nav-link-custom {% if active_page == 'chat' %}active{% endif %}">
+                <i class="fas fa-comments"></i>
+                <span>Chat & Pesan</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <a href="{% url 'tamu:pegawai_logout' %}" class="logout-btn">
+                <i class="fas fa-power-off"></i>
+                <span>Keluar</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <button class="mobile-toggle" id="mobileToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <div class="topbar-right">
+                
+                <!-- Notification Bell -->
+                <div class="dropdown" style="position: relative;">
+                    <button class="icon-btn" id="notifDropdownBtn" aria-label="Notifikasi" data-bs-toggle="dropdown" aria-expanded="false" style="background: none; border: none; cursor: pointer; position: relative; color: var(--text-primary); font-size: 1.25rem; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; transition: var(--transition);">
+                        <i class="fas fa-bell"></i>
+                        {% if pegawai_unread_count > 0 %}
+                        <span class="notif-badge" style="position: absolute; top: 0px; right: 0px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 99px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">{{ pegawai_unread_count }}</span>
+                        {% endif %}
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="width: 320px; border-radius: 16px; padding: 0; overflow: hidden; margin-top: 0.5rem;" aria-labelledby="notifDropdownBtn">
+                        <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <h6 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #0f172a;">Notifikasi</h6>
+                        </div>
+                        <div style="max-height: 300px; overflow-y: auto;" id="pegawaiNotifList">
+                            <!-- Placeholder untuk notifikasi, bisa dihubungkan ke halaman notifikasi atau diload via htmx -->
+                            <div style="padding: 1.5rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                                {% if pegawai_unread_count == 0 %}
+                                    <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; color: #10b981;"></i>
+                                    <div>Tidak ada notifikasi baru</div>
+                                {% else %}
+                                    <i class="fas fa-bell" style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary);"></i>
+                                    <div>Anda memiliki {{ pegawai_unread_count }} notifikasi baru. Silakan cek menu kunjungan.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Dropdown -->
+                <div class="dropdown">
+                    <div class="user-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <div class="user-info text-end d-none d-sm-flex">
+                            <span class="user-name">{{ pegawai.name }}</span>
+                            <span class="user-role">{{ pegawai.department|default:"Pegawai" }}</span>
+                        </div>
+                        <div class="user-avatar">
+                            {{ pegawai.name|make_list|first|upper }}
+                        </div>
+                    </div>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="border-radius: var(--radius-md); min-width: 200px; margin-top: 0.5rem;">
+                        <li><a class="dropdown-item py-2" href="{% url 'tamu:pegawai_profile' %}"><i class="far fa-user me-2 text-muted"></i> Profil Saya</a></li>
+                        <li><hr class="dropdown-divider my-1"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="{% url 'tamu:pegawai_logout' %}"><i class="fas fa-sign-out-alt me-2"></i> Keluar</a></li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTENT -->
+        <div class="content-wrapper">
+            <!-- Alert Messages -->
+            {% if messages %}
+                <div class="mb-4">
+                    {% for message in messages %}
+                        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}success{% endif %} alert-dismissible fade show border-0 shadow-sm" role="alert" style="border-radius: var(--radius-sm);">
+                            <i class="fas fa-{% if message.tags == 'error' %}exclamation-circle{% else %}check-circle{% endif %} me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Toast Notifikasi Real-time -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1060;">
+        <div id="liveToast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <strong id="toastTitle">Notifikasi Baru</strong><br>
+                    <span id="toastBody" style="font-size: 0.85rem;">Ada pembaruan kunjungan.</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function initPegawaiApp() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const toggleBtn = document.getElementById('mobileToggle');
+
+            function toggleSidebar() {
+                sidebar.classList.toggle('show');
+                overlay.classList.toggle('show');
+            }
+
+            if (toggleBtn) {
+                // Pasang event listener untuk mobile toggle
+                const newToggleBtn = toggleBtn.cloneNode(true);
+                toggleBtn.parentNode.replaceChild(newToggleBtn, toggleBtn);
+                newToggleBtn.addEventListener('click', toggleSidebar);
+            }
+            if (overlay) {
+                const newOverlay = overlay.cloneNode(true);
+                overlay.parentNode.replaceChild(newOverlay, overlay);
+                newOverlay.addEventListener('click', toggleSidebar);
+            }
+            
+            // --- Real-time Notification via WebSockets ---
+            if (window.pegawaiNotifSocket) {
+                window.pegawaiNotifSocket.close();
+            }
+            
+            const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+            window.pegawaiNotifSocket = new WebSocket(
+                wsProtocol + '://' + window.location.host + '/ws/notifications/'
+            );
+
+            window.pegawaiNotifSocket.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.action === 'pong' || data.type === 'pong' || (!data.message && !data.title)) {
+                        return;
+                    }
+                    
+                    // Mainkan suara jika ada notifikasi baru
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.play().catch(e => console.log('Autoplay diblokir:', e));
+                    
+                    const toastTitle = document.getElementById('toastTitle');
+                    const toastBody = document.getElementById('toastBody');
+                    if (toastTitle) toastTitle.innerText = data.title;
+                    if (toastBody) toastBody.innerText = data.message;
+                    
+                    const toastEl = document.getElementById('liveToast');
+                    if (toastEl) {
+                        const toast = new bootstrap.Toast(toastEl);
+                        toast.show();
+                    }
+                    
+                    let badge = document.querySelector('.badge-notification');
+                    if (data.unread_count > 0) {
+                        if (badge) {
+                            badge.innerText = data.unread_count;
+                            badge.style.display = 'flex';
+                        } else {
+                            const btn = document.querySelector('[data-bs-toggle="dropdown"] .fa-bell').parentElement;
+                            if (btn) {
+                                badge = document.createElement('span');
+                                badge.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger badge-notification';
+                                badge.style.fontSize = '0.65rem';
+                                badge.style.padding = '0.35em 0.5em';
+                                badge.innerText = data.unread_count;
+                                btn.style.position = 'relative';
+                                btn.appendChild(badge);
+                            }
+                        }
+                    } else if (badge) {
+                        badge.style.display = 'none';
+                    }
+                } catch (err) {
+                    console.warn('Error handling notification:', err);
+                }
+            };
+            
+            window.pegawaiNotifSocket.onclose = function(e) {
+                console.error('Notification socket closed unexpectedly');
+            };
+
+            // Fetch dropdown notifications
+            const notifDropdownBtn = document.getElementById('notifDropdownBtn');
+            if (notifDropdownBtn) {
+                notifDropdownBtn.addEventListener('click', () => {
+                    fetch("{% url 'tamu:api_get_recent_notifications' %}")
+                        .then(res => res.json())
+                        .then(data => {
+                            const notifList = document.getElementById('pegawaiNotifList');
+                            if (data.notifications && data.notifications.length > 0) {
+                                notifList.innerHTML = data.notifications.map(n => {
+                                    let url = "#";
+                                    let onclickAttr = "";
+                                    
+                                    if (n.notification_type === 'message_replied') {
+                                        url = "{% url 'tamu:pegawai_chat' %}";
+                                        onclickAttr = `onclick="window.location.href='${url}'"`;
+                                    } else if (n.related_object_id) {
+                                        url = "/pegawai-portal/kunjungan/" + n.related_object_id + "/";
+                                        onclickAttr = `onclick="window.location.href='${url}'"`;
+                                    }
+                                    
+                                    return `
+                                        <div style="padding: 1rem; border-bottom: 1px solid #f1f5f9; display: flex; gap: 0.75rem; cursor: pointer; ${n.status === 'unread' ? 'background: #f8fafc;' : ''}" ${onclickAttr}>
+                                            <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: ${n.notification_type === 'message_replied' ? '#eff6ff; color: #3b82f6;' : '#f0fdf4; color: #10b981;'}">
+                                                <i class="fas ${n.notification_type === 'message_replied' ? 'fa-comment-dots' : 'fa-bell'}"></i>
+                                            </div>
+                                            <div style="flex: 1;">
+                                                <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin-bottom: 0.2rem;">${n.title}</div>
+                                                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">${n.message}</div>
+                                                <div style="font-size: 0.65rem; color: #94a3b8;"><i class="far fa-clock"></i> ${n.created_at}</div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('');
+                                
+                                // Mark as read API
+                                fetch("{% url 'tamu:api_mark_all_notifications_read' %}", {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRFToken': '{{ csrf_token }}'
+                                    }
+                                });
+                                // Remove badge
+                                const badge = document.querySelector('.notif-badge');
+                                if (badge) badge.remove();
+                                previousUnreadCount = 0;
+                            } else {
+                                notifList.innerHTML = `
+                                    <div style="padding: 2rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                                        <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; color: #10b981;"></i>
+                                        <div>Tidak ada notifikasi baru</div>
+                                    </div>
+                                `;
+                            }
+                        });
+                });
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', initPegawaiApp);
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

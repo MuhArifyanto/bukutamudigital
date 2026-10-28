@@ -1,27 +1,46 @@
-# Environment Variables
+# Environment Variables & Secrets
 .env
 .env.local
+.env.*.local
+*.env
 
-# Google API Credentials (Old JSON file)
+# Google & Firebase Credentials
 google_credentials.json
 firebase_credentials.json
+serviceAccountKey.json
 
-# Python
+# Python & Virtual Environments
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
 env/
 venv/
+ENV/
+*.egg-info/
+.pytest_cache/
 
 # Django
 db.sqlite3
+db.sqlite3-journal
 media/
 staticfiles/
 
 # Node
 node_modules/
 
-# Temp Files
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.kiro/
+
+# Temp & Log Files
+*.log
+*.bak
+*.tmp
+*.swp
 downloaded_captcha/
 static/images/captcha/
 test_traffic_light_*.jpg

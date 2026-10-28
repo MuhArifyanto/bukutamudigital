@@ -559,6 +559,24 @@
                 font-size: 2.2rem; /* Ukuran font yang lebih pas di HP */
             }
         }
+        @media (max-width: 576px) {
+            .hero-section { padding: 2.5rem 0; }
+            .hero-title { font-size: 1.85rem; }
+            .hero-main-card { padding: 1.75rem; border-radius: 24px; }
+            .card-stats { gap: 0.75rem; padding: 1.1rem; }
+            .stat-num { font-size: 1.3rem; }
+            .features-section { padding: 3rem 0; }
+            .cta-section { padding: 3rem 0; }
+            .btn-hero-primary, .btn-hero-outline { padding: 0.7rem 1.4rem; font-size: 0.9rem; }
+            .hero-actions { gap: 0.75rem; }
+            .footer { padding: 3rem 0 1.5rem; }
+        }
+        @media (max-width: 360px) {
+            .hero-title { font-size: 1.6rem; }
+            .hero-badge { font-size: 0.72rem; padding: 0.25rem 0.75rem; }
+            .btn-hero-primary, .btn-hero-outline { width: 100%; justify-content: center; }
+            .hero-actions { flex-direction: column; }
+        }
     </style>
 </head>
 <body>

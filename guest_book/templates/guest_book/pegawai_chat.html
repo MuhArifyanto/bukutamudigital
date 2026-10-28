@@ -1,0 +1,707 @@
+{% extends 'guest_book/pegawai_base.html' %}
+{% load static custom_filters %}
+
+{% block title %}Chat & Pesan{% endblock %}
+
+{% block content %}
+<style>
+    /* ── Chat Container ── */
+    .chat-card {
+        background: #ffffff !important;
+        border-radius: 20px !important;
+        height: calc(100vh - 130px) !important; /* Diperbesar kebawah agar lebih lega */
+        min-height: 550px !important;
+        display: grid !important;
+        grid-template-columns: 340px 1fr !important;
+        grid-template-rows: minmax(0, 1fr) !important; /* Tambahan agar row menghormati container */
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+        border: 1px solid #f1f5f9 !important;
+        overflow: hidden !important;
+    }
+
+    /* ── Upgrade: Thin Scrollbar ── */
+    .chat-list::-webkit-scrollbar,
+    .message-area::-webkit-scrollbar {
+        width: 5px !important;
+    }
+    .chat-list::-webkit-scrollbar-thumb,
+    .message-area::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1 !important;
+        border-radius: 10px !important;
+    }
+    .chat-list::-webkit-scrollbar-track,
+    .message-area::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+
+    /* ── Sidebar ── */
+    .chat-sidebar {
+        border-right: 1px solid #f1f5f9 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        background: #f8fafc !important;
+    }
+    .sidebar-header {
+        padding: 1.5rem !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+    }
+    .sidebar-header h6 { 
+        font-size: 1.1rem !important; 
+        font-weight: 800 !important; 
+        color: #0f172a !important; 
+        margin: 0 !important;
+        letter-spacing: -0.02em !important;
+    }
+    
+    .chat-list {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        padding: 0.75rem !important;
+    }
+    .chat-item {
+        padding: 1rem !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 1rem !important;
+        cursor: pointer !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        border-radius: 12px !important;
+        margin-bottom: 0.5rem !important;
+        background: #ffffff !important;
+        border: 1px solid transparent !important;
+    }
+    .chat-item:hover { 
+        background: #f1f5f9 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+    }
+    .chat-item.active { 
+        background: #eff6ff !important; 
+        border-color: #bfdbfe !important;
+        box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .chat-item .avatar {
+        width: 48px !important; height: 48px !important; border-radius: 14px !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
+        font-weight: 700 !important; color: #fff !important; flex-shrink: 0 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+    .chat-item .info { flex: 1 !important; min-width: 0 !important; }
+    .chat-item .info .name { font-size: 0.95rem !important; font-weight: 700 !important; color: #1e293b !important; margin-bottom: 4px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    .chat-item .info .last-msg { font-size: 0.8rem !important; color: #64748b !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    
+    .chat-item .meta { text-align: right !important; }
+    .chat-item .meta .time { font-size: 0.7rem !important; color: #94a3b8 !important; margin-bottom: 6px !important; font-weight: 500 !important; }
+    .chat-item .meta .badge-unread {
+        background: #ef4444 !important; color: #fff !important; font-size: 0.7rem !important; font-weight: 700 !important;
+        padding: 2px 6px !important; border-radius: 8px !important;
+        box-shadow: 0 2px 4px 0 rgba(239, 68, 68, 0.3) !important;
+    }
+
+    /* ── Main Chat Window ── */
+    .chat-window {
+        display: flex !important;
+        flex-direction: column !important;
+        background: #fbfcfe !important;
+        min-height: 0 !important; /* Tambahan agar flex child bisa mengecil */
+    }
+    .chat-header {
+        padding: 1.25rem 1.5rem !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        z-index: 10 !important;
+    }
+    .active-user-info { display: flex !important; align-items: center !important; gap: 1rem !important; }
+    .active-user-info .name { font-size: 1.05rem !important; font-weight: 800 !important; color: #0f172a !important; }
+    .active-user-info .status { font-size: 0.8rem !important; color: #10b981 !important; display: flex !important; align-items: center !important; gap: 6px !important; font-weight: 600 !important; }
+    .active-user-info .status::before { content: '' !important; width: 8px !important; height: 8px !important; background: #10b981 !important; border-radius: 50% !important; }
+
+    .message-area {
+        flex: 1 !important;
+        padding: 2rem !important;
+        overflow-y: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 1.25rem !important;
+        background: #f8fafc !important;
+        min-height: 0 !important;
+    }
+    
+    .msg-group { display: flex !important; flex-direction: column !important; gap: 0.4rem !important; max-width: 65% !important; }
+    .msg-group.sent { align-self: flex-end !important; align-items: flex-end !important; }
+    .msg-group.received { align-self: flex-start !important; align-items: flex-start !important; }
+
+    .msg-bubble {
+        padding: 0.85rem 1.25rem !important;
+        border-radius: 18px !important;
+        font-size: 0.925rem !important;
+        line-height: 1.5 !important;
+        position: relative !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    }
+    .sent .msg-bubble { 
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; 
+        color: #ffffff !important; 
+        border-bottom-right-radius: 4px !important;
+        box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2) !important;
+    }
+    .received .msg-bubble { 
+        background: #ffffff !important; 
+        color: #1e293b !important; 
+        border-bottom-left-radius: 4px !important; 
+        border: 1px solid #e2e8f0 !important; 
+    }
+    
+    .msg-time { font-size: 0.7rem !important; color: #94a3b8 !important; font-weight: 500 !important; margin: 0 4px !important; }
+
+    /* ── Input Area ── */
+    .chat-input-area {
+        padding: 1.5rem !important;
+        background: #ffffff !important;
+        border-top: 1px solid #f1f5f9 !important;
+        z-index: 10 !important;
+    }
+    .input-wrapper {
+        display: flex !important;
+        gap: 1rem !important;
+        background: #f8fafc !important;
+        padding: 0.75rem !important;
+        border-radius: 16px !important;
+        align-items: center !important;
+        border: 1px solid #e2e8f0 !important;
+        transition: all 0.2s !important;
+    }
+    .input-wrapper:focus-within {
+        border-color: #a7f3d0 !important;
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1) !important;
+        background: #ffffff !important;
+    }
+    .input-wrapper input {
+        flex: 1 !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0.5rem !important;
+        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        color: #1e293b !important;
+    }
+    .input-wrapper input:focus { outline: none !important; }
+    
+    .btn-send {
+        width: 44px !important; height: 44px !important; border-radius: 12px !important;
+        background: #10b981 !important; color: #fff !important; border: none !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
+        transition: all 0.2s !important;
+        box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2) !important;
+    }
+    .btn-send:hover { 
+        background: #059669 !important; 
+        transform: scale(1.05) !important;
+        box-shadow: 0 6px 8px -1px rgba(16, 185, 129, 0.3) !important;
+    }
+
+    .action-btn-circle {
+        width: 40px !important; height: 40px !important; border-radius: 50% !important;
+        background: transparent !important; border: none !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
+        color: #64748b !important;
+        transition: all 0.2s !important;
+    }
+    .action-btn-circle:hover {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+    }
+
+    .empty-chat {
+        flex: 1 !important; display: flex !important; flex-direction: column !important;
+        align-items: center !important; justify-content: center !important;
+        color: #94a3b8 !important; text-align: center !important;
+        background: #f8fafc !important;
+    }
+    .empty-chat h5 { color: #0f172a !important; font-weight: 700 !important; margin-top: 1rem !important; }
+
+    /* ── File Card ── */
+    .file-card {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.75rem !important;
+        background: rgba(255,255,255,0.1) !important;
+        padding: 0.75rem !important;
+        border-radius: 12px !important;
+        text-decoration: none !important;
+        color: inherit !important;
+        transition: background 0.2s !important;
+    }
+    .received .file-card {
+        background: #f1f5f9 !important;
+    }
+    .file-card:hover {
+        background: rgba(255,255,255,0.2) !important;
+    }
+    .received .file-card:hover {
+        background: #e2e8f0 !important;
+    }
+
+    @media (max-width: 900px) {
+        .chat-card { grid-template-columns: 1fr !important; height: 85vh !important; }
+        
+        .chat-sidebar { display: flex !important; }
+        .chat-window { display: none !important; }
+        
+        .chat-card.chat-active .chat-sidebar { display: none !important; }
+        .chat-card.chat-active .chat-window { display: flex !important; height: 100% !important; }
+    }
+</style>
+<div class="chat-card {% if request.GET.session %}chat-active{% endif %}">
+    <!-- Sidebar -->
+    <div class="chat-sidebar">
+        <div class="sidebar-header" style="padding: 1rem !important; background: #ffffff !important; border-bottom: 1px solid #f1f5f9 !important;">
+            <h6><i class="fas fa-comments"></i> Chat & Pesan</h6>
+        </div>
+        <div class="chat-list" style="flex: 1 !important; overflow-y: auto !important; padding: 0.75rem !important;">
+            {% for conv in conversations %}
+            <div class="chat-item {% if active_conversation and active_conversation.id == conv.id %}active{% endif %}" onclick="loadChat('{{ conv.id }}')">
+                <div class="avatar initials-avatar" data-name="{{ conv.name }}">
+                    {{ conv.avatar_letters }}
+                </div>
+                <div class="info">
+                    <div class="name">{{ conv.name }} {% if conv.is_admin %}<i class="fas fa-check-circle text-primary" style="font-size:0.7rem;"></i>{% endif %}</div>
+                    <div class="last-msg">
+                        {% if conv.last_message %}
+                            {{ conv.last_message.content|truncatechars:30 }}
+                        {% else %}
+                            Belum ada pesan
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="meta">
+                    <div class="time">{% if conv.last_message %}{{ conv.last_message.created_at|date:"H:i" }}{% endif %}</div>
+                    {% if conv.unread_count > 0 %}
+                    <span class="badge-unread">{{ conv.unread_count }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align: center; padding: 3rem; color: #94a3b8; font-size: 0.8rem;">
+                Belum ada percakapan.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Chat Window -->
+    <div class="chat-window">
+        {% if active_conversation %}
+        <div class="chat-header">
+            <div class="active-user-info">
+                <a href="{% url 'tamu:pegawai_chat' %}" class="d-inline-block d-md-none me-3" style="color: #64748b; font-size: 1.25rem; text-decoration: none;"><i class="fas fa-arrow-left"></i></a>
+                <div class="avatar initials-avatar" data-name="{{ active_conversation.name }}" style="width:40px; height:40px; font-size:0.8rem;">
+                    {{ active_conversation.avatar_letters }}
+                </div>
+                <div>
+                    <div class="name">{{ active_conversation.name }}</div>
+                    <div class="status">Online</div>
+                </div>
+            </div>
+            <div class="header-actions">
+                {% if active_conversation.is_admin %}
+                    <span class="badge bg-primary">Admin</span>
+                {% else %}
+                    <a href="{% url 'tamu:pegawai_kunjungan_detail' active_conversation.kunjungan_id %}" class="btn btn-sm btn-outline-success">Lihat Kunjungan</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="message-area" id="messageArea" style="flex: 1 !important; padding: 2rem !important; overflow-y: auto !important; display: flex !important; flex-direction: column !important; gap: 1.25rem !important; background-color: #f8fafc !important; background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') !important; background-repeat: repeat !important; background-size: 400px !important; min-height: 0 !important;">
+            {% for msg in messages_list %}
+            
+            <!-- DATE SEPARATOR -->
+            {% ifchanged msg.created_at.date %}
+            <div style="text-align: center; margin: 1.5rem 0; position: relative; z-index: 1;">
+                <span style="background: #eff6ff; color: #1e40af; font-size: 0.65rem; font-weight: 800; padding: 0.35rem 0.85rem; border-radius: 99px; letter-spacing: 0.05em; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">{{ msg.created_at|smart_date }}</span>
+            </div>
+            {% endifchanged %}
+
+            <div class="msg-group {% if msg.sender_type == 'pegawai' %}sent{% else %}received{% endif %}" data-id="{{ msg.id }}" data-created-at="{{ msg.created_at|date:'c' }}">
+                <div class="msg-bubble">
+                    {% if msg.message_type == 'deleted' %}
+                        <span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>
+                    {% elif msg.message_type == 'image' and msg.attachment %}
+                        <img src="{{ msg.attachment.url }}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">
+                    {% elif msg.message_type == 'file' and msg.attachment %}
+                        <a href="{{ msg.attachment.url }}" target="_blank" rel="noopener noreferrer" class="file-card">
+                            <i class="fas fa-file-alt"></i>
+                            <div class="file-info">
+                                <span class="file-name">{{ msg.attachment.name|cut:"chat_attachments/" }}</span>
+                                <span class="file-size">Klik untuk mengunduh</span>
+                            </div>
+                        </a>
+                    {% else %}
+                        {{ msg.content }}
+                    {% endif %}
+                </div>
+                <div class="msg-time" style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span>{{ msg.created_at|date:"H:i" }}</span>
+                    {% if msg.sender_type == 'pegawai' %}
+                        {% if msg.is_read %}
+                            <i class="fas fa-check-double" style="color: #10b981; font-size: 0.75rem;"></i>
+                        {% else %}
+                            <i class="fas fa-check-double" style="color: #cbd5e1; font-size: 0.75rem;"></i>
+                        {% endif %}
+                    {% endif %}
+                    {% if msg.sender_type == 'pegawai' and msg.message_type != 'deleted' %}
+                        {% if msg.message_type == 'text' %}
+                            <a href="#" class="edit-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-pencil-alt" style="font-size: 0.6rem;"></i></a>
+                        {% endif %}
+                        <a href="#" class="delete-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-trash" style="font-size: 0.6rem;"></i></a>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-chat">
+                <i class="fas fa-comments" style="font-size: 4rem; opacity: 0.1; margin-bottom: 1rem;"></i>
+                <h5>Mulai percakapan</h5>
+                <p>Kirim pesan untuk memulai percakapan.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="chat-input-area" style="padding: 1.5rem !important; background: #ffffff !important; border-top: 1px solid #f1f5f9 !important; z-index: 10 !important;">
+            <div id="editModeIndicator" style="display: none; background: #fef08a; padding: 0.5rem 1rem; border-radius: 12px; font-size: 0.85rem; margin-bottom: 0.75rem; justify-content: space-between; align-items: center; border: 1px solid #fde047; color: #713f12;">
+                <span><i class="fas fa-pencil-alt"></i> Sedang mengedit pesan...</span>
+                <button type="button" id="btnCancelEdit" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem;"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="chatForm">
+                {% csrf_token %}
+                <div class="input-wrapper">
+                    <button type="button" class="action-btn-circle" style="color: #64748b;" id="btnAttach"><i class="fas fa-paperclip"></i></button>
+                    <input type="file" id="chatFileInput" style="display: none;" accept=".doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.svg">
+                    <input type="text" id="chatInput" placeholder="Ketik pesan balasan di sini..." autocomplete="off">
+                    <button type="submit" class="btn-send"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        <div class="empty-chat">
+            <i class="fas fa-comments" style="font-size: 4rem; opacity: 0.1; margin-bottom: 1rem;"></i>
+            <h5>Pilih percakapan</h5>
+            <p>Klik salah satu tamu atau admin di sebelah kiri untuk mulai mengobrol.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/chat_client.js' %}"></script>
+<script>
+    let activeSession = "{% if active_conversation %}{{ active_conversation.session_id }}{% endif %}";
+    let pegawaiId = "{{ pegawai.id }}";
+    let chatSocket;
+    let editingMessageId = null;
+    let lastMsgId = "{% if active_conversation %}{% with last=active_conversation.messages|last %}{{ last.id }}{% endwith %}{% endif %}";
+    
+    (function() {
+        "use strict";
+
+        // Dynamic Avatar Coloring
+        document.querySelectorAll('.initials-avatar').forEach(el => {
+            const name = el.getAttribute('data-name') || "";
+            const hue = (name.length * 41) % 360;
+            el.style.backgroundColor = `hsl(${hue}, 55%, 50%)`;
+            el.style.color = '#fff';
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'center';
+            el.style.fontWeight = 'bold';
+        });
+
+        // Scroll to bottom
+        const msgArea = document.getElementById('messageArea');
+        if (msgArea) msgArea.scrollTop = msgArea.scrollHeight;
+
+        // Handle Chat Form
+        const chatForm = document.getElementById('chatForm');
+        const chatInput = document.getElementById('chatInput');
+
+        if (activeSession) {
+            const sendBtn = chatForm ? chatForm.querySelector('.btn-send') : null;
+            chatSocket = new ChatClient({
+                sessionId: activeSession,
+                senderId: pegawaiId,
+                senderType: 'pegawai',
+                sendButton: sendBtn,
+                lastMessageId: lastMsgId,
+                historyApiUrl: '/api/chat/messages/',
+                onMessageReceived: (data, isLive = true) => {
+                    const type = data.sender_type === 'pegawai' ? 'sent' : 'received';
+                    if (type === 'received' && isLive) {
+                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                        audio.play().catch(e => console.log('Autoplay diblokir browser'));
+                    }
+                    addMessageToUI(data.message, type, data.created_at, data.message_type, data.file_url, data.message_id);
+                },
+                onMessageUpdated: (data) => {
+                    const msgEl = document.querySelector(`.msg-group[data-id="${data.message_id}"]`);
+                    if (msgEl) {
+                        const bubble = msgEl.querySelector('.msg-bubble');
+                        if (data.action === 'edit') {
+                            bubble.innerText = data.message;
+                        } else if (data.action === 'delete') {
+                            bubble.innerHTML = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
+                            const btns = msgEl.querySelectorAll('.edit-msg-btn, .delete-msg-btn');
+                            btns.forEach(b => b.remove());
+                        }
+                    }
+                },
+                onError: (err) => alert(err)
+            });
+            chatSocket.connect();
+
+            if (chatForm) {
+                chatForm.onsubmit = (e) => {
+                    e.preventDefault();
+                    const text = chatInput.value.trim();
+                    if (!text) return;
+
+                    chatInput.value = '';
+
+                    if (editingMessageId) {
+                        chatSocket.send(JSON.stringify({
+                            'action': 'edit',
+                            'message_id': editingMessageId,
+                            'message': text,
+                            'sender_id': pegawaiId,
+                            'sender_type': 'pegawai'
+                        }));
+                        editingMessageId = null;
+                        document.getElementById('editModeIndicator').style.display = 'none';
+                        chatInput.placeholder = "Ketik pesan balasan di sini...";
+                    } else {
+                        chatSocket.send(JSON.stringify({
+                            'action': 'create',
+                            'message': text,
+                            'sender_id': pegawaiId,
+                            'sender_type': 'pegawai',
+                            'message_type': 'text'
+                        }));
+                    }
+                };
+            }
+
+            // File Upload Handle
+            const btnAttach = document.getElementById('btnAttach');
+            const chatFileInput = document.getElementById('chatFileInput');
+
+            if (btnAttach && chatFileInput) {
+                btnAttach.addEventListener('click', function() {
+                    chatFileInput.click();
+                });
+
+                chatFileInput.addEventListener('change', function() {
+                    const file = this.files[0];
+                    if (!file) return;
+
+                    const allowedExtensions = ['doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'svg'];
+                    const fileExt = file.name.split('.').pop().toLowerCase();
+                    
+                    if (!allowedExtensions.includes(fileExt)) {
+                        alert('Format file tidak didukung! Hanya file Word, Excel, PNG, JPG, dan SVG yang diperbolehkan.');
+                        this.value = '';
+                        return;
+                    }
+
+                    btnAttach.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                    let messageType = 'file';
+                    if (file.type.startsWith('image/')) {
+                        messageType = 'image';
+                    }
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    fetch('/api/chat/upload/', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if(data.success) {
+                            chatSocket.send(JSON.stringify({
+                                'action': 'create',
+                                'message': data.file_name,
+                                'sender_id': pegawaiId,
+                                'sender_type': 'pegawai',
+                                'message_type': data.message_type,
+                                'file_url': data.file_url,
+                                'file_path': data.file_path
+                            }));
+                        } else {
+                            alert('Gagal mengunggah file: ' + data.error);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Terjadi kesalahan saat menghubungi server.');
+                    })
+                    .finally(() => {
+                        btnAttach.innerHTML = '<i class="fas fa-paperclip"></i>';
+                        chatFileInput.value = '';
+                    });
+                });
+            }
+        }
+    })();
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function addMessageToUI(content, type, time, messageType = 'text', fileUrl = null, messageId = null) {
+        const msgArea = document.getElementById('messageArea');
+        const msgGroup = document.createElement('div');
+        msgGroup.className = `msg-group ${type}`;
+        if (messageId) msgGroup.setAttribute('data-id', messageId);
+        msgGroup.setAttribute('data-created-at', new Date().toISOString()); 
+        
+        let bubbleContent = escapeHtml(content);
+        if (messageType === 'deleted') {
+            bubbleContent = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
+        } else if (messageType === 'image') {
+            bubbleContent = `<img src="${encodeURI(fileUrl || '')}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">`;
+        } else if (messageType === 'file') {
+            const rawFilename = (fileUrl || '').split('/').pop();
+            const filename = escapeHtml(rawFilename);
+            bubbleContent = `<a href="${encodeURI(fileUrl || '')}" target="_blank" rel="noopener noreferrer" class="file-card">
+                <i class="fas fa-file-alt"></i>
+                <div class="file-info">
+                    <span class="file-name">${filename}</span>
+                    <span class="file-size">Klik untuk mengunduh</span>
+                </div>
+            </a>`;
+        }
+        
+        const isSent = type === 'sent';
+        let actionButtons = '';
+        if (isSent && messageType !== 'deleted') {
+            let editBtn = '';
+            if (messageType === 'text') {
+                editBtn = `<a href="#" class="edit-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-pencil-alt" style="font-size: 0.6rem;"></i></a>`;
+            }
+            actionButtons = `
+                ${editBtn}
+                <a href="#" class="delete-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-trash" style="font-size: 0.6rem;"></i></a>
+            `;
+        }
+
+        let ticks = '';
+        if (isSent) {
+            ticks = `<i class="fas fa-check-double" style="color: #cbd5e1; font-size: 0.75rem;"></i>`; 
+        }
+
+        msgGroup.innerHTML = `
+            <div class="msg-bubble">${bubbleContent}</div>
+            <div class="msg-time" style="display: flex; gap: 0.5rem; align-items: center;">
+                <span>${time}</span>
+                ${ticks}
+                ${actionButtons}
+            </div>
+        `;
+        
+        if (msgArea.querySelector('.empty-chat')) {
+            msgArea.querySelector('.empty-chat').remove();
+        }
+        
+        msgArea.appendChild(msgGroup);
+        msgArea.scrollTop = msgArea.scrollHeight;
+    }
+
+    // Handle Edit Click
+    function handleEditClick(e, messageId) {
+        e.preventDefault();
+        const msgEl = e.target.closest('.msg-group');
+        const createdAtStr = msgEl.getAttribute('data-created-at');
+        const createdAt = new Date(createdAtStr);
+        const now = new Date();
+        
+        if (now - createdAt > 2 * 60 * 1000) {
+            alert('Waktu edit sudah habis (maksimal 2 menit)');
+            return;
+        }
+        
+        const bubble = msgEl.querySelector('.msg-bubble');
+        const currentText = bubble.innerText;
+        
+        const chatInput = document.getElementById('chatInput');
+        chatInput.value = currentText;
+        chatInput.focus();
+        
+        editingMessageId = messageId;
+        document.getElementById('editModeIndicator').style.display = 'flex';
+        chatInput.placeholder = "Edit pesan...";
+    }
+
+    // Handle Delete Click
+    function handleDeleteClick(e, messageId) {
+        e.preventDefault();
+        if (confirm('Apakah Anda yakin ingin menghapus pesan ini?')) {
+            chatSocket.send(JSON.stringify({
+                'action': 'delete',
+                'message_id': messageId,
+                'sender_id': pegawaiId,
+                'sender_type': 'pegawai'
+            }));
+        }
+    }
+
+    // Event delegation
+    document.addEventListener('click', function(e) {
+        const editBtn = e.target.closest('.edit-msg-btn');
+        const deleteBtn = e.target.closest('.delete-msg-btn');
+        const cancelEditBtn = e.target.closest('#btnCancelEdit');
+        
+        if (editBtn) {
+            e.preventDefault();
+            const msgEl = editBtn.closest('.msg-group');
+            const messageId = msgEl.getAttribute('data-id');
+            handleEditClick(e, messageId);
+        }
+        
+        if (deleteBtn) {
+            e.preventDefault();
+            const msgEl = deleteBtn.closest('.msg-group');
+            const messageId = msgEl.getAttribute('data-id');
+            handleDeleteClick(e, messageId);
+        }
+
+        if (cancelEditBtn) {
+            e.preventDefault();
+            editingMessageId = null;
+            document.getElementById('editModeIndicator').style.display = 'none';
+            const chatInput = document.getElementById('chatInput');
+            chatInput.value = '';
+            chatInput.placeholder = "Ketik pesan balasan di sini...";
+        }
+    });
+
+    window.loadChat = function(convId) {
+        location.href = `?session=${convId}`; 
+    };
+</script>
+{% endblock %}

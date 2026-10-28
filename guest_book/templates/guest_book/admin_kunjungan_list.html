@@ -258,17 +258,33 @@
                 </td>
                 <td>
                     <div class="time-info">{{ k.purpose|truncatechars:35 }}</div>
-                    <div class="time-sub"><i class="far fa-building me-1"></i> {{ k.pegawai.department_rel.nama|default:k.pegawai.department|default:"Umum" }}</div>
+                    <div class="time-sub"><i class="far fa-building me-1"></i> 
+                        {% if k.pegawai %}
+                            {{ k.pegawai.department_rel.nama|default:k.pegawai.department|default:"Umum" }}
+                        {% else %}
+                            Umum
+                        {% endif %}
+                    </div>
                 </td>
                 <td>
-                    {% if k.status == 'completed' %}
-                    <span class="status-pill pill-selesai"><span class="dot"></span>Selesai</span>
-                    {% elif k.status == 'pending' %}
-                    <span class="status-pill pill-menunggu"><span class="dot"></span>Menunggu</span>
-                    {% elif k.status == 'cancelled' %}
-                    <span class="status-pill pill-ditolak"><span class="dot"></span>Dibatalkan</span>
+                    {% if k.status == 'menunggu_admin' %}
+                    <span class="status-pill pill-menunggu"><span class="dot"></span>Menunggu Admin</span>
+                    {% elif k.status == 'menunggu_pegawai' %}
+                    <span class="status-pill pill-menunggu"><span class="dot"></span>Menunggu Pegawai</span>
+                    {% elif k.status == 'disetujui_pegawai' %}
+                    <span class="status-pill pill-bertamu"><span class="dot"></span>Disetujui Pegawai</span>
+                    {% elif k.status == 'ditolak_pegawai' %}
+                    <span class="status-pill pill-ditolak"><span class="dot"></span>Ditolak Pegawai</span>
+                    {% elif k.status == 'disetujui' %}
+                    <span class="status-pill pill-selesai"><span class="dot"></span>Disetujui (ACC)</span>
                     {% elif k.status == 'in_progress' %}
                     <span class="status-pill pill-bertamu"><span class="dot"></span>Bertamu</span>
+                    {% elif k.status == 'completed' %}
+                    <span class="status-pill pill-selesai"><span class="dot"></span>Selesai</span>
+                    {% elif k.status == 'cancelled' %}
+                    <span class="status-pill pill-ditolak"><span class="dot"></span>Dibatalkan</span>
+                    {% elif k.status == 'pending' %}
+                    <span class="status-pill pill-menunggu"><span class="dot"></span>Menunggu</span>
                     {% endif %}
                 </td>
                 <td>
@@ -280,11 +296,18 @@
                             
                             <li><hr class="dropdown-divider"></li>
                             
-                            {% if k.status == 'pending' %}
-                            <li><a class="dropdown-item py-2 px-3 text-success" href="#" onclick="updateStatus('{{ k.id }}', 'in_progress')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-check me-2"></i> Terima (ACC)</a></li>
+                            {% if k.status == 'pending' or k.status == 'menunggu_admin' %}
+                            <li><a class="dropdown-item py-2 px-3 text-info" href="#" onclick="updateStatus('{{ k.id }}', 'menunggu_pegawai')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-user-clock me-2"></i> Teruskan ke Pegawai</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-success" href="#" onclick="updateStatus('{{ k.id }}', 'disetujui')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-check me-2"></i> ACC Kunjungan</a></li>
                             <li><a class="dropdown-item py-2 px-3 text-danger" href="#" onclick="updateStatus('{{ k.id }}', 'cancelled')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Tolak</a></li>
+                            {% elif k.status == 'menunggu_pegawai' %}
+                            <li><a class="dropdown-item py-2 px-3 text-success" href="#" onclick="updateStatus('{{ k.id }}', 'disetujui')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-check me-2"></i> ACC Kunjungan</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-danger" href="#" onclick="updateStatus('{{ k.id }}', 'cancelled')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Tolak</a></li>
+                            {% elif k.status == 'disetujui' or k.status == 'disetujui_pegawai' %}
+                            <li><a class="dropdown-item py-2 px-3 text-primary" href="#" onclick="updateStatus('{{ k.id }}', 'in_progress')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-play me-2"></i> Mulai Bertamu</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-danger" href="#" onclick="updateStatus('{{ k.id }}', 'cancelled')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Batalkan</a></li>
                             {% elif k.status == 'in_progress' %}
-                            <li><a class="dropdown-item py-2 px-3 text-primary" href="#" onclick="updateStatus('{{ k.id }}', 'completed')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-sign-out-alt me-2"></i> Selesai</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-success" href="#" onclick="updateStatus('{{ k.id }}', 'completed')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-sign-out-alt me-2"></i> Selesai</a></li>
                             {% endif %}
                         </ul>
                     </div>
@@ -488,8 +511,9 @@
             });
         };
 
-        // Auto-refresh (Live Update) setiap 10 detik dengan tetap mempertahankan filter
+        // Auto-refresh (Live Update) setiap 25 detik hanya saat tab aktif
         setInterval(() => {
+            if (document.hidden) return;
             fetch(window.location.href)
             .then(response => response.text())
             .then(html => {

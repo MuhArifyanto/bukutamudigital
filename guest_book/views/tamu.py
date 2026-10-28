@@ -1,11 +1,15 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.utils import timezone
+from django.db.models import Count, Q as _Q
 from .base import tamu_login_required, base_context
 from ..models import Kunjungan, Pegawai, Message, Departemen
 from ..forms import KunjunganForm, PesanForm
 from ..utils import send_notification
+
+logger = logging.getLogger(__name__)
 
 def landing_view(request):
     """View untuk Landing Page utama"""
@@ -36,13 +40,19 @@ def dashboard_view(request, tamu):
     """View untuk Dashboard Tamu"""
     now = timezone.now()
     base_qs = Kunjungan.objects.filter(tamu=tamu)
-    stats = {
-        'total': base_qs.count(),
-        'pending': base_qs.filter(status='pending').count(),
-        'in_progress': base_qs.filter(status='in_progress').count(),
-        'completed': base_qs.filter(status='completed').count(),
-        'bulan_ini': base_qs.filter(arrival_time__year=now.year, arrival_time__month=now.month).count(),
-    }
+
+    # 1 query: semua status sekaligus via conditional Count
+    agg = base_qs.aggregate(
+        total=Count('id'),
+        pending=Count('id', filter=_Q(status__in=['menunggu_admin', 'menunggu_pegawai', 'disetujui_pegawai'])),
+        in_progress=Count('id', filter=_Q(status='in_progress')),
+        completed=Count('id', filter=_Q(status='completed')),
+        bulan_ini=Count('id', filter=_Q(
+            arrival_time__year=now.year,
+            arrival_time__month=now.month,
+        )),
+    )
+    stats = agg  # aggregate() langsung kembalikan dict dengan key yang sama
     
     q = request.GET.get('q', '').strip()
     kunjungan_qs = base_qs
@@ -59,15 +69,74 @@ def dashboard_view(request, tamu):
 @tamu_login_required
 def kunjungan_baru_view(request, tamu):
     form = KunjunganForm(request.POST or None)
-    pegawai_list = Pegawai.objects.filter(account_status='active')
+    pegawai_list = Pegawai.objects.filter(account_status='active').select_related('department_rel')
 
     if request.method == 'POST' and form.is_valid():
+        from django.db import transaction
+        from ..validators import validate_kunjungan_schedule
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
         kunjungan = form.save(commit=False)
         kunjungan.tamu = tamu
-        kunjungan.status = 'pending'
-        kunjungan.save()
-        
-        messages.success(request, "Kunjungan Anda berhasil didaftarkan!")
+        kunjungan.status = 'menunggu_admin'
+
+        try:
+            with transaction.atomic():
+                validate_kunjungan_schedule(
+                    arrival_time=kunjungan.arrival_time,
+                    departure_time=kunjungan.departure_time,
+                    instance=kunjungan,
+                    is_admin=False,
+                    is_import=False,
+                    lock_for_update=True
+                )
+                kunjungan.save()
+        except DjangoValidationError as e:
+            if hasattr(e, 'error_dict'):
+                for field, error_list in e.error_dict.items():
+                    for err in error_list:
+                        form.add_error(field, err)
+            elif hasattr(e, 'message'):
+                form.add_error('arrival_time', e.message)
+            else:
+                form.add_error('arrival_time', str(e))
+            return render(request, 'guest_book/tamu_kunjungan_baru.html', {
+                'form': form,
+                'pegawai_list': pegawai_list,
+            })
+
+        # ── N8N Auto-Routing: AI pilihkan pegawai yang paling sesuai ──────────
+        from ..utils import call_n8n_routing
+        n8n_result = call_n8n_routing(
+            kunjungan_id=kunjungan.id,
+            purpose=kunjungan.purpose,
+            pegawai_queryset=pegawai_list,
+        )
+        if n8n_result and n8n_result.get('pegawai_id'):
+            try:
+                pegawai_assign = Pegawai.objects.get(
+                    pk=n8n_result['pegawai_id'],
+                    account_status='active'
+                )
+                kunjungan.pegawai = pegawai_assign
+                kunjungan.status = 'menunggu_pegawai'
+                kunjungan.admin_notes = (
+                    f"[Auto-Routing AI] Pegawai direkomendasikan oleh N8N.\n"
+                    f"Bidang: {n8n_result.get('bidang', '-')}\n"
+                    f"Confidence: {n8n_result.get('confidence', '-')}\n"
+                    f"Alasan: {n8n_result.get('alasan', '-')}"
+                )
+                kunjungan.save(update_fields=['pegawai', 'status', 'admin_notes'])
+                messages.success(
+                    request,
+                    f"Kunjungan Anda berhasil didaftarkan dan telah diarahkan ke "
+                    f"{pegawai_assign.name} ({pegawai_assign.jabatan or 'Pegawai'})."
+                )
+            except Pegawai.DoesNotExist:
+                messages.success(request, "Kunjungan Anda berhasil didaftarkan!")
+        else:
+            messages.success(request, "Kunjungan Anda berhasil didaftarkan!")
+        # ── End N8N Routing ───────────────────────────────────────────────────
         
         # Notifikasi ke Admin
         send_notification(
@@ -87,6 +156,7 @@ def kunjungan_baru_view(request, tamu):
         from datetime import datetime, time
         from django.db.models import Q
         from django.utils import timezone
+
         
         try:
             # Hitung nomor urut & nomor unik
@@ -122,7 +192,10 @@ def kunjungan_baru_view(request, tamu):
             
             msg = EmailMultiAlternatives(subject, text_content, from_email, [to_email])
             msg.attach_alternative(html_content, "text/html")
-            msg.send()
+            
+            # Kirim email di latar belakang menggunakan thread agar tidak memblokir UI (Asynchronous)
+            import threading
+            threading.Thread(target=msg.send).start()
         except Exception as e:
             # Jika gagal kirim email, log saja agar tidak menghentikan proses booking!
             import logging
@@ -153,15 +226,15 @@ def riwayat_view(request, tamu):
     if date_filter:
         qs = qs.filter(arrival_time__date=date_filter)
 
-    # Calculate stats for the current user (unfiltered)
+    # Calculate stats for the current user (1 query, unfiltered)
     base_qs = Kunjungan.objects.filter(tamu=tamu)
-    stats = {
-        'total': base_qs.count(),
-        'pending': base_qs.filter(status='pending').count(),
-        'cancelled': base_qs.filter(status='cancelled').count(),
-    }
+    stats = base_qs.aggregate(
+        total=Count('id'),
+        pending=Count('id', filter=_Q(status__in=Kunjungan.Status.PENDING_VERIFICATION)),
+        cancelled=Count('id', filter=_Q(status='cancelled')),
+    )
 
-    paginator = Paginator(qs, 10)
+    paginator = Paginator(qs, 100)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -176,34 +249,69 @@ def riwayat_view(request, tamu):
 
 @tamu_login_required
 def kunjungan_detail_view(request, tamu, pk):
+    from ..permissions import PermissionManager
+    
     kunjungan = get_object_or_404(Kunjungan, pk=pk, tamu=tamu)
-    status_history = kunjungan.status_history.order_by('changed_at')
-    notes_list = kunjungan.notes_history.order_by('created_at')
+    status_history = kunjungan.status_history.all().order_by('-changed_at')
+    notes_list = kunjungan.notes_history.all().order_by('created_at')
+    
+    # Get rejection reason if any
+    rejection_note = None
+    if kunjungan.status == 'ditolak_pegawai':
+        rejection_note = kunjungan.notes_history.filter(note_type='rejection').first()
+    
+    # Check if chat is available
+    chat_available = PermissionManager.can_access_chat_pegawai_tamu(kunjungan)
+    chat_session_id = f'kunjungan_{kunjungan.id}' if chat_available else None
 
     ctx = base_context(tamu, 'riwayat')
     ctx.update({
         'kunjungan': kunjungan,
         'status_history': status_history,
         'notes_list': notes_list,
+        'rejection_note': rejection_note,
+        'chat_available': chat_available,
+        'chat_session_id': chat_session_id,
     })
     return render(request, 'guest_book/tamu_kunjungan_detail.html', ctx)
 
 @tamu_login_required
 def kunjungan_batal_view(request, tamu, pk):
     if request.method == 'POST':
-        kunjungan = get_object_or_404(Kunjungan, pk=pk, tamu=tamu, status='pending')
+        kunjungan = get_object_or_404(
+            Kunjungan.objects.select_related('pegawai'), 
+            pk=pk, 
+            tamu=tamu, 
+            status__in=Kunjungan.Status.CANCELABLE
+        )
         kunjungan.status = 'cancelled'
         kunjungan.save(update_fields=['status', 'updated_at'])
         messages.success(request, "Kunjungan berhasil dibatalkan.")
         
-        send_notification(
-            recipient_id='admin',
-            recipient_type='admin',
-            notification_type='system_alert',
-            title='Kunjungan Dibatalkan oleh Tamu',
-            message=f'Tamu {tamu.name} telah membatalkan kunjungan mereka.',
-            related_object_id=str(kunjungan.id)
-        )
+        try:
+            send_notification(
+                recipient_id='admin',
+                recipient_type='admin',
+                notification_type='system_alert',
+                title='Kunjungan Dibatalkan oleh Tamu',
+                message=f'Tamu {tamu.name} telah membatalkan kunjungan mereka.',
+                related_object_id=str(kunjungan.id)
+            )
+        except Exception as notif_err:
+            logger.warning("Gagal mengirim notifikasi pembatalan ke admin: %s", notif_err)
+        
+        if kunjungan.pegawai:
+            try:
+                send_notification(
+                    recipient_id=str(kunjungan.pegawai.id),
+                    recipient_type='pegawai',
+                    notification_type='system_alert',
+                    title='Kunjungan Dibatalkan oleh Tamu',
+                    message=f'Tamu {tamu.name} telah membatalkan jadwal kunjungan mereka.',
+                    related_object_id=str(kunjungan.id)
+                )
+            except Exception as notif_err:
+                logger.warning("Gagal mengirim notifikasi pembatalan ke pegawai: %s", notif_err)
     return redirect('tamu:riwayat')
 
 @tamu_login_required
@@ -267,90 +375,113 @@ def notifications_view(request, tamu):
     ctx['notifications'] = notifications
     return render(request, 'guest_book/tamu_notifications.html', ctx)
 
-def ensure_chat_table_exists():
-    try:
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS chat_message (
-                    id VARCHAR(36) NOT NULL PRIMARY KEY,
-                    session_id VARCHAR(255) NOT NULL,
-                    sender_id VARCHAR(255) NOT NULL,
-                    sender_type VARCHAR(20) NOT NULL,
-                    content LONGTEXT NOT NULL,
-                    attachment VARCHAR(255) NULL,
-                    message_type VARCHAR(20) NOT NULL DEFAULT 'text',
-                    is_read TINYINT(1) NOT NULL DEFAULT 0,
-                    created_at DATETIME(6) NOT NULL,
-                    INDEX idx_chat_session_id (session_id)
-                );
-            """)
-    except Exception as e:
-        print(f"Error creating chat_message table: {e}")
+
 
 @tamu_login_required
 def user_chat_view(request, tamu):
-    """View untuk Chat Tamu ke Admin (WA Style)"""
-    import traceback
-    from django.http import HttpResponse
+    """View untuk Chat Tamu — Admin & Pegawai (multi-conversation, WA style)"""
+    from ..models import ChatMessage, Pegawai, Kunjungan
+    from .base import _get_cached_admin_user
 
-    # Pastikan tabel chat_message selalu ada di DB (bahkan jika django_migrations out of sync)
-    ensure_chat_table_exists()
+    admin_user = _get_cached_admin_user()
 
-    try:
-        from ..models import ChatMessage, Pegawai, Tamu
-        session_id = str(tamu.pk)
-        
-        messages_qs = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at')[:50]
-        messages_list = list(messages_qs)
-        messages_list.reverse()
-        
-        # Mark read messages from admin
-        ChatMessage.objects.filter(session_id=session_id, sender_type='admin', is_read=False).update(is_read=True)
-        
-        # Optimasi: Ambil semua sender yang terlibat
-        admin_ids = [msg.sender_id for msg in messages_list if msg.sender_type == 'admin']
-        pegawai_ids = [msg.sender_id for msg in messages_list if msg.sender_type == 'pegawai']
-        
-        # Validasi UUID agar tidak error jika ada data kotor (misal: "null")
-        import uuid
-        def is_valid_uuid(val):
-            if not val:
-                return False
-            try:
-                uuid.UUID(str(val))
-                return True
-            except (ValueError, AttributeError, TypeError):
-                return False
-                
-        valid_admin_ids = [uid for uid in admin_ids if is_valid_uuid(uid)]
-        valid_pegawai_ids = [uid for uid in pegawai_ids if is_valid_uuid(uid)]
-        
-        # Admin disimpan di tabel Tamu dengan is_admin=True
-        admins = {str(a.pk): a for a in Tamu.objects.filter(pk__in=valid_admin_ids, is_admin=True)}
-        pegawais = {str(p.pk): p for p in Pegawai.objects.filter(pk__in=valid_pegawai_ids)}
-        
-        # Fallback untuk sender_id 'admin' (data lama/hardcoded)
-        admin_user = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
-        
-        for msg in messages_list:
-            if msg.sender_type == 'tamu':
-                msg.sender_obj = tamu
-            elif msg.sender_type == 'admin':
-                msg.sender_obj = admin_user
-            elif msg.sender_type == 'pegawai':
-                msg.sender_obj = pegawais.get(msg.sender_id)
-                
-        ctx = base_context(tamu, 'chat')
-        ctx.update({
-            'messages_list': messages_list,
+    # ── 1. Conversation dengan Admin ─────────────────────────────────────────
+    admin_session_id = str(tamu.pk)
+    admin_last_msg = ChatMessage.objects.filter(session_id=admin_session_id).order_by('-created_at').first()
+    admin_unread = ChatMessage.objects.filter(
+        session_id=admin_session_id, sender_type='admin', is_read=False
+    ).count()
+
+    conversations = [{
+        'id': 'admin',
+        'session_id': admin_session_id,
+        'type': 'admin',
+        'name': 'Admin Diskominfosantik',
+        'subtitle': 'Layanan Umum',
+        'avatar_letters': 'AD',
+        'last_message': admin_last_msg,
+        'unread_count': admin_unread,
+    }]
+
+    # ── 2. Conversations dengan Pegawai (dari kunjungan tamu) ─────────────────
+    kunjungan_list = list(Kunjungan.objects.filter(
+        tamu=tamu,
+        status__in=['disetujui', 'in_progress', 'completed'],
+        pegawai__isnull=False,
+    ).select_related('pegawai', 'pegawai__department_rel').order_by('-created_at')[:20])
+
+    session_ids = [f'kunjungan_{k.id}' for k in kunjungan_list]
+    unread_counts = {}
+    last_messages = {}
+
+    if session_ids:
+        unread_qs = ChatMessage.objects.filter(
+            session_id__in=session_ids, is_read=False
+        ).exclude(sender_type='tamu').values('session_id').annotate(c=Count('id'))
+        unread_counts = {item['session_id']: item['c'] for item in unread_qs}
+
+        # Ambil pesan terakhir per session secara batch
+        recent_msgs = ChatMessage.objects.filter(
+            session_id__in=session_ids
+        ).order_by('session_id', '-created_at')
+        for msg in recent_msgs:
+            if msg.session_id not in last_messages:
+                last_messages[msg.session_id] = msg
+
+    for k in kunjungan_list:
+        session_id = f'kunjungan_{k.id}'
+        conversations.append({
+            'id': str(k.id),
             'session_id': session_id,
-            'admin_user': admin_user,
+            'type': 'pegawai',
+            'name': k.pegawai.name,
+            'subtitle': k.pegawai.department or (k.pegawai.department_rel.nama if k.pegawai.department_rel else 'Pegawai'),
+            'avatar_letters': k.pegawai.name[:2].upper(),
+            'last_message': last_messages.get(session_id),
+            'unread_count': unread_counts.get(session_id, 0),
         })
-        return render(request, 'guest_book/tamu_chat.html', ctx)
-    except Exception as e:
-        error_details = traceback.format_exc()
-        return HttpResponse(f"<h3>Error in Chat View:</h3><pre>{error_details}</pre>", status=500)
+
+    # ── 3. Tentukan active conversation ───────────────────────────────────────
+    active_session = request.GET.get('session', admin_session_id)
+    active_conv = next((c for c in conversations if c['session_id'] == active_session), conversations[0])
+
+    # Mark as read
+    ChatMessage.objects.filter(
+        session_id=active_conv['session_id'], is_read=False
+    ).exclude(sender_type='tamu').update(is_read=True)
+
+    # Load messages for active conversation
+    messages_qs = ChatMessage.objects.filter(
+        session_id=active_conv['session_id']
+    ).order_by('-created_at')[:50]
+    messages_list = list(reversed(messages_qs))
+
+    # Attach sender objects secara batch (mencegah N+1 query)
+    pegawai_ids = {msg.sender_id for msg in messages_list if msg.sender_type == 'pegawai' and msg.sender_id}
+    pegawai_map = {}
+    if pegawai_ids:
+        pegawai_map = {
+            str(p.id): p 
+            for p in Pegawai.objects.filter(id__in=pegawai_ids).select_related('department_rel')
+        }
+
+    for msg in messages_list:
+        if msg.sender_type == 'tamu':
+            msg.sender_obj = tamu
+        elif msg.sender_type == 'admin':
+            msg.sender_obj = admin_user
+        elif msg.sender_type == 'pegawai':
+            msg.sender_obj = pegawai_map.get(str(msg.sender_id))
+
+    ctx = base_context(tamu, 'chat')
+    ctx.update({
+        'conversations': conversations,
+        'active_conv': active_conv,
+        'messages_list': messages_list,
+        'admin_user': admin_user,
+        'tamu_id': str(tamu.pk),
+    })
+    return render(request, 'guest_book/tamu_chat.html', ctx)
 
 @tamu_login_required
 def tamu_kunjungan_cetak_pdf(request, tamu):
@@ -377,31 +508,70 @@ def tamu_kunjungan_cetak_pdf(request, tamu):
     })
     return render(request, 'guest_book/tamu_kunjungan_cetak_pdf.html', ctx)
 
+
+@tamu_login_required
+def tamu_chat_pegawai_view(request, tamu, kunjungan_id):
+    """Chat interface antara Tamu dan Pegawai untuk kunjungan tertentu."""
+    from django.core.exceptions import PermissionDenied
+    from ..models import ChatMessage
+    from ..permissions import PermissionManager
+    
+    kunjungan = get_object_or_404(Kunjungan, pk=kunjungan_id, tamu=tamu)
+    
+    # Validasi permission
+    if not PermissionManager.can_access_chat_pegawai_tamu(kunjungan):
+        messages.warning(request, "Chat hanya tersedia setelah kunjungan di-ACC oleh Admin")
+        return redirect('tamu:kunjungan_detail', pk=kunjungan_id)
+    
+    session_id = f'kunjungan_{kunjungan.id}'
+    
+    # Get chat history
+    messages_list = ChatMessage.objects.filter(
+        session_id=session_id
+    ).order_by('-created_at')[:50]
+    messages_list = list(reversed(messages_list))
+    
+    ctx = base_context(tamu, 'chat')
+    ctx.update({
+        'kunjungan': kunjungan,
+        'session_id': session_id,
+        'chat_partner': kunjungan.pegawai.name if kunjungan.pegawai else 'Pegawai',
+        'messages_list': messages_list,
+    })
+    return render(request, 'guest_book/tamu_chat_pegawai.html', ctx)
+
+
 @tamu_login_required
 def profil_view(request, tamu):
     """View untuk profil pengguna (tamu)"""
-    total_kunjungan = Kunjungan.objects.filter(tamu=tamu).count()
-    total_instansi = Kunjungan.objects.filter(tamu=tamu).values('pegawai__department').distinct().count()
-    recent_visits = Kunjungan.objects.filter(tamu=tamu).order_by('-arrival_time')[:3]
-    
-    # Hitung kapan terakhir ganti password
+    base_qs = Kunjungan.objects.filter(tamu=tamu)
+
+    # 1 query: total + distinct departemen sekaligus
+    agg = base_qs.aggregate(total=Count('id'))
+    total_kunjungan = agg['total']
+
+    # Distinct count tidak bisa digabung dalam aggregate() standar Django,
+    # tapi 1 query values+distinct jauh lebih efisien dari 2 filter().count() terpisah
+    total_instansi = base_qs.values('pegawai__department').distinct().count()
+
+    # 1 query: 3 kunjungan terbaru
+    recent_visits = base_qs.select_related('pegawai').order_by('-arrival_time')[:3]
+
+    # Cari tanggal terakhir ganti password dari AuditLog
+    # Ambil hanya 1 log terbaru yang mengandung 'password' — tidak perlu load semua log
     from ..models import AuditLog
-    last_change_date = tamu.registration_date
-    logs = AuditLog.objects.filter(
+    last_password_log = AuditLog.objects.filter(
         user_id=str(tamu.id),
         user_type='tamu',
         action='update',
-        table_name='tamu'
-    ).order_by('-timestamp')
-    
-    for log in logs:
-        if log.new_value and 'password' in log.new_value:
-            last_change_date = log.timestamp
-            break
-            
+        table_name='tamu',
+        new_value__has_key='password',
+    ).order_by('-timestamp').values('timestamp').first()
+
+    last_change_date = last_password_log['timestamp'] if last_password_log else tamu.registration_date
     days_since_change = (timezone.now() - last_change_date).days
     needs_password_change = days_since_change >= 90
-    
+
     ctx = base_context(tamu, 'profil')
     ctx.update({
         'tamu': tamu,

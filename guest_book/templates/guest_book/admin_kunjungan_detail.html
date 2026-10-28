@@ -1,5 +1,6 @@
 {% extends 'guest_book/admin_base.html' %}
 {% load static %}
+{% load custom_filters %}
 
 {% block title %}Detail Kunjungan{% endblock %}
 
@@ -9,35 +10,97 @@
 {% block content %}
 <style>
     .timeline-dot {
-        position: absolute; left: -21px; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff;
+        position: absolute; left: -28px; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff;
     }
     .dot-completed { background: #10b981; box-shadow: 0 0 0 2px #10b981; }
     .dot-cancelled { background: #ef4444; box-shadow: 0 0 0 2px #ef4444; }
     .dot-in-progress { background: #3b82f6; box-shadow: 0 0 0 2px #3b82f6; }
     .dot-pending { background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
+
+    /* Responsive layout untuk detail kunjungan */
+    .detail-outer-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+    }
+    .detail-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    .detail-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    .detail-action-bar {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .detail-action-bar button {
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0.6rem 1.1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: none;
+    }
+
+    @media (max-width: 1024px) {
+        .detail-outer-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+        .detail-info-grid { grid-template-columns: 1fr; gap: 1rem; }
+        .detail-action-bar { justify-content: stretch; }
+        .detail-action-bar button { flex: 1; justify-content: center; }
+    }
+    @media (max-width: 576px) {
+        .detail-action-bar { flex-direction: column; }
+        .detail-action-bar button { width: 100%; }
+        .detail-page-header { flex-direction: column; align-items: flex-start; }
+    }
 </style>
 <div style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
     <!-- BACK BUTTON & HEADER -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div class="detail-page-header">
         <a href="{% url 'tamu:admin_kunjungan_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: #64748b; text-decoration: none; font-size: 0.9rem; font-weight: 600;">
             <i class="fas fa-arrow-left"></i> Kembali ke Daftar
         </a>
         <div>
             {% if kunjungan.status == 'completed' %}
-            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">SELESAI</span>
-            {% elif kunjungan.status == 'pending' %}
-            <span style="background: #f1f5f9; color: #475569; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">MENUNGGU</span>
+            <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">SELESAI</span>
+            {% elif kunjungan.status == 'menunggu_admin' %}
+            <span style="background: #fef9c3; color: #854d0e; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">MENUNGGU ADMIN</span>
+            {% elif kunjungan.status == 'menunggu_pegawai' %}
+            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">MENUNGGU PEGAWAI</span>
+            {% elif kunjungan.status == 'disetujui_pegawai' %}
+            <span style="background: #d1fae5; color: #065f46; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">DISETUJUI PEGAWAI</span>
+            {% elif kunjungan.status == 'ditolak_pegawai' %}
+            <span style="background: #fee2e2; color: #991b1b; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">DITOLAK PEGAWAI</span>
+            {% elif kunjungan.status == 'ditolak_admin' %}
+            <span style="background: #fce7f3; color: #9d174d; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">DITOLAK ADMIN</span>
+            {% elif kunjungan.status == 'disetujui' %}
+            <span style="background: #dbeafe; color: #1d4ed8; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">DISETUJUI (ACC)</span>
+            {% elif kunjungan.status == 'in_progress' %}
+            <span style="background: #fef08a; color: #854d0e; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">BERJALAN</span>
             {% elif kunjungan.status == 'cancelled' %}
             <span style="background: #fee2e2; color: #991b1b; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">DIBATALKAN</span>
-            {% elif kunjungan.status == 'in_progress' %}
-            <span style="background: #fef08a; color: #854d0e; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">PROSES</span>
-            {% else %}
-            <span style="background: #fef08a; color: #854d0e; font-size: 0.75rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 99px;">{{ kunjungan.get_status_display|upper }}</span>
             {% endif %}
         </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+    <div class="detail-outer-grid">
         <!-- LEFT COLUMN: INFO -->
         <div>
             <!-- Main Info Card -->
@@ -76,17 +139,38 @@
                 </div>
 
                 <!-- Action Buttons for Admin -->
-                <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 1rem;">
-                    {% if kunjungan.status == 'pending' %}
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'in_progress')" style="background: #dcfce7; color: #15803d; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-check"></i> Terima (ACC)
+                <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
+                    {% if kunjungan.status == 'menunggu_admin' %}
+                    <button onclick="updateStatus('{{ kunjungan.id }}', 'menunggu_pegawai')" style="background: #dbeafe; color: #1d4ed8; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-share"></i> Forward ke Pegawai
+                    </button>
+                    <button onclick="showTolakAdminModal('{{ kunjungan.id }}')" style="background: #fce7f3; color: #9d174d; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-calendar-times"></i> Tolak (Jadwal Bentrok)
                     </button>
                     <button onclick="updateStatus('{{ kunjungan.id }}', 'cancelled')" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-times-circle"></i> Tolak
+                        <i class="fas fa-times-circle"></i> Batalkan
+                    </button>
+                    {% elif kunjungan.status == 'disetujui_pegawai' %}
+                    <button onclick="updateStatus('{{ kunjungan.id }}', 'disetujui')" style="background: #dcfce7; color: #15803d; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-check-double"></i> ACC (Setujui)
+                    </button>
+                    <button onclick="updateStatus('{{ kunjungan.id }}', 'cancelled')" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-times-circle"></i> Batalkan
+                    </button>
+                    {% elif kunjungan.status == 'disetujui' %}
+                    <button onclick="updateStatus('{{ kunjungan.id }}', 'in_progress')" style="background: #fef9c3; color: #854d0e; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-play"></i> Mulai Kunjungan
+                    </button>
+                    <button onclick="updateStatus('{{ kunjungan.id }}', 'cancelled')" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-times-circle"></i> Batalkan
                     </button>
                     {% elif kunjungan.status == 'in_progress' %}
                     <button onclick="updateStatus('{{ kunjungan.id }}', 'completed')" style="background: #e0f2fe; color: #0369a1; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-sign-out-alt"></i> Selesaikan Kunjungan
+                    </button>
+                    {% elif kunjungan.status == 'menunggu_pegawai' %}
+                    <button onclick="updateStatus('{{ kunjungan.id }}', 'cancelled')" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-times-circle"></i> Batalkan
                     </button>
                     {% endif %}
                 </div>
@@ -119,13 +203,13 @@
                     <i class="fas fa-history" style="color: #64748b;"></i> Riwayat Status
                 </h3>
                 
-                <div style="position: relative; padding-left: 1.5rem;">
+                <div style="position: relative; padding-left: 28px;">
                     <!-- Vertical Line -->
-                    <div style="position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; background: #e2e8f0;"></div>
+                    <div style="position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: #e2e8f0;"></div>
                     
                     <!-- Item: Created -->
                     <div style="position: relative; margin-bottom: 1.5rem;">
-                        <div style="position: absolute; left: -21px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; box-shadow: 0 0 0 2px #3b82f6;"></div>
+                        <div style="position: absolute; left: -28px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; box-shadow: 0 0 0 2px #3b82f6;"></div>
                         <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">Kunjungan Dibuat</div>
                         <div style="font-size: 0.75rem; color: #64748b;">{{ kunjungan.created_at|date:"d M Y, H:i" }} WIB</div>
                     </div>
@@ -138,13 +222,13 @@
                             {% elif hist.new_status == 'cancelled' %}dot-cancelled
                             {% elif hist.new_status == 'in_progress' %}dot-in-progress
                             {% else %}dot-pending{% endif %}"></div>
-                        <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">Status: {% if hist.new_status == 'completed' %}SELESAI{% elif hist.new_status == 'pending' %}MENUNGGU{% elif hist.new_status == 'cancelled' %}DIBATALKAN{% elif hist.new_status == 'in_progress' %}PROSES{% else %}{{ hist.new_status|upper }}{% endif %}</div>
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">Status: {% if hist.new_status == 'completed' %}SELESAI{% elif hist.new_status == 'pending' %}MENUNGGU{% elif hist.new_status == 'cancelled' %}DIBATALKAN{% elif hist.new_status == 'in_progress' %}PROSES{% else %}{{ hist.new_status|replace:"_| "|upper }}{% endif %}</div>
                         <div style="font-size: 0.75rem; color: #64748b;">{{ hist.changed_at|date:"d M Y, H:i" }} WIB</div>
                         <div style="font-size: 0.7rem; color: #94a3b8;">Oleh: {{ hist.changed_by_type|capfirst }}</div>
                     </div>
                     {% empty %}
                     <div style="position: relative;">
-                        <div style="position: absolute; left: -21px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #94a3b8; border: 2px solid #fff; box-shadow: 0 0 0 2px #94a3b8;"></div>
+                        <div style="position: absolute; left: -28px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #94a3b8; border: 2px solid #fff; box-shadow: 0 0 0 2px #94a3b8;"></div>
                         <div style="font-weight: 700; color: #64748b; font-size: 0.85rem;">Menunggu Tindakan</div>
                         <div style="font-size: 0.75rem; color: #94a3b8;">Belum ada perubahan status</div>
                     </div>
@@ -164,8 +248,9 @@
         // Global Update Status Function
         window.updateStatus = function(id, status) {
             const statusLabels = {
-                'pending': 'Menunggu',
-                'in_progress': 'Bertamu',
+                'menunggu_pegawai': 'Forward ke Pegawai',
+                'disetujui': 'ACC (Disetujui)',
+                'in_progress': 'Berjalan',
                 'completed': 'Selesai',
                 'cancelled': 'Dibatalkan'
             };
@@ -202,6 +287,85 @@
                 btn.disabled = false;
             });
         };
+
+        // Modal: Tolak Admin
+        let _tolakKunjunganId = null;
+
+        window.showTolakAdminModal = function(id) {
+            _tolakKunjunganId = id;
+            document.getElementById('inputAlasanTolak').value = '';
+            const modal = document.getElementById('modalTolakAdmin');
+            modal.style.display = 'flex';
+        };
+
+        window.closeTolakAdminModal = function() {
+            document.getElementById('modalTolakAdmin').style.display = 'none';
+            _tolakKunjunganId = null;
+        };
+
+        window.submitTolakAdmin = function() {
+            const alasan = document.getElementById('inputAlasanTolak').value.trim();
+            if (!alasan) {
+                alert('Alasan penolakan wajib diisi.');
+                return;
+            }
+            const btn = document.querySelector('#modalTolakAdmin button:last-child');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            fetch('{% url "tamu:api_update_kunjungan_status" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    kunjungan_id: _tolakKunjunganId,
+                    status: 'ditolak_admin',
+                    rejection_reason: alasan
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+                    btn.innerHTML = '<i class="fas fa-times-circle"></i> Konfirmasi Tolak';
+                    btn.disabled = false;
+                }
+            })
+            .catch(err => {
+                alert('Terjadi kesalahan koneksi.');
+                btn.innerHTML = '<i class="fas fa-times-circle"></i> Konfirmasi Tolak';
+                btn.disabled = false;
+            });
+        };
+
+        // Tutup modal saat klik di luar
+        document.getElementById('modalTolakAdmin').addEventListener('click', function(e) {
+            if (e.target === this) closeTolakAdminModal();
+        });
+
     })();
 </script>
 {% endblock %}
+
+<!-- Modal: Tolak Admin (Jadwal Bentrok) -->
+<div id="modalTolakAdmin" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; padding:2rem; width:100%; max-width:480px; margin:1rem; box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+        <h3 style="font-size:1.1rem; font-weight:800; color:#9d174d; margin:0 0 0.5rem;">
+            <i class="fas fa-calendar-times"></i> Tolak Kunjungan — Jadwal Bentrok
+        </h3>
+        <p style="font-size:0.85rem; color:#64748b; margin:0 0 1.25rem;">Berikan alasan yang jelas agar tamu dapat mengajukan ulang di waktu yang tepat.</p>
+        <textarea id="inputAlasanTolak" rows="4"
+            placeholder="Contoh: Jadwal tanggal tersebut sudah penuh. Silakan ajukan kunjungan di hari lain."
+            style="width:100%; border:1px solid #e2e8f0; border-radius:8px; padding:0.75rem; font-size:0.9rem; outline:none; resize:vertical; box-sizing:border-box; font-family:inherit;"></textarea>
+        <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.25rem;">
+            <button onclick="closeTolakAdminModal()" style="background:#f1f5f9; color:#475569; border:none; border-radius:8px; padding:0.6rem 1.25rem; font-size:0.85rem; font-weight:600; cursor:pointer;">Batal</button>
+            <button onclick="submitTolakAdmin()" style="background:#9d174d; color:#fff; border:none; border-radius:8px; padding:0.6rem 1.25rem; font-size:0.85rem; font-weight:600; cursor:pointer;">
+                <i class="fas fa-times-circle"></i> Konfirmasi Tolak
+            </button>
+        </div>
+    </div>
+</div>

@@ -11,8 +11,8 @@
     .page-content .chat-card {
         background: #ffffff !important;
         border-radius: 20px !important;
-        height: 70vh !important; /* Gunakan % tinggi layar agar pasti muat */
-        min-height: 400px !important;
+        height: calc(100vh - 130px) !important; /* Diperbesar kebawah agar lebih lega */
+        min-height: 550px !important;
         display: grid !important;
         grid-template-columns: 340px 1fr !important;
         grid-template-rows: minmax(0, 1fr) !important; /* Tambahan agar row menghormati container */
@@ -262,7 +262,7 @@
         .page-content .chat-card.chat-active .chat-window { display: flex !important; height: 100% !important; }
     }
 </style>
-<div class="chat-card {% if request.GET.guest %}chat-active{% endif %}">
+<div class="chat-card {% if request.GET.session or request.GET.guest %}chat-active{% endif %}">
     <!-- Sidebar -->
     <div class="chat-sidebar">
         <div class="sidebar-header" style="padding: 1rem !important; background: #ffffff !important; border-bottom: 1px solid #f1f5f9 !important;">
@@ -274,17 +274,25 @@
         </div>
         <div class="chat-list" style="flex: 1 !important; overflow-y: auto !important; padding: 0.75rem !important;">
             {% for conv in conversations %}
-            <div class="chat-item {% if forloop.first %}active{% endif %}" onclick="loadChat('{{ conv.guest.id }}')">
-                {% if conv.guest.profile_picture %}
-                    <img src="{{ conv.guest.profile_picture.url }}" class="avatar" style="width: 48px; height: 48px; border-radius: 14px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                {% else %}
-                    <div class="avatar initials-avatar" data-name="{{ conv.guest.name }}">
-                        {{ conv.guest.name|slice:":2"|upper }}
+            <div class="chat-item {% if forloop.first %}active{% endif %}" onclick="loadChat('{{ conv.session_id }}')">
+                {% if conv.participant_type == 'pegawai' %}
+                    <div class="avatar initials-avatar" data-name="{{ conv.name }}">
+                        {{ conv.name|slice:":2"|upper }}
                     </div>
+                {% else %}
+                    {% if conv.guest.profile_picture %}
+                        <img src="{{ conv.guest.profile_picture.url }}" class="avatar" style="width: 48px; height: 48px; border-radius: 14px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    {% else %}
+                        <div class="avatar initials-avatar" data-name="{{ conv.name }}">
+                            {{ conv.name|slice:":2"|upper }}
+                        </div>
+                    {% endif %}
                 {% endif %}
                 <div class="info">
-                    <div class="name">{{ conv.guest.name }}</div>
-                    <div class="last-msg">{{ conv.last_message.content|truncatechars:30 }}</div>
+                    <div class="name">{{ conv.name }}</div>
+                    <div class="last-msg">
+                        {% if conv.last_message %}{{ conv.last_message.content|truncatechars:30 }}{% else %}Belum ada pesan{% endif %}
+                    </div>
                 </div>
                 <div class="meta">
                     <div class="time">{{ conv.last_message.created_at|date:"H:i" }}</div>
@@ -308,16 +316,24 @@
         <div class="chat-header">
             <div class="active-user-info">
                 <a href="{% url 'tamu:admin_chat' %}" class="d-inline-block d-md-none me-3" style="color: #64748b; font-size: 1.25rem; text-decoration: none;"><i class="fas fa-arrow-left"></i></a>
-                {% if first_conv.guest.profile_picture %}
-                    <img src="{{ first_conv.guest.profile_picture.url }}" class="avatar" style="width: 40px; height: 40px; border-radius: 14px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                {% else %}
-                    <div class="avatar initials-avatar" data-name="{{ first_conv.guest.name }}" style="width:40px; height:40px; font-size:0.8rem;">
-                        {{ first_conv.guest.name|slice:":2"|upper }}
+                
+                {% if first_conv.participant_type == 'pegawai' %}
+                    <div class="avatar initials-avatar" data-name="{{ first_conv.name }}" style="width:40px; height:40px; font-size:0.8rem;">
+                        {{ first_conv.name|slice:":2"|upper }}
                     </div>
+                {% else %}
+                    {% if first_conv.guest.profile_picture %}
+                        <img src="{{ first_conv.guest.profile_picture.url }}" class="avatar" style="width: 40px; height: 40px; border-radius: 14px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    {% else %}
+                        <div class="avatar initials-avatar" data-name="{{ first_conv.name }}" style="width:40px; height:40px; font-size:0.8rem;">
+                            {{ first_conv.name|slice:":2"|upper }}
+                        </div>
+                    {% endif %}
                 {% endif %}
+
                 <div>
-                    <div class="name">{{ first_conv.guest.name }}</div>
-                    <div class="status">Online</div>
+                    <div class="name">{{ first_conv.name }}</div>
+                    <div class="status">{{ first_conv.subtitle }}</div>
                 </div>
             </div>
             <div class="header-actions">
@@ -402,9 +418,10 @@
 {% endblock %}
 
 {% block extra_js %}
-<script type="module">
-    let activeSession = "{% if conversations %}{{ conversations.0.guest.id }}{% endif %}";
-    let lastMsgId = "{% if conversations %}{% with last=conversations.0.messages.last %}{{ last.id }}{% endwith %}{% endif %}";
+<script src="{% static 'js/chat_client.js' %}"></script>
+<script>
+    let activeSession = "{% if conversations %}{{ conversations.0.session_id }}{% endif %}";
+    let lastMsgId = "{% if conversations %}{% with last=conversations.0.messages|last %}{{ last.id }}{% endwith %}{% endif %}";
     let chatSocket;
     let editingMessageId = null;
     
@@ -427,54 +444,38 @@
         const chatInput = document.getElementById('chatInput');
 
         if (activeSession) {
-            const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-            chatSocket = new WebSocket(
-                `${wsScheme}://${window.location.host}/ws/chat/${activeSession}/`
-            );
-
-            chatSocket.onmessage = function(e) {
-                const data = JSON.parse(e.data);
-                
-                if (data.action === 'error') {
-                    alert(data.message);
-                    return;
-                }
-                
-                if (data.action === 'edit') {
+            const sendBtn = chatForm ? chatForm.querySelector('.btn-send') : null;
+            chatSocket = new ChatClient({
+                sessionId: activeSession,
+                senderId: 'admin',
+                senderType: 'admin',
+                sendButton: sendBtn,
+                lastMessageId: lastMsgId,
+                historyApiUrl: '/api/chat/messages/',
+                onMessageReceived: (data, isLive = true) => {
+                    const type = data.sender_type === 'admin' ? 'sent' : 'received';
+                    if (type === 'received' && isLive) {
+                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                        audio.play().catch(e => console.log('Autoplay diblokir browser'));
+                    }
+                    addMessageToUI(data.message, type, data.created_at, data.message_type, data.file_url, data.message_id);
+                },
+                onMessageUpdated: (data) => {
                     const msgEl = document.querySelector(`.msg-group[data-id="${data.message_id}"]`);
                     if (msgEl) {
                         const bubble = msgEl.querySelector('.msg-bubble');
-                        bubble.innerText = data.message;
+                        if (data.action === 'edit') {
+                            bubble.innerText = data.message;
+                        } else if (data.action === 'delete') {
+                            bubble.innerHTML = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
+                            const btns = msgEl.querySelectorAll('.edit-msg-btn, .delete-msg-btn');
+                            btns.forEach(b => b.remove());
+                        }
                     }
-                    return;
-                }
-                
-                if (data.action === 'delete') {
-                    const msgEl = document.querySelector(`.msg-group[data-id="${data.message_id}"]`);
-                    if (msgEl) {
-                        const bubble = msgEl.querySelector('.msg-bubble');
-                        bubble.innerHTML = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
-                        // Sembunyikan tombol edit/hapus
-                        const btns = msgEl.querySelectorAll('.edit-msg-btn, .delete-msg-btn');
-                        btns.forEach(b => b.remove());
-                    }
-                    return;
-                }
-
-                const type = data.sender_type === 'admin' ? 'sent' : 'received';
-                
-                // Bunyi jika pesan masuk
-                if (type === 'received') {
-                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                    audio.play().catch(e => console.log('Autoplay diblokir browser'));
-                }
-                
-                addMessageToUI(data.message, type, data.created_at, data.message_type, data.file_url, data.message_id);
-            };
-
-            chatSocket.onclose = function(e) {
-                console.error('Chat socket closed unexpectedly');
-            };
+                },
+                onError: (err) => alert(err)
+            });
+            chatSocket.connect();
 
             if (chatForm) {
                 chatForm.onsubmit = (e) => {
@@ -576,6 +577,13 @@
         }
     })();
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     function addMessageToUI(content, type, time, messageType = 'text', fileUrl = null, messageId = null) {
         const msgArea = document.getElementById('messageArea');
         const msgGroup = document.createElement('div');
@@ -583,14 +591,15 @@
         if (messageId) msgGroup.setAttribute('data-id', messageId);
         msgGroup.setAttribute('data-created-at', new Date().toISOString()); // Untuk pesan baru
         
-        let bubbleContent = content;
+        let bubbleContent = escapeHtml(content);
         if (messageType === 'deleted') {
             bubbleContent = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
         } else if (messageType === 'image') {
-            bubbleContent = `<img src="${fileUrl}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">`;
+            bubbleContent = `<img src="${encodeURI(fileUrl || '')}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">`;
         } else if (messageType === 'file') {
-            const filename = fileUrl.split('/').pop();
-            bubbleContent = `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer" class="file-card">
+            const rawFilename = (fileUrl || '').split('/').pop();
+            const filename = escapeHtml(rawFilename);
+            bubbleContent = `<a href="${encodeURI(fileUrl || '')}" target="_blank" rel="noopener noreferrer" class="file-card">
                 <i class="fas fa-file-alt"></i>
                 <div class="file-info">
                     <span class="file-name">${filename}</span>
@@ -700,8 +709,8 @@
         }
     });
 
-    window.loadChat = function(guestId) {
-        location.href = `?guest=${guestId}`; 
+    window.loadChat = function(sessionId) {
+        location.href = `?session=${sessionId}`; 
     };
 
     const inputSearchUser = document.getElementById('inputSearchUser');

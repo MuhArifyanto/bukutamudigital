@@ -1,0 +1,382 @@
+{% extends "guest_book/pegawai_base.html" %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .greeting-section {
+        margin-bottom: 2rem;
+    }
+    .greeting-section h1 {
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: var(--sidebar-bg);
+        margin-bottom: 0.5rem;
+    }
+    .greeting-section h1 span {
+        color: var(--accent-hover);
+    }
+    .greeting-section p {
+        color: var(--text-secondary);
+        font-size: 1rem;
+    }
+
+    /* Stats Grid */
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2.5rem;
+    }
+    .stat-card {
+        background: #fff;
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        border: 1px solid rgba(15,76,53,0.08);
+        box-shadow: var(--shadow-sm);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+        transition: var(--transition);
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-md);
+    }
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0;
+        width: 4px; height: 100%;
+        background: var(--accent);
+    }
+    .stat-card.primary::before { background: var(--sidebar-bg); }
+    .stat-card.warning::before { background: #f59e0b; }
+    .stat-card.info::before { background: #3b82f6; }
+    
+    .stat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+    .stat-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .stat-icon {
+        width: 38px; height: 38px;
+        border-radius: var(--radius-sm);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem;
+    }
+    .stat-card.primary .stat-icon { background: rgba(15,76,53,0.1); color: var(--sidebar-bg); }
+    .stat-card.warning .stat-icon { background: rgba(245,158,11,0.1); color: #f59e0b; }
+    .stat-card.info .stat-icon { background: rgba(59,130,246,0.1); color: #3b82f6; }
+    .stat-card .stat-icon { background: rgba(16,185,129,0.1); color: #10b981; }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        line-height: 1;
+    }
+
+    /* Table Section */
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin-bottom: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .table-container {
+        background: #fff;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(15,76,53,0.08);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+    .table-custom {
+        width: 100%;
+        margin-bottom: 0;
+    }
+    .table-custom th {
+        background: rgba(240,253,244,0.5);
+        color: var(--sidebar-bg);
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgba(15,76,53,0.08);
+    }
+    .table-custom td {
+        padding: 1.25rem 1.5rem;
+        vertical-align: middle;
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        border-bottom: 1px solid rgba(15,76,53,0.04);
+    }
+    .table-custom tr:last-child td { border-bottom: none; }
+    .table-custom tr:hover td { background: rgba(240,253,244,0.3); }
+
+    .tamu-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .tamu-avatar {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        background: var(--page-bg);
+        color: var(--sidebar-bg);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 0.9rem;
+    }
+    .tamu-name { font-weight: 700; display: block; margin-bottom: 0.2rem; }
+    .tamu-instansi { font-size: 0.75rem; color: var(--text-secondary); }
+    
+    .purpose-text {
+        max-width: 250px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+    
+    .action-btn {
+        padding: 0.4rem 0.75rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: var(--transition);
+        border: 1px solid transparent;
+    }
+    .btn-view {
+        background: rgba(59,130,246,0.1);
+        color: #2563eb;
+    }
+    .btn-view:hover {
+        background: #3b82f6;
+        color: #fff;
+    }
+
+    .empty-state {
+        padding: 4rem 2rem;
+        text-align: center;
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: #d1d5db;
+        margin-bottom: 1rem;
+    }
+    .empty-state h4 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+    .empty-state p {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        margin-bottom: 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .greeting-section h1 { font-size: 1.6rem; }
+        .stats-container { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .stat-value { font-size: 2rem; }
+        .table-custom th, .table-custom td { padding: 0.875rem 1rem; }
+    }
+    @media (max-width: 576px) {
+        .greeting-section h1 { font-size: 1.35rem; }
+        .stats-container { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .stat-card { padding: 1rem; }
+        .stat-value { font-size: 1.75rem; }
+        .table-custom th, .table-custom td { padding: 0.75rem 0.875rem; font-size: 0.8rem; }
+        .purpose-text { max-width: 140px; }
+    }
+    @media (max-width: 400px) {
+        .stats-container { grid-template-columns: 1fr; }
+        .greeting-section h1 { font-size: 1.2rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="greeting-section">
+    <h1>Selamat datang, <span>{{ pegawai.name }}</span>!</h1>
+    <p>Pantau dan kelola jadwal kunjungan tamu Anda hari ini.</p>
+</div>
+
+<!-- Statistik -->
+<div class="stats-container">
+    <div class="stat-card primary">
+        <div class="stat-header">
+            <span class="stat-title">Total Kunjungan</span>
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+        </div>
+        <div class="stat-value">{{ stats.total|default:0 }}</div>
+    </div>
+    
+    <div class="stat-card warning">
+        <div class="stat-header">
+            <span class="stat-title">Menunggu Persetujuan</span>
+            <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        </div>
+        <div class="stat-value">{{ stats.pending|default:0 }}</div>
+    </div>
+
+    <div class="stat-card info">
+        <div class="stat-header">
+            <span class="stat-title">Kunjungan Berjalan</span>
+            <div class="stat-icon"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+        <div class="stat-value">{{ stats.in_progress|default:0 }}</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-title">Selesai / Hari Ini</span>
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+        </div>
+        <div class="stat-value">{{ stats.completed|default:0 }} <span style="font-size:1rem; color:var(--text-secondary); font-weight:500;">/ {{ stats.hari_ini|default:0 }}</span></div>
+    </div>
+</div>
+
+<!-- Kunjungan Terbaru -->
+<h2 class="section-title">
+    <i class="fas fa-list text-muted me-2"></i> Kunjungan Terbaru
+</h2>
+
+<div class="table-container">
+    {% if kunjungan_list %}
+    <div class="table-responsive">
+        <table class="table table-custom">
+            <thead>
+                <tr>
+                    <th>Tamu & Instansi</th>
+                    <th>Waktu Kunjungan</th>
+                    <th>Tujuan</th>
+                    <th>Status</th>
+                    <th class="text-end">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for k in kunjungan_list %}
+                <tr>
+                    <td>
+                        <div class="tamu-info">
+                            <div class="tamu-avatar">
+                                {{ k.tamu.name|make_list|first|upper }}
+                            </div>
+                            <div>
+                                <span class="tamu-name">{{ k.tamu.name }}</span>
+                                <span class="tamu-instansi">{{ k.tamu.instansi|default:"Personal" }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-weight:600;">{{ k.arrival_time|date:"d M Y" }}</div>
+                        <div style="font-size:0.75rem; color:var(--text-secondary);">{{ k.arrival_time|time:"H:i" }} WIB</div>
+                    </td>
+                    <td>
+                        <span class="purpose-text" title="{{ k.purpose }}">{{ k.purpose }}</span>
+                    </td>
+                    <td>
+                        {% if k.status == 'menunggu_admin' %}
+                            <span class="badge-status badge-pending"><i class="fas fa-clock"></i> Menunggu Admin</span>
+                        {% elif k.status == 'menunggu_pegawai' %}
+                            <span class="badge-status badge-pending"><i class="fas fa-user-clock"></i> Menunggu Respon Anda</span>
+                        {% elif k.status == 'disetujui_pegawai' %}
+                            <span class="badge-status badge-progress"><i class="fas fa-thumbs-up"></i> Disetujui (Menunggu Admin)</span>
+                        {% elif k.status == 'ditolak_pegawai' %}
+                            <span class="badge-status badge-cancelled"><i class="fas fa-thumbs-down"></i> Ditolak</span>
+                        {% elif k.status == 'disetujui' %}
+                            <span class="badge-status badge-completed"><i class="fas fa-check-double"></i> Disetujui (ACC)</span>
+                        {% elif k.status == 'in_progress' %}
+                            <span class="badge-status badge-progress"><i class="fas fa-spinner fa-spin"></i> Berjalan</span>
+                        {% elif k.status == 'completed' %}
+                            <span class="badge-status badge-completed"><i class="fas fa-check"></i> Selesai</span>
+                        {% elif k.status == 'cancelled' %}
+                            <span class="badge-status badge-cancelled"><i class="fas fa-times"></i> Batal</span>
+                        {% else %}
+                            <span class="badge-status badge-pending"><i class="fas fa-question"></i> {{ k.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="d-flex gap-2 justify-content-end">
+                            {% if k.status == 'menunggu_pegawai' %}
+                            <button onclick="updateStatus('{{ k.id }}', 'disetujui_pegawai')" class="action-btn btn-view" style="background: rgba(16,185,129,0.1); color: #10b981;" title="Setujui Kunjungan">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button onclick="updateStatus('{{ k.id }}', 'ditolak_pegawai')" class="action-btn btn-view" style="background: rgba(239,68,68,0.1); color: #ef4444;" title="Tolak Kunjungan">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            {% endif %}
+                            <a href="{% url 'tamu:pegawai_chat' %}?session=kunjungan_{{ k.id }}" class="action-btn btn-view" style="background: rgba(139,92,246,0.1); color: #8b5cf6;" title="Chat">
+                                <i class="fas fa-comments"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="far fa-folder-open"></i>
+        <h4>Belum ada kunjungan</h4>
+        <p>Anda belum memiliki jadwal kunjungan tamu saat ini.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function updateStatus(kunjunganId, status) {
+        if (!confirm('Apakah Anda yakin ingin memperbarui status kunjungan ini?')) return;
+        
+        fetch("{% url 'tamu:api_update_kunjungan_status' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                kunjungan_id: kunjunganId,
+                status: status
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Gagal memperbarui status: ' + (data.error || 'Terjadi kesalahan'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Gagal menghubungi server.');
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,560 @@
+{% extends 'guest_book/pegawai_base.html' %}
+{% load static custom_filters %}
+
+{% block title %}Detail Kunjungan - {{ kunjungan.tamu.name }}{% endblock %}
+
+{% block content %}
+<style>
+    /* Premium UI Styles */
+    .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+    }
+    .btn-back {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        font-weight: 600;
+        border-radius: 12px;
+        padding: 0.6rem 1.25rem;
+        transition: all 0.2s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .btn-back:hover {
+        background: #f8fafc;
+        color: #0f172a;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+    
+    .detail-card {
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.02), 0 8px 10px -6px rgba(0,0,0,0.02);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    .card-title-modern {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1.5rem 1.5rem 1rem;
+        border-bottom: 1px solid #f8fafc;
+    }
+    .card-title-modern i {
+        color: var(--accent, #10b981);
+        background: rgba(16, 185, 129, 0.1);
+        padding: 0.6rem;
+        border-radius: 10px;
+        font-size: 1rem;
+    }
+    .card-body-modern {
+        padding: 1.5rem;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .info-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .info-value {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    
+    /* Beautiful Timeline */
+    .timeline-container {
+        position: relative;
+        padding-left: 2rem;
+    }
+    .timeline-container::before {
+        content: '';
+        position: absolute;
+        left: 0.5rem;
+        top: 0.5rem;
+        bottom: 0.5rem;
+        width: 2px;
+        background: #e2e8f0;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    .timeline-item:last-child {
+        margin-bottom: 0;
+    }
+    .timeline-dot {
+        position: absolute;
+        left: -2rem;
+        top: 0.25rem;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px #e2e8f0;
+        background: #fff;
+        z-index: 1;
+    }
+    .timeline-dot.active {
+        background: var(--accent, #10b981);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    }
+    .timeline-content {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 1rem;
+        border: 1px solid #f1f5f9;
+    }
+    .timeline-title {
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.9rem;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.25rem;
+    }
+    .timeline-time {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+    .timeline-meta {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin-top: 0.25rem;
+    }
+    .timeline-notes {
+        margin-top: 0.5rem;
+        padding: 0.75rem;
+        background: #fff;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        color: #475569;
+        font-style: italic;
+        border-left: 3px solid #cbd5e1;
+    }
+
+    /* Badges */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.85rem;
+        border-radius: 99px;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+    .badge-menunggu { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+    .badge-disetujui { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-ditolak { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .badge-inprogress { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    
+    /* Action Form */
+    .action-radio-group {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+    .action-radio-group .form-check {
+        padding: 0;
+        margin: 0;
+    }
+    .action-radio-group .form-check-input {
+        display: none;
+    }
+    .action-radio-group .form-check-label {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background: #f8fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .action-radio-group .form-check-input:checked + .form-check-label {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        color: #1d4ed8;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    }
+    
+    .form-control, .form-select {
+        border-radius: 12px;
+        border: 1px solid #cbd5e1;
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Chat Callout */
+    .chat-callout {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        color: #fff;
+        text-align: center;
+        box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
+    }
+    .chat-callout h5 {
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+    .chat-callout p {
+        color: rgba(255,255,255,0.8);
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+    }
+    .chat-callout .btn-chat {
+        background: #fff;
+        color: #059669;
+        font-weight: 700;
+        border-radius: 12px;
+        padding: 0.75rem 1.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s;
+        text-decoration: none;
+    }
+    .chat-callout .btn-chat:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    }
+</style>
+
+<div class="container-fluid py-2">
+    <div class="page-header">
+        <a href="{% url 'tamu:pegawai_dashboard' %}" class="btn-back text-decoration-none">
+            <i class="fas fa-arrow-left me-2"></i> Kembali ke Dashboard
+        </a>
+    </div>
+    
+    <div class="row g-4">
+        <!-- Left Column: Details -->
+        <div class="col-lg-8">
+            <!-- Guest Info -->
+            <div class="detail-card">
+                <div class="card-title-modern">
+                    <i class="fas fa-user-circle"></i> Informasi Tamu
+                </div>
+                <div class="card-body-modern">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Nama Lengkap</span>
+                            <span class="info-value">{{ kunjungan.tamu.name }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Instansi / Asal</span>
+                            <span class="info-value">{{ kunjungan.tamu.instansi|default:"Pribadi" }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Telepon / WhatsApp</span>
+                            <span class="info-value">{{ kunjungan.tamu.phone }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Email</span>
+                            <span class="info-value">{{ kunjungan.tamu.email|default:"-" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Visit Info -->
+            <div class="detail-card">
+                <div class="card-title-modern">
+                    <i class="fas fa-calendar-alt" style="color: #3b82f6; background: rgba(59, 130, 246, 0.1);"></i> Detail Kunjungan
+                </div>
+                <div class="card-body-modern">
+                    <div class="info-grid mb-4">
+                        <div class="info-item">
+                            <span class="info-label">Waktu Kedatangan</span>
+                            <span class="info-value">{{ kunjungan.arrival_time|date:"d F Y, H:i" }} WIB</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Status Saat Ini</span>
+                            <div>
+                                {% if kunjungan.status == 'menunggu_pegawai' %}
+                                    <span class="status-badge badge-menunggu"><i class="fas fa-clock"></i> Menunggu Respons Anda</span>
+                                {% elif kunjungan.status == 'disetujui_pegawai' or kunjungan.status == 'disetujui' %}
+                                    <span class="status-badge badge-disetujui"><i class="fas fa-check-circle"></i> Disetujui</span>
+                                {% elif kunjungan.status == 'ditolak_pegawai' or kunjungan.status == 'cancelled' %}
+                                    <span class="status-badge badge-ditolak"><i class="fas fa-times-circle"></i> Dibatalkan / Ditolak</span>
+                                {% elif kunjungan.status == 'in_progress' %}
+                                    <span class="status-badge badge-inprogress"><i class="fas fa-sync fa-spin"></i> Pertemuan Berlangsung</span>
+                                {% elif kunjungan.status == 'completed' %}
+                                    <span class="status-badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;"><i class="fas fa-flag-checkered"></i> Selesai</span>
+                                {% else %}
+                                    <span class="status-badge bg-secondary text-white">{{ kunjungan.get_status_display }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="info-item mb-3">
+                        <span class="info-label">Tujuan / Keperluan</span>
+                        <div class="info-value" style="background: #f8fafc; padding: 1rem; border-radius: 12px; margin-top: 0.5rem; border: 1px solid #e2e8f0; line-height: 1.5;">
+                            {{ kunjungan.purpose }}
+                        </div>
+                    </div>
+                    
+                    {% if kunjungan.notes %}
+                    <div class="info-item">
+                        <span class="info-label">Catatan Tamu</span>
+                        <div class="info-value" style="background: #fffbeb; padding: 1rem; border-radius: 12px; margin-top: 0.5rem; border: 1px solid #fde68a; color: #92400e;">
+                            <i class="fas fa-quote-left opacity-50 me-2"></i> {{ kunjungan.notes }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Approval Form -->
+            {% if can_respond and form %}
+            <div class="detail-card" style="border: 1px solid #fde68a;">
+                <div class="card-title-modern" style="border-bottom-color: #fef3c7;">
+                    <i class="fas fa-clipboard-check" style="color: #d97706; background: #fef3c7;"></i> Berikan Keputusan
+                </div>
+                <div class="card-body-modern">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="info-label mb-2 d-block">Aksi yang Anda ambil:</label>
+                            <div class="action-radio-group">
+                                {% for radio in form.action %}
+                                    <div class="form-check">
+                                        {{ radio.tag }}
+                                        <label class="form-check-label" for="{{ radio.id_for_label }}">
+                                            {% if radio.choice_label == 'Setujui' %}
+                                                <i class="fas fa-check-circle text-success me-1"></i> {{ radio.choice_label }}
+                                            {% elif radio.choice_label == 'Tolak' %}
+                                                <i class="fas fa-times-circle text-danger me-1"></i> {{ radio.choice_label }}
+                                            {% else %}
+                                                <i class="fas fa-calendar-alt text-warning me-1"></i> {{ radio.choice_label }}
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% if form.action.errors %}
+                                <div class="text-danger small mt-1">{{ form.action.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4" id="rejectionReasonDiv" style="display: none;">
+                            <label class="info-label mb-2 d-block">Alasan (Wajib jika menolak/reschedule):</label>
+                            {{ form.rejection_reason }}
+                            {% if form.rejection_reason.errors %}
+                                <div class="text-danger small mt-1">{{ form.rejection_reason.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-4" id="rescheduleTimeDiv" style="display: none;">
+                            <label class="info-label mb-2 d-block">Usulan Waktu Baru:</label>
+                            {{ form.reschedule_time }}
+                            {% if form.reschedule_time.errors %}
+                                <div class="text-danger small mt-1">{{ form.reschedule_time.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="info-label mb-2 d-block">Pesan Tambahan (Opsional):</label>
+                            {{ form.notes }}
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary flex-grow-1 py-3" style="border-radius: 12px; font-weight: 700; font-size: 1rem;">
+                                <i class="fas fa-paper-plane me-2"></i> Kirim Keputusan
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary py-3 px-3" data-bs-toggle="modal" data-bs-target="#delegateModal" style="border-radius: 12px; font-weight: 700; font-size: 1rem;">
+                                <i class="fas fa-exchange-alt"></i> Delegasikan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Modal Delegasi -->
+            <div class="modal fade" id="delegateModal" tabindex="-1" aria-labelledby="delegateModalLabel" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content" style="border-radius: 16px; border:none;">
+                  <div class="modal-header" style="border-bottom: 1px solid #f1f5f9;">
+                    <h5 class="modal-title fw-bold" id="delegateModalLabel"><i class="fas fa-exchange-alt text-primary me-2"></i> Delegasikan Kunjungan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <form method="post">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                      <p class="text-muted small mb-3">Pilih rekan kerja di departemen Anda untuk menangani kunjungan tamu ini.</p>
+                      <div class="mb-3">
+                        <label class="form-label fw-bold">Pilih Rekan Kerja</label>
+                        <select name="delegate_to" class="form-select" required style="border-radius:10px;">
+                            <option value="">-- Pilih Rekan --</option>
+                            {% for rekan in rekan_kerja %}
+                                <option value="{{ rekan.id }}">{{ rekan.name }}</option>
+                            {% empty %}
+                                <option value="" disabled>Tidak ada rekan kerja (aktif) di departemen ini.</option>
+                            {% endfor %}
+                        </select>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label fw-bold">Alasan Pendelegasian</label>
+                        <textarea name="delegate_reason" class="form-control" rows="3" required placeholder="Contoh: Saya sedang rapat di luar..." style="border-radius:10px;"></textarea>
+                      </div>
+                    </div>
+                    <div class="modal-footer" style="border-top: 1px solid #f1f5f9;">
+                      <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius:10px; font-weight:600;">Batal</button>
+                      <button type="submit" class="btn btn-primary" style="border-radius:10px; font-weight:600;"><i class="fas fa-check"></i> Ya, Delegasikan</button>
+                    </div>
+                  </form>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Report Form -->
+            {% if kunjungan.status == 'in_progress' or kunjungan.status == 'completed' %}
+            <div class="detail-card" style="border: 1px solid #bfdbfe;">
+                <div class="card-title-modern" style="border-bottom-color: #eff6ff;">
+                    <i class="fas fa-file-alt" style="color: #2563eb; background: #dbeafe;"></i> Laporan Hasil Pertemuan
+                </div>
+                <div class="card-body-modern">
+                    {% if reports %}
+                        <div class="mb-4">
+                            <span class="info-label d-block mb-3">Riwayat Laporan:</span>
+                            {% for report in reports %}
+                                <div class="p-3 mb-3" style="background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span style="font-weight: 700; font-size: 0.85rem; color: #0f172a;"><i class="fas fa-user-edit me-1 text-primary"></i> Anda</span>
+                                        <span style="font-size: 0.75rem; color: #64748b;"><i class="far fa-clock me-1"></i> {{ report.created_at|date:"d M Y, H:i" }}</span>
+                                    </div>
+                                    <p class="mb-0 text-secondary" style="white-space: pre-line; font-size: 0.95rem; line-height: 1.6;">{{ report.content }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center p-4 mb-4" style="background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;">
+                            <i class="fas fa-folder-open text-muted mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
+                            <p class="text-muted mb-0 font-weight-medium">Belum ada catatan laporan pertemuan.</p>
+                        </div>
+                    {% endif %}
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="info-label mb-2 d-block">Tambah Catatan Laporan Baru:</label>
+                            {{ report_form.content }}
+                            {% if report_form.content.errors %}
+                                <div class="text-danger small mt-1">{{ report_form.content.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <button type="submit" name="submit_report" class="btn btn-outline-primary" style="border-radius: 10px; font-weight: 600;">
+                            <i class="fas fa-save me-1"></i> Simpan Laporan
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Right Column: Timeline & Chat -->
+        <div class="col-lg-4">
+            
+            <div class="detail-card">
+                <div class="card-title-modern">
+                    <i class="fas fa-history" style="color: #64748b; background: #f1f5f9;"></i> Timeline Status
+                </div>
+                <div class="card-body-modern" style="padding-top: 1rem;">
+                    <div class="timeline-container">
+                        {% for history in status_history %}
+                        <div class="timeline-item">
+                            <div class="timeline-dot {% if forloop.first %}active{% endif %}"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">
+                                    {{ history.new_status|capfirst|replace:"_| " }}
+                                    <span class="timeline-time">{{ history.changed_at|date:"H:i" }}</span>
+                                </div>
+                                <div class="timeline-meta">
+                                    {{ history.changed_at|date:"d M Y" }} &bull; Oleh: {{ history.changed_by_type|capfirst }}
+                                </div>
+                                {% if history.notes %}
+                                <div class="timeline-notes">
+                                    {{ history.notes }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted font-italic mb-0 text-center py-4">Belum ada pergerakan status</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            {% if chat_available %}
+            <div class="chat-callout mt-4">
+                <h5><i class="fas fa-comments fa-lg mb-3"></i><br>Chat Tersedia</h5>
+                <p>Kunjungan telah disetujui. Anda dapat bertukar pesan dan file secara langsung dengan Tamu.</p>
+                <a href="{% url 'tamu:pegawai_chat' %}?session=kunjungan_{{ kunjungan.id }}" class="btn-chat">
+                    Buka Chat Sekarang <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            {% endif %}
+            
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Style form controls dynamically if they don't have classes
+    document.querySelectorAll('textarea, input[type="text"], input[type="datetime-local"]').forEach(el => {
+        if(!el.classList.contains('form-control')) el.classList.add('form-control');
+    });
+
+    // Show/hide rejection reason based on action
+    document.querySelectorAll('input[name="action"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            const rejectionDiv = document.getElementById('rejectionReasonDiv');
+            const rescheduleDiv = document.getElementById('rescheduleTimeDiv');
+            
+            if (this.value === 'reject') {
+                rejectionDiv.style.display = 'block';
+                rescheduleDiv.style.display = 'none';
+            } else if (this.value === 'reschedule') {
+                rejectionDiv.style.display = 'block';
+                rescheduleDiv.style.display = 'block';
+            } else {
+                rejectionDiv.style.display = 'none';
+                rescheduleDiv.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock %}

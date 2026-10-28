@@ -295,8 +295,8 @@
 
         @media (max-width: 991px) {
             .login-card { flex-direction: column; max-width: 500px; }
-            .login-info, .login-form-area { width: 100%; padding: 3rem 2rem; }
-            .login-info { min-height: 300px; }
+            .login-info { display: none; }
+            .login-form-area { width: 100%; padding: 3rem 2rem; }
         }
     </style>
 </head>
@@ -368,11 +368,11 @@
             <form id="loginForm" method="post" action="{% url 'tamu:login' %}">
                 {% csrf_token %}
                 
-                <label class="form-label" for="id_username">Nama Lengkap / Email</label>
+                <label class="form-label" for="id_username">Email / NIK</label>
                 <div class="input-group-custom">
                     <i class="far fa-user input-icon"></i>
                     <input type="text" id="id_username" name="username" class="form-control-custom" 
-                           placeholder="Masukkan nama atau email" required>
+                           placeholder="Masukkan email atau NIK 16 digit" required>
                 </div>
 
                 <label class="form-label" for="id_password">Password</label>
@@ -460,7 +460,7 @@
 </script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAsJCzp8DUY5PyQ4u7MgO2hppYQ8o4UjlU",
@@ -482,7 +482,7 @@
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const usernameInput = document.getElementById('id_username').value.trim();
+            const identifierInput = document.getElementById('id_username').value.trim();
             const passwordInput = document.getElementById('id_password').value;
             
             const submitBtn = document.querySelector('.btn-continue');
@@ -490,72 +490,34 @@
             submitBtn.disabled = true;
             submitBtn.innerText = 'Memproses Masuk...';
             
-            // 1. Resolve username to email if it's name/NIK
-            fetch(`{% url "tamu:api_resolve_email" %}?username=${encodeURIComponent(usernameInput)}`)
-                .then(res => res.json())
-                .then(resData => {
-                    if (!resData.success) {
-                        alert(resData.message);
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = originalBtnText;
-                        return;
-                    }
-                    
-                    const resolvedEmail = resData.email;
-                    
-                    // 2. Sign in with resolved email & password via Firebase
-                    signInWithEmailAndPassword(auth, resolvedEmail, passwordInput)
-                        .then((userCredential) => {
-                            const user = userCredential.user;
-                            
-                            // 3. Get ID Token
-                            user.getIdToken().then(idToken => {
-                                // 4. Send ID Token to Django to authenticate session
-                                fetch("{% url 'tamu:api_firebase_login' %}", {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-CSRFToken': '{{ csrf_token }}'
-                                    },
-                                    body: JSON.stringify({ id_token: idToken })
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        window.location.href = data.redirect_url;
-                                    } else {
-                                        alert(data.message || 'Login gagal.');
-                                        submitBtn.disabled = false;
-                                        submitBtn.innerHTML = originalBtnText;
-                                    }
-                                })
-                                .catch(error => {
-                                    console.error('Error:', error);
-                                    alert('Terjadi kesalahan saat menghubungi server.');
-                                    submitBtn.disabled = false;
-                                    submitBtn.innerHTML = originalBtnText;
-                                });
-                            });
-                        })
-                        .catch((firebaseError) => {
-                            console.error('Firebase Login Error:', firebaseError);
-                            let errMsg = firebaseError.message;
-                            if (firebaseError.code === 'auth/invalid-credential' || firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/user-not-found') {
-                                errMsg = 'Email atau password salah.';
-                            } else if (firebaseError.code === 'auth/invalid-email') {
-                                errMsg = 'Format email tidak valid.';
-                            }
-                            alert('Gagal masuk: ' + errMsg);
-                            submitBtn.disabled = false;
-                            submitBtn.innerHTML = originalBtnText;
-                        });
-                })
-                .catch(err => {
-                    console.error('Error resolving email:', err);
-                    alert('Terjadi kesalahan saat mencari akun.');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalBtnText;
-                });
+            const resetBtn = () => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            };
+
+            // Autentikasi sepenuhnya di server: email tidak pernah dikirim ke browser.
+            fetch("{% url 'tamu:api_tamu_login' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ identifier: identifierInput, password: passwordInput })
+            })
+            .then(res => res.json().catch(() => ({ success: false })))
+            .then(data => {
+                if (data.success && data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert(data.message || 'Email/NIK atau password salah.');
+                    resetBtn();
+                }
+            })
+            .catch(() => {
+                alert('Terjadi kesalahan saat menghubungi server.');
+                resetBtn();
+            });
         });
     }
 

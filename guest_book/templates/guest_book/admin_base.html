@@ -61,6 +61,7 @@
             top: 0; left: 0;
             width: var(--sidebar-w);
             height: 100vh;
+            height: 100dvh;
             background: var(--sidebar-bg);
             display: flex;
             flex-direction: column;
@@ -86,8 +87,9 @@
             display: flex;
             align-items: center;
             gap: 0.9rem;
-            padding: 1.6rem 1.5rem 1.2rem;
+            padding: 1.4rem 1.5rem 1rem;
             border-bottom: 1px solid var(--sidebar-border);
+            flex-shrink: 0;
         }
         .brand-logo {
             width: 44px; height: 44px;
@@ -116,27 +118,35 @@
             color: rgba(255,255,255,0.3);
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            padding: 1.4rem 1.5rem 0.4rem;
+            padding: 1rem 1.5rem 0.35rem;
+            flex-shrink: 0;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.2) transparent;
+        }
+        .sidebar-nav::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 10px;
         }
 
         .nav-menu { 
             list-style: none; 
-            padding: 0 0.75rem; 
-            flex: 1; 
-            overflow-y: auto;
-            /* Custom Scrollbar for nav-menu */
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255,255,255,0.2) transparent;
-        }
-        .nav-menu::-webkit-scrollbar {
-            width: 4px;
-        }
-        .nav-menu::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .nav-menu::-webkit-scrollbar-thumb {
-            background-color: rgba(255,255,255,0.2);
-            border-radius: 10px;
+            padding: 0 0.75rem 1rem; 
+            margin: 0;
         }
         
         .nav-menu li { margin-bottom: 2px; }
@@ -196,12 +206,13 @@
         /* ── Sidebar Footer ── */
         .sidebar-footer {
             margin-top: auto;
-            padding: 1rem 1rem 1rem;
+            padding: 0.85rem 1rem;
             border-top: 1px solid var(--sidebar-border);
             display: flex;
             align-items: center;
             gap: 0.7rem;
             background: rgba(0,0,0,0.15);
+            flex-shrink: 0;
         }
         .admin-avatar-sidebar {
             width: 40px; height: 40px;
@@ -393,11 +404,67 @@
             .page-content { padding: 1.5rem; }
         }
 
+        @media (max-width: 768px) {
+            .search-box { width: 160px; }
+            .admin-chip span { display: none; }
+        }
+
         @media (max-width: 576px) {
+            /* Sembunyikan search box tapi tampilkan tombol search icon */
             .search-box { display: none; }
+            .search-toggle-btn { display: flex !important; }
+            /* Search overlay untuk mobile */
+            .search-overlay {
+                display: none;
+                position: fixed;
+                top: 0; left: 0; right: 0;
+                z-index: 200;
+                background: #fff;
+                padding: 1rem;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                gap: 0.75rem;
+                align-items: center;
+            }
+            .search-overlay.show { display: flex; }
+            .search-overlay input {
+                flex: 1; border: none; outline: none;
+                font-size: 0.95rem; font-family: inherit;
+                color: var(--text-primary);
+            }
+            .search-overlay .close-search {
+                background: none; border: none;
+                color: var(--text-secondary); cursor: pointer;
+                padding: 0.25rem; font-size: 1.1rem;
+            }
             .top-bar { padding: 0 1rem; }
             .admin-chip span { display: none; }
-            .page-content { padding: 1rem; }
+            .page-content { padding: 0.875rem; }
+        }
+
+        /* Search toggle button — hidden by default, shown on mobile */
+        .search-toggle-btn {
+            display: none;
+            width: 40px; height: 40px;
+            background: var(--card-bg);
+            border: 1px solid rgba(15,23,42,0.06);
+            border-radius: var(--radius-sm);
+            align-items: center; justify-content: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+        }
+        .search-toggle-btn:hover { background: var(--accent); color: #fff; }
+
+        /* Messages wrapper — responsive padding */
+        .messages-admin-wrap {
+            padding: 1rem 2.5rem 0;
+        }
+        @media (max-width: 1024px) {
+            .messages-admin-wrap { padding: 1rem 1.5rem 0; }
+        }
+        @media (max-width: 576px) {
+            .messages-admin-wrap { padding: 0.75rem 0.875rem 0; }
         }
 
         /* ══════════════════════════════════════════
@@ -443,6 +510,19 @@
 </head>
 <body>
 
+    <!-- SEARCH OVERLAY (mobile) -->
+    <div class="search-overlay" id="searchOverlay">
+        <i class="fas fa-search" style="color: var(--text-secondary);"></i>
+        <form action="{% url 'tamu:admin_kunjungan_list' %}" method="GET" style="flex:1; display:flex;">
+            <input type="text" name="q" placeholder="Cari nama, tujuan, atau instansi..."
+                   value="{{ request.GET.q|default:'' }}" autofocus
+                   style="flex:1; border:none; outline:none; font-size:0.95rem; font-family:inherit; color:#0f172a;">
+        </form>
+        <button class="close-search" id="closeSearchBtn" aria-label="Tutup pencarian">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
     <!-- SIDEBAR OVERLAY (mobile) -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -463,7 +543,7 @@
         <p class="nav-section-label">Menu Utama</p>
 
         <!-- Navigation -->
-        <nav>
+        <nav class="sidebar-nav">
             <ul class="nav-menu">
                 <li>
                     <a href="{% url 'tamu:admin_dashboard' %}"
@@ -510,12 +590,28 @@
                 </li>
                 
                 <li>
+                    <a href="{% url 'tamu:admin_instansi' %}"
+                       class="nav-link-custom {% if active_page == 'instansi' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-building"></i></span>
+                        Profil Instansi
+                    </a>
+                </li>
+                
+                <li>
                     <a href="{% url 'tamu:admin_pengguna' %}"
                        class="nav-link-custom {% if active_page == 'pengguna' %}active{% endif %}">
                         <span class="nav-icon"><i class="fas fa-users-cog"></i></span>
                         Kelola Pengguna
                     </a>
                 </li>
+                <li>
+                    <a href="{% url 'tamu:admin_pegawai' %}"
+                       class="nav-link-custom {% if active_page == 'pegawai' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-id-badge"></i></span>
+                        Kelola Pegawai
+                    </a>
+                </li>
+
                 <li>
                     <a href="{% url 'tamu:admin_audit_log' %}"
                        class="nav-link-custom {% if active_page == 'audit_log' %}active{% endif %}">
@@ -565,6 +661,11 @@
                        value="{{ request.GET.q|default:'' }}">
             </form>
 
+            <!-- Mobile Search Toggle (only visible on small screens) -->
+            <button class="search-toggle-btn" id="searchToggleBtn" aria-label="Buka pencarian">
+                <i class="fas fa-search"></i>
+            </button>
+
             <!-- Actions -->
             <div class="top-actions">
                 <!-- Notification Bell -->
@@ -601,7 +702,7 @@
 
         <!-- Django Messages -->
         {% if messages %}
-        <div style="padding: 1rem 2.5rem 0;">
+        <div class="messages-admin-wrap">
             {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
                 {% if message.tags == 'success' %}
@@ -628,8 +729,24 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
+        /* ── Search Toggle (mobile) ── */
+        const searchToggleBtn = document.getElementById('searchToggleBtn');
+        const searchOverlay = document.getElementById('searchOverlay');
+        const closeSearchBtn = document.getElementById('closeSearchBtn');
+
+        if (searchToggleBtn && searchOverlay) {
+            searchToggleBtn.addEventListener('click', () => {
+                searchOverlay.classList.add('show');
+                searchOverlay.querySelector('input')?.focus();
+            });
+        }
+        if (closeSearchBtn && searchOverlay) {
+            closeSearchBtn.addEventListener('click', () => {
+                searchOverlay.classList.remove('show');
+            });
+        }
+
         /* ── Sidebar Toggle ── */
         const sidebar        = document.getElementById('sidebar');
         const sidebarToggle  = document.getElementById('sidebarToggle');
@@ -666,7 +783,7 @@
                 const h = Math.abs(hash) % 360;
             });
         }
-        document.addEventListener('DOMContentLoaded', () => {
+        function initAdminApp() {
             initAvatars();
             
             // Dropdown Notifikasi
@@ -763,21 +880,29 @@
                     }
                 });
             }
-        });
+        } // End of initAdminApp
+
+        document.addEventListener('DOMContentLoaded', initAdminApp);
 
         /* ── Real-time Notification WebSocket ── */
-        const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-        const notificationSocket = new WebSocket(
-            `${wsScheme}://${window.location.host}/ws/notifications/`
-        );
+        // Pastikan hanya membuat 1 socket
+        if (!window.notificationSocket) {
+            const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+            window.notificationSocket = new WebSocket(
+                `${wsScheme}://${window.location.host}/ws/notifications/`
+            );
 
-        notificationSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            console.log("Notifikasi Baru:", data);
+        window.notificationSocket.onmessage = function(e) {
+            try {
+                const data = JSON.parse(e.data);
+                if (data.action === 'pong' || data.type === 'pong' || (!data.message && !data.title)) {
+                    return;
+                }
+                console.log("Notifikasi Baru:", data);
 
-            // 1. Mainkan bunyi
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.play().catch(err => console.log('Autoplay diblokir browser:', err));
+                // 1. Mainkan bunyi
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                audio.play().catch(err => console.log('Autoplay diblokir browser:', err));
 
             // 2. Update Konten Toast
             document.getElementById('toastTitle').innerText = data.title || "Notifikasi Baru";
@@ -824,14 +949,18 @@
             } else if (badge) {
                 badge.remove();
             }
+        } catch (err) {
+            console.warn('Error handling notification:', err);
+        }
         };
 
-        notificationSocket.onclose = function(e) {
+        window.notificationSocket.onclose = function(e) {
             console.error('Koneksi notifikasi real-time terputus.');
         };
+        } // end if (!window.notificationSocket)
         
         // Handler untuk klik pada toast
-        document.addEventListener('DOMContentLoaded', () => {
+        function initToastClick() {
             const toastEl = document.getElementById('liveToast');
             if (toastEl) {
                 toastEl.addEventListener('click', function(e) {
@@ -844,7 +973,8 @@
                     }
                 });
             }
-        });
+        }
+        document.addEventListener('DOMContentLoaded', initToastClick);
     </script>
 
     <!-- Toast Container untuk Pop-up Notifikasi -->

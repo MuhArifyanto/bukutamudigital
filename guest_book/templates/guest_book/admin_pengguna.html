@@ -64,6 +64,18 @@
     .btn-suspend:hover { background: #fca5a5; }
     .btn-activate { background: #dcfce7; color: #15803d; }
     .btn-activate:hover { background: #86efac; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .table-prem th, .table-prem td { padding: 1rem; }
+        .filter-card { padding: 1.25rem; }
+    }
+    @media (max-width: 576px) {
+        .table-prem th, .table-prem td { padding: 0.875rem 0.875rem; font-size: 0.82rem; }
+        .action-btn { padding: 0.4rem 0.75rem; font-size: 0.78rem; }
+        .filter-card { padding: 1rem; border-radius: 16px; }
+        .top-search-bar { padding: 0.65rem 1rem; }
+    }
 </style>
 {% endblock %}
 
@@ -145,6 +157,45 @@
             {% endfor %}
         </tbody>
     </table>
+    <!-- ── Pagination ── -->
+    {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; background: #fafbff; border-top: 1px solid #f1f5f9; border-radius: 0 0 24px 24px; flex-wrap: wrap; gap: 1rem;">
+        <span style="font-size: 0.85rem; color: #64748b; font-weight: 600;">
+            Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }} (Total {{ page_obj.paginator.count }} pengguna)
+        </span>
+        <nav aria-label="Page navigation">
+            <ul class="pagination pagination-sm m-0" style="gap: 4px;">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" style="border-radius: 8px; color: #0284c7;">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for i in page_obj.paginator.page_range %}
+                    {% if page_obj.number == i %}
+                        <li class="page-item active">
+                            <span class="page-link" style="background-color: #0284c7; border-color: #0284c7; border-radius: 8px; font-weight: 700;">{{ i }}</span>
+                        </li>
+                    {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ i }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" style="color: #475569; border-radius: 8px;">{{ i }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" style="border-radius: 8px; color: #0284c7;">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

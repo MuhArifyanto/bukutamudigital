@@ -39,16 +39,16 @@ class TamuAdmin(admin.ModelAdmin):
 
 @admin.register(Pegawai)
 class PegawaiAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'department_rel', 'account_status', 'created_at')
-    list_filter = ('account_status', 'department_rel', 'created_at')
-    search_fields = ('name', 'email', 'department_rel__nama')
+    list_display = ('name', 'email', 'department_rel', 'role', 'account_status', 'created_at')
+    list_filter = ('account_status', 'role', 'department_rel', 'created_at')
+    search_fields = ('name', 'email', 'nip', 'jabatan', 'department_rel__nama')
     readonly_fields = ('id', 'created_at', 'last_login')
     fieldsets = (
         ('Personal Information', {
-            'fields': ('id', 'name', 'email', 'phone', 'department_rel')
+            'fields': ('id', 'name', 'email', 'phone', 'nip', 'jabatan', 'department_rel')
         }),
         ('Account', {
-            'fields': ('password', 'account_status')
+            'fields': ('password', 'role', 'account_status')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'last_login'),

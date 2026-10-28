@@ -1,42 +1,43 @@
 #!/usr/bin/env bash
 set -e
 
-echo "==> Running collectstatic..."
-python manage.py collectstatic --noinput || true
-
-echo "==> Running database migrations..."
+echo "==> Running migrations..."
 python manage.py migrate --noinput
 
-echo "==> Ensuring default admin superuser exists..."
-python manage.py shell -c "
+echo "==> Ensuring cache table exists..."
+python manage.py createcachetable
+
+echo "==> Collecting static files..."
+python manage.py collectstatic --noinput
+
+if [ -n "$ADMIN_INITIAL_PASSWORD" ]; then
+  echo "==> Ensuring initial admin exists..."
+  python manage.py shell -c "
+import os
 from django.contrib.auth.models import User
 from guest_book.models import Tamu
 
-# 1. Create Django auth superuser (admin / admin123)
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@diskominfosantik.bekasikab.go.id', 'admin123')
-    print('CREATED: Superuser admin (password: admin123)')
-else:
-    u = User.objects.get(username='admin')
-    u.set_password('admin123')
-    u.is_staff = True
-    u.is_superuser = True
-    u.save()
-    print('UPDATED: Superuser admin password set to admin123')
+pw = os.environ['ADMIN_INITIAL_PASSWORD']
+email = os.environ.get('ADMIN_EMAIL', 'admin@diskominfosantik.bekasikab.go.id')
 
-# 2. Create Tamu admin profile if missing
-if not Tamu.objects.filter(nik='admin').exists() and not Tamu.objects.filter(is_admin=True).exists():
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', email, pw)
+    print('CREATED: superuser admin')
+else:
+    print('SKIPPED: superuser admin sudah ada, password tidak diubah')
+
+if not Tamu.objects.filter(is_admin=True).exists():
     Tamu.objects.create(
-        name='Super Admin',
-        email='admin@diskominfosantik.bekasikab.go.id',
-        phone='081234567890',
-        nik='admin',
-        is_admin=True,
-        admin_role='super_admin',
+        name='Administrator', email=email, phone='081234567890',
+        nik='admin', is_admin=True, admin_role='operator',
         account_status='active'
     )
     print('CREATED: Tamu admin record')
+
 "
+else
+  echo "==> ADMIN_INITIAL_PASSWORD tidak diset, pembuatan admin dilewati"
+fi
 
 echo "==> Starting Daphne server..."
 exec daphne -b 0.0.0.0 -p ${PORT:-8000} bukudigital.asgi:application
