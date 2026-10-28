@@ -3,6 +3,60 @@
 from django.db import migrations, models
 
 
+def safe_apply_0015_db(apps, schema_editor):
+    connection = schema_editor.connection
+    Pegawai = apps.get_model('guest_book', 'Pegawai')
+    from django.db.models import Index
+
+    if connection.vendor == 'mysql':
+        with connection.cursor() as cursor:
+            # 1. Handle role index safely
+            cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name = 'pegawai_role_idx'")
+            has_old = bool(cursor.fetchall())
+            cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name = 'pegawai_role_b2a92e_idx'")
+            has_new = bool(cursor.fetchall())
+            if has_old and not has_new:
+                cursor.execute("ALTER TABLE pegawai RENAME INDEX pegawai_role_idx TO pegawai_role_b2a92e_idx")
+            elif not has_old and not has_new:
+                cursor.execute("SHOW INDEX FROM pegawai WHERE Column_name = 'role'")
+                if not cursor.fetchall():
+                    cursor.execute("CREATE INDEX pegawai_role_b2a92e_idx ON pegawai (role)")
+
+            # 2. Add username column if not exists
+            cursor.execute("SHOW COLUMNS FROM pegawai LIKE 'username'")
+            if not cursor.fetchall():
+                cursor.execute("ALTER TABLE pegawai ADD COLUMN username VARCHAR(50) NULL UNIQUE")
+
+            # 3. Add username index if not exists
+            cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name = 'pegawai_usernam_227342_idx'")
+            if not cursor.fetchall():
+                try:
+                    cursor.execute("CREATE INDEX pegawai_usernam_227342_idx ON pegawai (username)")
+                except Exception:
+                    pass
+    else:
+        # SQLite / other backends for testing
+        try:
+            old_index = Index(fields=['role'], name='pegawai_role_idx')
+            new_index = Index(fields=['role'], name='pegawai_role_b2a92e_idx')
+            schema_editor.rename_index(Pegawai, old_index, new_index)
+        except Exception:
+            pass
+
+        field = models.CharField(blank=True, max_length=50, null=True, unique=True, verbose_name='Username')
+        field.set_attributes_from_name('username')
+        try:
+            schema_editor.add_field(Pegawai, field)
+        except Exception:
+            pass
+
+        idx = Index(fields=['username'], name='pegawai_usernam_227342_idx')
+        try:
+            schema_editor.add_index(Pegawai, idx)
+        except Exception:
+            pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,18 +64,25 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RenameIndex(
-            model_name='pegawai',
-            new_name='pegawai_role_b2a92e_idx',
-            old_name='pegawai_role_idx',
-        ),
-        migrations.AddField(
-            model_name='pegawai',
-            name='username',
-            field=models.CharField(blank=True, max_length=50, null=True, unique=True, verbose_name='Username'),
-        ),
-        migrations.AddIndex(
-            model_name='pegawai',
-            index=models.Index(fields=['username'], name='pegawai_usernam_227342_idx'),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.RenameIndex(
+                    model_name='pegawai',
+                    new_name='pegawai_role_b2a92e_idx',
+                    old_name='pegawai_role_idx',
+                ),
+                migrations.AddField(
+                    model_name='pegawai',
+                    name='username',
+                    field=models.CharField(blank=True, max_length=50, null=True, unique=True, verbose_name='Username'),
+                ),
+                migrations.AddIndex(
+                    model_name='pegawai',
+                    index=models.Index(fields=['username'], name='pegawai_usernam_227342_idx'),
+                ),
+            ],
+            database_operations=[
+                migrations.RunPython(safe_apply_0015_db, reverse_code=migrations.RunPython.noop),
+            ],
         ),
     ]
