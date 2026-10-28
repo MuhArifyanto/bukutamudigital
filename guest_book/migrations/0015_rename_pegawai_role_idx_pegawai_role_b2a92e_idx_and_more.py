@@ -11,25 +11,35 @@ def safe_apply_0015_db(apps, schema_editor):
     if connection.vendor == 'mysql':
         with connection.cursor() as cursor:
             # 1. Handle role index safely
-            cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name = 'pegawai_role_idx'")
-            has_old = bool(cursor.fetchall())
-            cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name = 'pegawai_role_b2a92e_idx'")
-            has_new = bool(cursor.fetchall())
-            if has_old and not has_new:
-                cursor.execute("ALTER TABLE pegawai RENAME INDEX pegawai_role_idx TO pegawai_role_b2a92e_idx")
-            elif not has_old and not has_new:
-                cursor.execute("SHOW INDEX FROM pegawai WHERE Column_name = 'role'")
-                if not cursor.fetchall():
-                    cursor.execute("CREATE INDEX pegawai_role_b2a92e_idx ON pegawai (role)")
+            try:
+                cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name = 'pegawai_role_idx'")
+                has_old = bool(cursor.fetchall())
+                cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name = 'pegawai_role_b2a92e_idx'")
+                has_new = bool(cursor.fetchall())
+                if has_old and not has_new:
+                    cursor.execute("ALTER TABLE pegawai RENAME INDEX pegawai_role_idx TO pegawai_role_b2a92e_idx")
+                elif not has_old and not has_new:
+                    cursor.execute("SHOW INDEX FROM pegawai WHERE Column_name = 'role'")
+                    if not cursor.fetchall():
+                        cursor.execute("CREATE INDEX pegawai_role_b2a92e_idx ON pegawai (role)")
+            except Exception:
+                pass
 
-            # 2. Add username column if not exists
+            # 2. Add username column without inline UNIQUE (kompatibel TiDB Cloud & MySQL)
             cursor.execute("SHOW COLUMNS FROM pegawai LIKE 'username'")
             if not cursor.fetchall():
-                cursor.execute("ALTER TABLE pegawai ADD COLUMN username VARCHAR(50) NULL UNIQUE")
+                cursor.execute("ALTER TABLE pegawai ADD COLUMN username VARCHAR(50) NULL")
 
-            # 3. Add username index if not exists
-            cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name = 'pegawai_usernam_227342_idx'")
-            if not cursor.fetchall():
+            # 3. Add username unique constraint / index secara terpisah
+            cursor.execute("SHOW INDEX FROM pegawai WHERE Key_name IN ('username', 'pegawai_username_uniq', 'pegawai_usernam_227342_idx')")
+            existing_user_indexes = {row[2] for row in cursor.fetchall()}
+            if not any(k in existing_user_indexes for k in ('username', 'pegawai_username_uniq')):
+                try:
+                    cursor.execute("CREATE UNIQUE INDEX pegawai_username_uniq ON pegawai (username)")
+                except Exception:
+                    pass
+
+            if 'pegawai_usernam_227342_idx' not in existing_user_indexes:
                 try:
                     cursor.execute("CREATE INDEX pegawai_usernam_227342_idx ON pegawai (username)")
                 except Exception:
