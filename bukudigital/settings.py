@@ -72,8 +72,9 @@ if IS_PRODUCTION:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
 
-    # Reverse proxy header (aktif HANYA jika server berada di belakang reverse proxy seperti Nginx)
-    if os.getenv('USE_PROXY_SSL_HEADER', 'False').lower() in ('true', '1'):
+    # Reverse proxy header (aktif default di production PaaS seperti Render yang berada di balik reverse proxy)
+    use_proxy_env = os.getenv('USE_PROXY_SSL_HEADER')
+    if use_proxy_env is None or use_proxy_env.lower() in ('true', '1'):
         SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     else:
         SECURE_PROXY_SSL_HEADER = None
