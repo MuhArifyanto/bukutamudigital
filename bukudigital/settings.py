@@ -224,6 +224,14 @@ DATABASES = {
     }
 }
 
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+
 # Channel Layers:
 # InMemoryChannelLayer digunakan untuk single-instance (lokal maupun single container PaaS) & testing.
 # RedisChannelLayer digunakan jika USE_REDIS_CHANNEL_LAYER=true dan REDIS_URL diset (untuk multi-instance).
@@ -344,7 +352,7 @@ if IS_PRODUCTION and not FIREBASE_WEBHOOK_SECRET:
 # Firebase Auth (login password sisi server)
 # FIREBASE_API_KEY = "Web API Key" proyek Firebase (Project settings > General).
 # Jika kosong, login password dinonaktifkan dan endpoint membalas "layanan tidak tersedia" (bukan error 500).
-FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY', '').strip()
+FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY', 'AIzaSyAsJCzp8DUY5PyQ4u7MgO2hppYQ8o4UjlU').strip()
 FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'bukutamudigital-43ae7').strip()
 if IS_PRODUCTION and not FIREBASE_API_KEY:
     import logging as _logging

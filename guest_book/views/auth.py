@@ -720,7 +720,33 @@ def api_tamu_login(request):
             if len(matches) == 1:
                 tamu = matches[0]
 
-        # 2. Autentikasi ke Firebase (selalu dipanggil agar waktu respons setara)
+        # 2. Verifikasi Password Lokal (Django check_password):
+        from django.contrib.auth.hashers import check_password
+        local_auth_ok = False
+        if tamu and tamu.password:
+            try:
+                local_auth_ok = check_password(password, tamu.password)
+            except Exception:
+                local_auth_ok = False
+
+        if local_auth_ok:
+            del password
+            if tamu.account_status != 'active':
+                return fail('akun_tidak_aktif')
+
+            clear_rate_limit(id_key)
+            clear_failed_login(client_ip, user_type='tamu')
+            _establish_tamu_session(request, tamu)
+            LoginAttempt.objects.create(
+                email=tamu.email, user_type='tamu', success=True, ip_address=client_ip
+            )
+            return JsonResponse({
+                'success': True,
+                'redirect_url': reverse('tamu:dashboard'),
+                'message': 'Login berhasil.',
+            })
+
+        # 3. Autentikasi ke Firebase (selalu dipanggil agar waktu respons setara)
         target_email = tamu.email if tamu else _LOGIN_DUMMY_EMAIL
         fb_status, id_token_str = firebase_rest.sign_in_with_password(target_email, password)
         del password
