@@ -511,13 +511,17 @@ def user_chat_view(request, tamu):
 
     for k in kunjungan_list:
         session_id = f'kunjungan_{k.id}'
+        peg_name = (k.pegawai.name if k.pegawai and k.pegawai.name else 'Pegawai')
+        peg_dept = 'Pegawai'
+        if k.pegawai:
+            peg_dept = k.pegawai.department or (k.pegawai.department_rel.nama if k.pegawai.department_rel else 'Pegawai')
         conversations.append({
             'id': str(k.id),
             'session_id': session_id,
             'type': 'pegawai',
-            'name': k.pegawai.name,
-            'subtitle': k.pegawai.department or (k.pegawai.department_rel.nama if k.pegawai.department_rel else 'Pegawai'),
-            'avatar_letters': k.pegawai.name[:2].upper(),
+            'name': peg_name,
+            'subtitle': peg_dept,
+            'avatar_letters': peg_name[:2].upper(),
             'last_message': last_messages.get(session_id),
             'unread_count': unread_counts.get(session_id, 0),
         })

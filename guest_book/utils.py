@@ -123,7 +123,7 @@ def get_google_calendar_holidays(year):
     """Ambil hari libur nasional dari Google Calendar API atau fallback lokal."""
     # Cache per tahun
     cache_key = f"holidays_{year}"
-    cached = cache.get(cache_key)
+    cached = safe_cache_get(cache_key)
     if cached:
         return cached
 
@@ -154,7 +154,7 @@ def get_google_calendar_holidays(year):
                     'name': item.get('summary', 'Hari Libur')
                 })
 
-        cache.set(cache_key, holidays, timeout=86400 * 7)  # 7 hari
+        safe_cache_set(cache_key, holidays, timeout=86400 * 7)  # 7 hari
         return holidays
     except Exception as e:
         logger.warning(f"Gagal mengambil hari libur Google Calendar: {e}")
@@ -260,12 +260,37 @@ def _get_clean_session_key(session_id):
     return str(session_id or '').strip().replace(':', '_').replace(' ', '_')
 
 
+def safe_cache_get(key, default=None):
+    """Ambil data dari cache secara aman tanpa pernah melempar exception."""
+    try:
+        return cache.get(key, default)
+    except Exception as e:
+        logger.warning(f"safe_cache_get error for {key}: {e}")
+        return default
+
+
+def safe_cache_set(key, value, timeout=None):
+    """Simpan data ke cache secara aman tanpa pernah melempar exception."""
+    try:
+        cache.set(key, value, timeout)
+    except Exception as e:
+        logger.warning(f"safe_cache_set error for {key}: {e}")
+
+
+def safe_cache_delete(key):
+    """Hapus data dari cache secara aman tanpa pernah melempar exception."""
+    try:
+        cache.delete(key)
+    except Exception as e:
+        logger.warning(f"safe_cache_delete error for {key}: {e}")
+
+
 def is_session_handed_off_to_admin(session_id):
     """Cek apakah sesi chat tamu saat ini sudah dialihkan penuh ke Admin manusia."""
     if not session_id:
         return False
     sess_key = _get_clean_session_key(session_id)
-    return bool(cache.get(f"ai_handoff_active_{sess_key}"))
+    return bool(safe_cache_get(f"ai_handoff_active_{sess_key}"))
 
 
 def get_session_strike_count(session_id):
@@ -273,7 +298,7 @@ def get_session_strike_count(session_id):
     if not session_id:
         return 0
     sess_key = _get_clean_session_key(session_id)
-    return int(cache.get(f"ai_strike_count_{sess_key}", 0) or 0)
+    return int(safe_cache_get(f"ai_strike_count_{sess_key}", 0) or 0)
 
 
 def set_session_handoff_to_admin(session_id, active=True):
@@ -284,10 +309,10 @@ def set_session_handoff_to_admin(session_id, active=True):
     key = f"ai_handoff_active_{sess_key}"
     strike_key = f"ai_strike_count_{sess_key}"
     if active:
-        cache.set(key, True, timeout=86400)
+        safe_cache_set(key, True, timeout=86400)
     else:
-        cache.delete(key)
-        cache.delete(strike_key)
+        safe_cache_delete(key)
+        safe_cache_delete(strike_key)
 
 
 def reset_session_ai_mode(session_id):
@@ -529,11 +554,11 @@ def _try_create_kunjungan_from_chat(tamu, message_text, n8n_res, pegawai_qs):
     txt = raw.lower()
 
     draft_key = f"chat_booking_draft_{tamu.id}"
-    draft = cache.get(draft_key)
+    draft = safe_cache_get(draft_key)
 
     # 1. Cek jika Tamu membatalkan proses pendaftaran
     if draft and any(w in txt for w in ('batal', 'cancel', 'tidak jadi', 'gak jadi', 'ga jadi')):
-        cache.delete(draft_key)
+        safe_cache_delete(draft_key)
         return (
             "🤖 Asisten AI Diskominfosantik:\n"
             "Baik, proses pengajuan kunjungan telah dibatalkan. Jika ada hal lain yang ingin Anda tanyakan, silakan beri tahu saya!"
@@ -645,7 +670,7 @@ def _try_create_kunjungan_from_chat(tamu, message_text, n8n_res, pegawai_qs):
     if target_date.weekday() in (5, 6):
         next_monday = target_date + timedelta(days=(7 - target_date.weekday()))
         if draft:
-            cache.delete(draft_key)
+            safe_cache_delete(draft_key)
         return (
             "🤖 Asisten AI Diskominfosantik:\n"
             f"⚠️ Mohon maaf, hari **{hari_str} ({target_date.strftime('%d/%m/%Y')})** adalah hari libur akhir pekan "
@@ -662,7 +687,7 @@ def _try_create_kunjungan_from_chat(tamu, message_text, n8n_res, pegawai_qs):
 
     if quota_info and quota_info.get('is_holiday'):
         if draft:
-            cache.delete(draft_key)
+            safe_cache_delete(draft_key)
         return (
             "🤖 Asisten AI Diskominfosantik:\n"
             f"🔴 Mohon maaf, tanggal **{target_date.strftime('%d/%m/%Y')} ({hari_str})** ditetapkan sebagai hari libur "
@@ -671,7 +696,7 @@ def _try_create_kunjungan_from_chat(tamu, message_text, n8n_res, pegawai_qs):
         )
     if quota_info and quota_info.get('is_full'):
         if draft:
-            cache.delete(draft_key)
+            safe_cache_delete(draft_key)
         return (
             "🤖 Asisten AI Diskominfosantik:\n"
             f"🔴 Mohon maaf, kuota kunjungan untuk hari **{hari_str}, {target_date.strftime('%d/%m/%Y')}** sudah penuh "
@@ -739,7 +764,7 @@ def _try_create_kunjungan_from_chat(tamu, message_text, n8n_res, pegawai_qs):
 
     # Jika Jam atau Keperluan belum diisi oleh Tamu (tanya interaktif)
     if visit_hour is None or not purpose_str:
-        cache.set(draft_key, {
+        safe_cache_set(draft_key, {
             'target_date': target_date.isoformat(),
             'hari_str': hari_str,
             'visit_hour': visit_hour,
@@ -811,7 +836,7 @@ def _try_create_kunjungan_from_chat(tamu, message_text, n8n_res, pegawai_qs):
         )
 
     # Hapus draft setelah pendaftaran sukses
-    cache.delete(draft_key)
+    safe_cache_delete(draft_key)
 
     # Kirim Notifikasi Real-Time ke Admin (dan Pegawai jika ada)
     try:
@@ -950,7 +975,7 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
 
     # Cek jika tamu sedang berada di alur booking interaktif di cache
     draft_key = f"chat_booking_draft_{tamu_id}"
-    has_active_draft = bool(cache.get(draft_key))
+    has_active_draft = bool(safe_cache_get(draft_key))
     if has_active_draft:
         intent = 'buat_kunjungan'
         n8n_wants_handoff = False
@@ -973,13 +998,13 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
 
     # Hitung strike jika AI tidak bisa menjawab (di_luar_konteks) atau Tamu kurang suka jawaban AI
     strike_key = f"ai_strike_count_{sess_key}"
-    strike_count = int(cache.get(strike_key, 0) or 0)
+    strike_count = int(safe_cache_get(strike_key, 0) or 0)
     is_strike = is_unsatisfied or ('luar_konteks' in intent) or bool(n8n_res.get('cannot_answer')) or (n8n_wants_handoff and 'keluhan' not in intent and 'masukan' not in intent)
     handoff = False
 
     if is_strike:
         strike_count += 1
-        cache.set(strike_key, strike_count, timeout=3600)
+        safe_cache_set(strike_key, strike_count, timeout=3600)
         if strike_count >= AI_MAX_STRIKES:
             handoff = True
             set_session_handoff_to_admin(sess_key, active=True)

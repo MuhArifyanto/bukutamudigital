@@ -6,11 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000
 
-# Install system dependencies (untuk mysqlclient)
+# Install system dependencies (untuk mysqlclient & SSL CA TiDB Cloud)
 RUN apt-get update && apt-get install -y \
     gcc \
     default-libmysqlclient-dev \
     pkg-config \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Set work directory

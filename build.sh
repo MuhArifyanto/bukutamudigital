@@ -10,3 +10,6 @@ python manage.py collectstatic --noinput
 
 # Jalankan migrasi database
 python manage.py migrate
+
+# Pastikan tabel cache database terbuat di production
+python manage.py createcachetable || true
