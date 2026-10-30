@@ -104,12 +104,12 @@
         <!-- LEFT COLUMN: INFO -->
         <div>
             <!-- Main Info Card -->
-            <div style="background: #fff; border-radius: 12px; padding: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 2rem;">
+            <div style="background: #fff; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.5rem;">
                 <h3 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
                     <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Informasi Kunjungan
                 </h3>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                <div class="detail-info-grid">
                     <div>
                         <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">NAMA PENGUNJUNG</div>
                         <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">{{ kunjungan.tamu.name }}</div>
@@ -132,14 +132,14 @@
                         <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">WAKTU KEPULANGAN</div>
                         <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">{{ kunjungan.departure_time|date:"d M Y, H:i"|default:"–" }}</div>
                     </div>
-                    <div style="grid-column: span 2;">
+                    <div style="grid-column: 1 / -1;">
                         <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">CATATAN PENGUNJUNG</div>
                         <div style="font-size: 0.9rem; color: #475569;">{{ kunjungan.notes|default:"Tidak ada catatan." }}</div>
                     </div>
                 </div>
 
                 <!-- Action Buttons for Admin -->
-                <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap;">
+                <div class="detail-action-bar">
                     {% if kunjungan.status == 'menunggu_admin' %}
                     <button onclick="updateStatus('{{ kunjungan.id }}', 'menunggu_pegawai')" style="background: #dbeafe; color: #1d4ed8; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-share"></i> Forward ke Pegawai

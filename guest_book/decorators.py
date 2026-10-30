@@ -16,15 +16,16 @@ def pegawai_login_required(view_func):
         pegawai_id = request.session.get('pegawai_id')
         if not pegawai_id:
             messages.error(request, "Silakan login terlebih dahulu.")
-            return redirect('pegawai:login')
+            return redirect('tamu:pegawai_login')
         
         try:
             pegawai = Pegawai.objects.get(pk=pegawai_id, account_status='active')
             request.pegawai = pegawai
+            request._pegawai = pegawai
         except Pegawai.DoesNotExist:
             request.session.flush()
             messages.error(request, "Akun tidak ditemukan atau tidak aktif.")
-            return redirect('pegawai:login')
+            return redirect('tamu:pegawai_login')
             
         return view_func(request, *args, **kwargs)
     return wrapper
@@ -50,11 +51,12 @@ def pegawai_role_required(allowed_roles):
             
             if not pegawai_id:
                 messages.error(request, "Silakan login terlebih dahulu.")
-                return redirect('pegawai:login')
+                return redirect('tamu:pegawai_login')
             
             try:
                 pegawai = Pegawai.objects.get(pk=pegawai_id, account_status='active')
                 request.pegawai = pegawai
+                request._pegawai = pegawai
                 
                 # Check if pegawai has required role
                 if pegawai.role not in allowed_roles:
@@ -62,12 +64,12 @@ def pegawai_role_required(allowed_roles):
                         request, 
                         f"Akses ditolak. Halaman ini memerlukan role: {', '.join(allowed_roles)}"
                     )
-                    return redirect('pegawai:dashboard')
+                    return redirect('tamu:pegawai_dashboard')
                     
             except Pegawai.DoesNotExist:
                 request.session.flush()
                 messages.error(request, "Akun tidak ditemukan atau tidak aktif.")
-                return redirect('pegawai:login')
+                return redirect('tamu:pegawai_login')
             
             return view_func(request, *args, **kwargs)
         return wrapper

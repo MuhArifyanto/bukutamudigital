@@ -157,14 +157,37 @@ def admin_statistik_view(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add_pegawai':
+            from django.contrib.auth.hashers import make_password
             from ..models import Pegawai
-            name = request.POST.get('name')
-            email = request.POST.get('email')
-            phone = request.POST.get('phone')
+            name = (request.POST.get('name') or '').strip()
+            email = (request.POST.get('email') or '').strip().lower()
+            phone = (request.POST.get('phone') or '').strip()
             department_id = request.POST.get('department')
+
+            if not name or not email or not phone or not department_id:
+                messages.error(request, "Semua field pegawai wajib diisi.")
+                return redirect('tamu:admin_statistik')
+
+            if Pegawai.objects.filter(email__iexact=email).exists():
+                messages.error(request, f"Pegawai dengan email {email} sudah terdaftar.")
+                return redirect('tamu:admin_statistik')
+
+            dept_obj = Departemen.objects.filter(pk=department_id).first()
+            base_username = (email.split('@')[0] if '@' in email else name.lower().replace(' ', '.'))[:50]
+            username = base_username or None
+            if username and Pegawai.objects.filter(username__iexact=username).exists():
+                import uuid
+                username = f"{base_username[:41]}_{uuid.uuid4().hex[:8]}"
+
             Pegawai.objects.create(
-                name=name, email=email, phone=phone,
-                department_rel_id=department_id, password='password123'
+                name=name,
+                username=username,
+                email=email,
+                phone=phone,
+                department_rel=dept_obj,
+                department=dept_obj.nama if dept_obj else None,
+                password=make_password('password123'),
+                account_status='active',
             )
             messages.success(request, f"Pegawai {name} berhasil ditambahkan.")
             return redirect('tamu:admin_statistik')

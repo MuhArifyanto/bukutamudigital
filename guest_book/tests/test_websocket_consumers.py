@@ -290,3 +290,90 @@ class WebSocketConsumerTests(TransactionTestCase):
         self.assertFalse(connected)
         self.assertEqual(code, 4003)
         await comm.disconnect()
+
+    async def test_kunjungan_chat_notifies_pegawai_and_tamu_instead_of_admin(self):
+        """
+        Saat Tamu mengirim pesan di sesi kunjungan_{id}, notifikasi dikirim ke Pegawai (bukan Admin).
+        Saat Pegawai mengirim pesan di sesi kunjungan_{id}, notifikasi dikirim ke Tamu (bukan Admin).
+        """
+        from channels.db import database_sync_to_async
+        from django.utils import timezone
+        from guest_book.models import Tamu, Pegawai, Kunjungan, KunjunganStatus, Notification
+
+        tamu = await database_sync_to_async(Tamu.objects.create)(
+            name='Tamu Chat Kunjungan',
+            email='tamu.chat.kunjungan@example.com',
+            phone='081234567890',
+            account_status='active'
+        )
+        pegawai = await database_sync_to_async(Pegawai.objects.create)(
+            name='Pegawai Chat Kunjungan',
+            username='pegawai.chat',
+            email='pegawai.chat@example.com',
+            phone='081234567891',
+            password='hashed_password',
+            account_status='active'
+        )
+        kunjungan = await database_sync_to_async(Kunjungan.objects.create)(
+            tamu=tamu,
+            pegawai=pegawai,
+            arrival_time=timezone.now(),
+            purpose='Diskusi Teknis',
+            status=KunjunganStatus.DISETUJUI
+        )
+        session_id = f'kunjungan_{kunjungan.id}'
+
+        # 1. Tamu mengirim pesan -> Pegawai yang menerima notifikasi
+        tamu_comm = WebsocketCommunicator(
+            MockScopeApp(ChatConsumer, session_id=session_id, session_data={'tamu_id': str(tamu.id)}),
+            f'/ws/chat/{session_id}/'
+        )
+        t_conn, _ = await tamu_comm.connect()
+        self.assertTrue(t_conn)
+
+        await tamu_comm.send_json_to({
+            'action': 'create',
+            'message': 'Selamat pagi Pak/Bu Pegawai.'
+        })
+        await tamu_comm.receive_json_from()
+
+        pegawai_notif = await database_sync_to_async(
+            Notification.objects.filter(
+                recipient_id=str(pegawai.id),
+                recipient_type='pegawai',
+                related_object_id=session_id
+            ).first
+        )()
+        self.assertIsNotNone(pegawai_notif)
+        self.assertIn('Selamat pagi Pak/Bu Pegawai.', pegawai_notif.message)
+
+        admin_notif_count = await database_sync_to_async(
+            Notification.objects.filter(recipient_type='admin', related_object_id=session_id).count
+        )()
+        self.assertEqual(admin_notif_count, 0)
+        await tamu_comm.disconnect()
+
+        # 2. Pegawai mengirim pesan -> Tamu yang menerima notifikasi
+        pegawai_comm = WebsocketCommunicator(
+            MockScopeApp(ChatConsumer, session_id=session_id, session_data={'pegawai_id': str(pegawai.id)}),
+            f'/ws/chat/{session_id}/'
+        )
+        p_conn, _ = await pegawai_comm.connect()
+        self.assertTrue(p_conn)
+
+        await pegawai_comm.send_json_to({
+            'action': 'create',
+            'message': 'Selamat pagi, silakan langsung ke lantai 2.'
+        })
+        await pegawai_comm.receive_json_from()
+
+        tamu_notif = await database_sync_to_async(
+            Notification.objects.filter(
+                recipient_id=str(tamu.id),
+                recipient_type='tamu',
+                related_object_id=session_id
+            ).first
+        )()
+        self.assertIsNotNone(tamu_notif)
+        self.assertIn('lantai 2', tamu_notif.message)
+        await pegawai_comm.disconnect()

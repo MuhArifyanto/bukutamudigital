@@ -93,7 +93,7 @@
                         <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">WAKTU KEPULANGAN</div>
                         <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">{{ kunjungan.departure_time|date:"d M Y, H:i"|default:"–" }}</div>
                     </div>
-                    <div style="grid-column: span 2;">
+                    <div class="notes-full-span" style="grid-column: 1 / -1;">
                         <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">CATATAN SAYA</div>
                         <div style="font-size: 0.9rem; color: #475569;">{{ kunjungan.notes|default:"Tidak ada catatan." }}</div>
                     </div>

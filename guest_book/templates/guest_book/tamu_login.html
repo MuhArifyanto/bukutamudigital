@@ -294,9 +294,17 @@
 
 
         @media (max-width: 991px) {
-            .login-card { flex-direction: column; max-width: 500px; }
+            .login-wrapper { padding: 1.25rem; }
+            .login-card { flex-direction: column; max-width: 500px; min-height: auto; border-radius: 20px; }
             .login-info { display: none; }
-            .login-form-area { width: 100%; padding: 3rem 2rem; }
+            .login-form-area { width: 100%; padding: 3.5rem 1.75rem 2.25rem; }
+            .back-to-home { top: 1.25rem; right: 1.5rem; }
+        }
+        @media (max-width: 576px) {
+            .login-wrapper { padding: 0.75rem; }
+            .login-form-area { padding: 3.25rem 1.25rem 1.75rem; }
+            .form-title { font-size: 1.45rem !important; }
+            .form-subtitle { margin-bottom: 1.5rem !important; font-size: 0.82rem !important; }
         }
     </style>
 </head>

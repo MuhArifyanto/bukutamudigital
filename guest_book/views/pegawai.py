@@ -378,7 +378,7 @@ def pegawai_chat_view(request, pegawai=None):
     # For simplicity, let's get kunjungan where this pegawai is the assignee, and status >= disetujui
     kunjungan_qs = Kunjungan.objects.filter(
         pegawai=pegawai,
-        status__in=['disetujui', 'in_progress', 'completed']
+        status__in=['disetujui_pegawai', 'disetujui', 'in_progress', 'completed']
     ).select_related('tamu').order_by('-created_at')
     
     for k in kunjungan_qs:
@@ -444,20 +444,27 @@ def pegawai_chat_view(request, pegawai=None):
 def pegawai_profile_view(request, pegawai=None):
     """View untuk update profil pegawai"""
     if request.method == 'POST':
-        name = request.POST.get('name')
-        phone = request.POST.get('phone')
+        name = (request.POST.get('name') or '').strip()
+        phone = (request.POST.get('phone') or '').strip()
         
         if name and phone:
             pegawai.name = name
             pegawai.phone = phone
             
             # Update password jika diisi
-            new_password = request.POST.get('new_password')
+            new_password = request.POST.get('new_password') or ''
             if new_password:
-                import hashlib
-                pegawai.password = hashlib.sha256(new_password.encode()).hexdigest()
+                if len(new_password) < 8:
+                    messages.error(request, 'Password baru minimal 8 karakter.')
+                    return render(request, 'guest_book/pegawai_profile.html', {
+                        'pegawai': pegawai,
+                        'active_page': 'profil'
+                    })
+                from django.contrib.auth.hashers import make_password
+                pegawai.password = make_password(new_password)
                 
             pegawai.save()
+            request.session['pegawai_name'] = pegawai.name
             messages.success(request, 'Profil berhasil diperbarui.')
             return redirect('tamu:pegawai_profile')
         else:

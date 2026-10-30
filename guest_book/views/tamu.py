@@ -1,15 +1,104 @@
 import logging
+import threading
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db.models import Count, Q as _Q
 from .base import tamu_login_required, base_context
-from ..models import Kunjungan, Pegawai, Message, Departemen
+from ..models import Kunjungan, KunjunganStatusHistory, Pegawai, Message, Departemen
 from ..forms import KunjunganForm, PesanForm
 from ..utils import send_notification
 
 logger = logging.getLogger(__name__)
+
+
+def _run_n8n_routing_bg(kunjungan_id, purpose, tamu_name, initial_pegawai_id=None):
+    """
+    Jalankan pemanggilan N8N Auto-Routing di latar belakang (background thread)
+    agar halaman submit Tamu langsung instan (< 0.5 detik) tanpa menunggu AI selesai berpikir.
+    """
+    from django.db import close_old_connections
+    from ..utils import call_n8n_routing
+
+    close_old_connections()
+    try:
+        active_pegawai_qs = Pegawai.objects.filter(account_status='active').select_related('department_rel')
+        n8n_result = call_n8n_routing(
+            kunjungan_id=kunjungan_id,
+            purpose=purpose,
+            pegawai_queryset=active_pegawai_qs,
+        )
+        if not n8n_result:
+            return
+
+        kunjungan = Kunjungan.objects.select_related('pegawai').filter(pk=kunjungan_id).first()
+        if not kunjungan or kunjungan.status != 'menunggu_admin':
+            return
+
+        ai_intent = n8n_result.get('intent', 'buat_kunjungan')
+        ai_reply = n8n_result.get('reply') or n8n_result.get('replay') or n8n_result.get('alasan') or '-'
+        ai_handoff = n8n_result.get('handoff')
+        ai_bidang = n8n_result.get('bidang', '-')
+        ai_conf = n8n_result.get('confidence', '-')
+
+        pegawai_assign = None
+        if n8n_result.get('pegawai_id'):
+            pegawai_assign = Pegawai.objects.filter(
+                pk=n8n_result['pegawai_id'],
+                account_status='active'
+            ).first()
+
+        note_lines = [
+            "[Auto-Routing AI N8N]",
+            f"Intent: {ai_intent}",
+        ]
+        if ai_bidang and ai_bidang != '-':
+            note_lines.append(f"Bidang: {ai_bidang}")
+        if ai_conf and ai_conf != '-':
+            note_lines.append(f"Confidence: {ai_conf}")
+        if ai_handoff is not None:
+            note_lines.append(f"Handoff: {ai_handoff}")
+        if pegawai_assign:
+            note_lines.append(f"Rekomendasi Pegawai: {pegawai_assign.name}")
+        if ai_reply and ai_reply != '-':
+            note_lines.append(f"Alasan/Reply AI: {ai_reply}")
+
+        kunjungan.admin_notes = "\n".join(note_lines)
+
+        # Jika Tamu belum memilih pegawai sendiri dan N8N merekomendasikan pegawai aktif:
+        # arahkan otomatis ke menunggu_pegawai. Jika Tamu sudah memilih pegawai sendiri di form,
+        # pertahankan pilihan Tamu dan simpan analisis AI di admin_notes.
+        if pegawai_assign and not initial_pegawai_id:
+            kunjungan.pegawai = pegawai_assign
+            kunjungan.status = 'menunggu_pegawai'
+            kunjungan.save(update_fields=['pegawai', 'status', 'admin_notes'])
+            KunjunganStatusHistory.objects.create(
+                kunjungan=kunjungan,
+                old_status='menunggu_admin',
+                new_status='menunggu_pegawai',
+                changed_by_id='admin',
+                changed_by_type='admin',
+                notes=f'Auto-Routing AI ke {pegawai_assign.name}'
+            )
+            try:
+                send_notification(
+                    recipient_id=str(pegawai_assign.id),
+                    recipient_type='pegawai',
+                    notification_type='visit_forwarded',
+                    title='Pembaruan Kunjungan',
+                    message=f'Permintaan kunjungan baru dari {tamu_name} menunggu persetujuan Anda.',
+                    related_object_id=str(kunjungan.id)
+                )
+            except Exception as notif_err:
+                logger.warning("Gagal mengirim notifikasi auto-routing ke pegawai: %s", notif_err)
+        else:
+            kunjungan.save(update_fields=['admin_notes'])
+    except Exception as bg_err:
+        logger.warning("Gagal memproses N8N routing di background: %s", bg_err)
+    finally:
+        close_old_connections()
+
 
 def landing_view(request):
     """View untuk Landing Page utama"""
@@ -105,37 +194,23 @@ def kunjungan_baru_view(request, tamu):
                 'pegawai_list': pegawai_list,
             })
 
-        # ── N8N Auto-Routing: AI pilihkan pegawai yang paling sesuai ──────────
-        from ..utils import call_n8n_routing
-        n8n_result = call_n8n_routing(
-            kunjungan_id=kunjungan.id,
-            purpose=kunjungan.purpose,
-            pegawai_queryset=pegawai_list,
-        )
-        if n8n_result and n8n_result.get('pegawai_id'):
-            try:
-                pegawai_assign = Pegawai.objects.get(
-                    pk=n8n_result['pegawai_id'],
-                    account_status='active'
-                )
-                kunjungan.pegawai = pegawai_assign
-                kunjungan.status = 'menunggu_pegawai'
-                kunjungan.admin_notes = (
-                    f"[Auto-Routing AI] Pegawai direkomendasikan oleh N8N.\n"
-                    f"Bidang: {n8n_result.get('bidang', '-')}\n"
-                    f"Confidence: {n8n_result.get('confidence', '-')}\n"
-                    f"Alasan: {n8n_result.get('alasan', '-')}"
-                )
-                kunjungan.save(update_fields=['pegawai', 'status', 'admin_notes'])
-                messages.success(
-                    request,
-                    f"Kunjungan Anda berhasil didaftarkan dan telah diarahkan ke "
-                    f"{pegawai_assign.name} ({pegawai_assign.jabatan or 'Pegawai'})."
-                )
-            except Pegawai.DoesNotExist:
-                messages.success(request, "Kunjungan Anda berhasil didaftarkan!")
+        # Tampilkan pesan sukses secara instan tanpa menunggu N8N selesai berpikir
+        if kunjungan.pegawai:
+            messages.success(
+                request,
+                f"Kunjungan Anda berhasil didaftarkan untuk menemui "
+                f"{kunjungan.pegawai.name} ({kunjungan.pegawai.jabatan or 'Pegawai'})."
+            )
         else:
             messages.success(request, "Kunjungan Anda berhasil didaftarkan!")
+
+        # ── N8N Auto-Routing: Dijalankan Asynchronous di Background Thread ────
+        initial_pegawai_id = str(kunjungan.pegawai_id) if kunjungan.pegawai_id else None
+        threading.Thread(
+            target=_run_n8n_routing_bg,
+            args=(kunjungan.id, kunjungan.purpose, tamu.name, initial_pegawai_id),
+            daemon=True,
+        ).start()
         # ── End N8N Routing ───────────────────────────────────────────────────
         
         # Notifikasi ke Admin
@@ -194,12 +269,9 @@ def kunjungan_baru_view(request, tamu):
             msg.attach_alternative(html_content, "text/html")
             
             # Kirim email di latar belakang menggunakan thread agar tidak memblokir UI (Asynchronous)
-            import threading
-            threading.Thread(target=msg.send).start()
+            threading.Thread(target=msg.send, daemon=True).start()
         except Exception as e:
             # Jika gagal kirim email, log saja agar tidak menghentikan proses booking!
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Gagal mengirim email ke {tamu.email}: {str(e)}")
         
         return redirect('tamu:riwayat')
@@ -284,8 +356,17 @@ def kunjungan_batal_view(request, tamu, pk):
             tamu=tamu, 
             status__in=Kunjungan.Status.CANCELABLE
         )
+        old_status = kunjungan.status
         kunjungan.status = 'cancelled'
         kunjungan.save(update_fields=['status', 'updated_at'])
+        KunjunganStatusHistory.objects.create(
+            kunjungan=kunjungan,
+            old_status=old_status,
+            new_status='cancelled',
+            changed_by_id=str(tamu.id),
+            changed_by_type='tamu',
+            notes='Dibatalkan oleh Tamu'
+        )
         messages.success(request, "Kunjungan berhasil dibatalkan.")
         
         try:
@@ -397,7 +478,7 @@ def user_chat_view(request, tamu):
         'session_id': admin_session_id,
         'type': 'admin',
         'name': 'Admin Diskominfosantik',
-        'subtitle': 'Layanan Umum',
+        'subtitle': 'Layanan Umum & Asisten AI',
         'avatar_letters': 'AD',
         'last_message': admin_last_msg,
         'unread_count': admin_unread,
@@ -406,7 +487,7 @@ def user_chat_view(request, tamu):
     # ── 2. Conversations dengan Pegawai (dari kunjungan tamu) ─────────────────
     kunjungan_list = list(Kunjungan.objects.filter(
         tamu=tamu,
-        status__in=['disetujui', 'in_progress', 'completed'],
+        status__in=['disetujui_pegawai', 'disetujui', 'in_progress', 'completed'],
         pegawai__isnull=False,
     ).select_related('pegawai', 'pegawai__department_rel').order_by('-created_at')[:20])
 
@@ -473,6 +554,8 @@ def user_chat_view(request, tamu):
         elif msg.sender_type == 'pegawai':
             msg.sender_obj = pegawai_map.get(str(msg.sender_id))
 
+    from ..utils import get_session_strike_count, is_session_handed_off_to_admin
+
     ctx = base_context(tamu, 'chat')
     ctx.update({
         'conversations': conversations,
@@ -480,6 +563,8 @@ def user_chat_view(request, tamu):
         'messages_list': messages_list,
         'admin_user': admin_user,
         'tamu_id': str(tamu.pk),
+        'ai_handoff_active': is_session_handed_off_to_admin(admin_session_id),
+        'ai_strike_count': get_session_strike_count(admin_session_id),
     })
     return render(request, 'guest_book/tamu_chat.html', ctx)
 

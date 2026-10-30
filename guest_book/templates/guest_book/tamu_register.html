@@ -336,9 +336,17 @@
             animation: shake 0.4s ease-in-out;
         }
         @media (max-width: 991px) {
-            .register-card { flex-direction: column; }
+            .register-wrapper { width: 100%; padding: 1.25rem; height: auto; min-height: 100vh; }
+            .register-card { flex-direction: column; height: auto; max-height: none; overflow: visible; border-radius: 20px; }
             .register-info { display: none; }
-            .register-form-area { width: 100%; padding: 2.5rem 1.5rem; overflow-y: visible; max-height: none; }
+            .register-form-area { width: 100%; padding: 3.5rem 1.75rem 2.25rem; overflow-y: visible; max-height: none; position: relative; }
+            .back-to-home { top: 1.25rem; right: 1.5rem; }
+        }
+        @media (max-width: 576px) {
+            .register-wrapper { padding: 0.75rem; }
+            .register-form-area { padding: 3.25rem 1.25rem 1.75rem; }
+            .form-title { font-size: 1.45rem; }
+            .form-subtitle { margin-bottom: 1.25rem; font-size: 0.82rem; }
         }
     </style>
 </head>

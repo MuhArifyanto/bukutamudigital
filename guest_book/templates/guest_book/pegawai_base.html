@@ -365,6 +365,15 @@
             color: #fff;
         }
 
+        @media (max-width: 576px) {
+            .topbar { padding: 0 1rem; }
+            .content-wrapper { padding: 1rem; }
+            .card-custom { padding: 1.15rem; }
+            .topbar .dropdown-menu {
+                max-width: calc(100vw - 1.5rem) !important;
+            }
+        }
+
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -503,12 +512,12 @@
     <script>
         function initPegawaiApp() {
             const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
+            let overlay = document.getElementById('sidebarOverlay');
             const toggleBtn = document.getElementById('mobileToggle');
 
             function toggleSidebar() {
                 sidebar.classList.toggle('show');
-                overlay.classList.toggle('show');
+                if (overlay) overlay.classList.toggle('show');
             }
 
             if (toggleBtn) {
@@ -520,7 +529,8 @@
             if (overlay) {
                 const newOverlay = overlay.cloneNode(true);
                 overlay.parentNode.replaceChild(newOverlay, overlay);
-                newOverlay.addEventListener('click', toggleSidebar);
+                overlay = newOverlay;
+                overlay.addEventListener('click', toggleSidebar);
             }
             
             // --- Real-time Notification via WebSockets ---

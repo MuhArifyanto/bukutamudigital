@@ -123,26 +123,30 @@
         .span-2-mobile {
             grid-column: span 1 !important;
         }
+
+        .profile-card-box {
+            padding: 1.25rem !important;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
+<div style="max-width: 1200px; margin: 1rem auto; padding: 0 0.5rem;">
     <!-- PAGE HEADER -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.5rem;">
         <div>
             <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem;">
                 <a href="{% url 'tamu:dashboard' %}" style="color: #64748b; text-decoration: none;">Buku Tamu
                     Digital</a> &gt; <span>Profil</span>
             </div>
-            <h1 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem;">Profil Akun</h1>
-            <p style="font-size: 0.85rem; color: #64748b;">Kelola informasi pribadi dan identitas akses Anda di
+            <h1 style="font-size: 1.6rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem;">Profil Akun</h1>
+            <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0;">Kelola informasi pribadi dan identitas akses Anda di
                 Diskominfosatik.</p>
         </div>
         <div>
             <span
-                style="background: #eff6ff; color: #1e40af; font-size: 0.75rem; font-weight: 700; padding: 0.4rem 0.75rem; border-radius: 99px; display: flex; align-items: center; gap: 0.25rem;">
+                style="background: #eff6ff; color: #1e40af; font-size: 0.75rem; font-weight: 700; padding: 0.4rem 0.75rem; border-radius: 99px; display: inline-flex; align-items: center; gap: 0.35rem;">
                 <i class="fas fa-check-circle"></i> Identitas Terverifikasi Sistem
             </span>
         </div>
@@ -150,9 +154,9 @@
 
     <div class="profile-layout">
         <!-- LEFT COLUMN -->
-        <div style="display: flex; flex-direction: column; gap: 2rem;">
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
             <!-- AVATAR CARD -->
-            <div
+            <div class="profile-card-box"
                 style="background: #fff; border-radius: 16px; padding: 2rem; border: 1px solid #e2e8f0; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                 <div style="position: relative; width: 120px; height: 120px; margin: 0 auto 1.5rem;">
                     {% if tamu.profile_picture %}
@@ -208,12 +212,12 @@
         </div>
 
         <!-- RIGHT COLUMN -->
-        <div style="display: flex; flex-direction: column; gap: 2rem;">
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
             <!-- INFORMASI PERSONAL -->
-            <div
+            <div class="profile-card-box"
                 style="background: #fff; border-radius: 16px; padding: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                    <h3 style="font-size: 1.1rem; font-weight: 800; color: #0f172a;">Informasi Personal</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0;">Informasi Personal</h3>
                     <span style="font-size: 0.75rem; color: #94a3b8;">Pembaruan terakhir: {% now "d M Y" %}</span>
                 </div>
 

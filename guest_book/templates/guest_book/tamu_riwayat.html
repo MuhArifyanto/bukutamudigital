@@ -6,83 +6,335 @@
 {% block page_title %}Aktifitas{% endblock %}
 {% block page_subtitle %}Riwayat Kunjungan Saya{% endblock %}
 
-{% block content %}
-<div style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
-    <!-- PAGE HEADER -->
-    <div
-        class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-        <div>
-            <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem;">
-                <a href="{% url 'tamu:dashboard' %}" style="color: #64748b; text-decoration: none;">Buku Tamu
-                    Digital</a> &gt; <span>Riwayat Kunjungan saya</span>
-            </div>
-            <h1 style="font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem;">Riwayat Kunjungan
-                Saya</h1>
-            <p style="font-size: 0.85rem; color: #64748b;">Daftar arsip seluruh kunjungan resmi Anda ke Dinas
-                Komunikasi, Informatika, Statistik, dan Persandian.</p>
-        </div>
-        <div class="d-flex gap-2 w-100 w-md-auto">
+{% block extra_css %}
+<style>
+    .riwayat-wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .riwayat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+    .riwayat-breadcrumb {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin-bottom: 0.25rem;
+    }
+    .riwayat-title {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 0.25rem;
+        letter-spacing: -0.02em;
+    }
+    .riwayat-subtitle {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin: 0;
+    }
+    .riwayat-toolbar {
+        display: flex;
+        gap: 0.65rem;
+        align-items: center;
+    }
+    .btn-riwayat-export,
+    .btn-riwayat-filter {
+        height: 40px;
+        padding: 0 1rem;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        text-decoration: none;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .btn-riwayat-export {
+        background: #0f172a;
+        color: #ffffff;
+        border: 1px solid #0f172a;
+    }
+    .btn-riwayat-export:hover {
+        background: #1e293b;
+        color: #ffffff;
+    }
+    .btn-riwayat-filter {
+        background: #ffffff;
+        color: #1e293b;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .btn-riwayat-filter:hover {
+        background: #f8fafc;
+        color: #0f172a;
+    }
 
+    .riwayat-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .riwayat-stat-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 1.25rem 1.35rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .riwayat-stat-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    .riwayat-stat-label {
+        font-size: 0.65rem;
+        color: #64748b;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.2rem;
+        text-transform: uppercase;
+    }
+    .riwayat-stat-val {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.1;
+    }
+
+    .riwayat-table-card {
+        background: #ffffff;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    .riwayat-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    @media (max-width: 640px) {
+        .riwayat-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.85rem;
+            margin-bottom: 1.1rem;
+        }
+        .riwayat-breadcrumb {
+            display: none;
+        }
+        .riwayat-title {
+            font-size: 1.35rem;
+        }
+        .riwayat-subtitle {
+            font-size: 0.78rem;
+            line-height: 1.4;
+        }
+        .riwayat-toolbar {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.6rem;
+            width: 100%;
+        }
+        .btn-riwayat-export,
+        .btn-riwayat-filter {
+            width: 100%;
+            font-size: 0.78rem;
+            padding: 0 0.75rem;
+            height: 38px;
+        }
+        .riwayat-stats-grid {
+            gap: 0.55rem;
+            margin-bottom: 1.15rem;
+        }
+        .riwayat-stat-card {
+            padding: 0.85rem 0.65rem;
+            border-radius: 12px;
+            align-items: flex-start;
+        }
+        .riwayat-stat-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+        .riwayat-stat-label {
+            font-size: 0.58rem;
+            line-height: 1.2;
+            letter-spacing: 0.02em;
+        }
+        .riwayat-stat-val {
+            font-size: 1.35rem;
+        }
+        /* Transformasi Tabel Riwayat menjadi Kartu Presisi di HP */
+        .riwayat-table-card {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            overflow: visible;
+        }
+        .riwayat-table {
+            min-width: 0 !important;
+            display: block;
+        }
+        .riwayat-table thead {
+            display: none;
+        }
+        .riwayat-table tbody {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .riwayat-table tbody tr {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-areas:
+                "purpose status"
+                "staff staff"
+                "date action";
+            gap: 0.4rem 0.65rem;
+            padding: 1rem;
+            background: #ffffff;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            align-items: center;
+        }
+        .riwayat-table tbody td {
+            padding: 0 !important;
+            border: none !important;
+        }
+        .riwayat-table tbody td:nth-child(2) {
+            grid-area: purpose;
+        }
+        .riwayat-table tbody td:nth-child(2) > div:first-child {
+            min-width: 0 !important;
+            font-size: 0.88rem !important;
+            line-height: 1.35;
+        }
+        .riwayat-table tbody td:nth-child(4) {
+            grid-area: status;
+            justify-self: end;
+            align-self: start;
+        }
+        .riwayat-table tbody td:nth-child(3) {
+            grid-area: staff;
+            padding-bottom: 0.45rem !important;
+            border-bottom: 1px dashed #e2e8f0 !important;
+        }
+        .riwayat-table tbody td:nth-child(3) > div {
+            font-size: 0.78rem !important;
+            color: #475569 !important;
+        }
+        .riwayat-table tbody td:nth-child(3) > div::before {
+            content: "Petugas: ";
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        .riwayat-table tbody td:nth-child(1) {
+            grid-area: date;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding-top: 0.15rem !important;
+        }
+        .riwayat-table tbody td:nth-child(1) > div {
+            display: inline;
+            font-size: 0.75rem !important;
+        }
+        .riwayat-table tbody td:nth-child(5) {
+            grid-area: action;
+            justify-self: end;
+            padding-top: 0.15rem !important;
+        }
+        .riwayat-table tbody td[colspan] {
+            grid-column: 1 / -1;
+            padding: 2rem 1rem !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="riwayat-wrap">
+    <!-- PAGE HEADER -->
+    <div class="riwayat-header">
+        <div>
+            <div class="riwayat-breadcrumb">
+                <a href="{% url 'tamu:dashboard' %}" style="color: #64748b; text-decoration: none;">Buku Tamu Digital</a> &gt; <span>Riwayat Kunjungan Saya</span>
+            </div>
+            <h1 class="riwayat-title">Riwayat Kunjungan Saya</h1>
+            <p class="riwayat-subtitle">Daftar arsip seluruh kunjungan resmi Anda ke Dinas Komunikasi, Informatika, Statistik, dan Persandian.</p>
+        </div>
+        <div class="riwayat-toolbar">
+            <button type="button" class="btn-riwayat-filter" data-bs-toggle="collapse" data-bs-target="#filterPanel">
+                <i class="fas fa-filter" style="color: #3b82f6;"></i> Filter Lanjutan
+            </button>
             <a href="{% url 'tamu:tamu_kunjungan_cetak_pdf' %}?status={{ request.GET.status|default:'' }}&q={{ request.GET.q|default:'' }}&date={{ request.GET.date|default:'' }}"
-                class="btn flex-grow-1 flex-md-grow-0"
-                style="background: #0f172a; color: #fff; font-weight: 600; border-radius: 8px; font-size: 0.85rem; padding: 0.6rem 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none;">
+                class="btn-riwayat-export">
                 <i class="fas fa-file-export"></i> Ekspor Riwayat
             </a>
         </div>
     </div>
 
     <!-- STATS CARDS -->
-    <div class="row g-3 mb-4">
+    <div class="riwayat-stats-grid">
         <!-- Card 1 -->
-        <div class="col-12 col-md-4">
-            <div
-                style="background: #fff; height: 100%; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                <div style="color: #3b82f6; margin-bottom: 1rem; font-size: 1.2rem;"><i class="far fa-calendar"></i>
-                </div>
-                <div
-                    style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
-                    TOTAL KUNJUNGAN SAYA</div>
-                <div style="font-size: 1.8rem; font-weight: 800; color: #0f172a;">{{ stats.total|default:0 }}</div>
+        <div class="riwayat-stat-card">
+            <div class="riwayat-stat-icon" style="background: #eff6ff; color: #3b82f6;">
+                <i class="far fa-calendar"></i>
+            </div>
+            <div>
+                <div class="riwayat-stat-label">Total Kunjungan</div>
+                <div class="riwayat-stat-val">{{ stats.total|default:0 }}</div>
             </div>
         </div>
         <!-- Card 2 -->
-        <div class="col-12 col-md-4">
-            <div
-                style="background: #fff; height: 100%; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                <div style="color: #64748b; margin-bottom: 1rem; font-size: 1.2rem;"><i class="far fa-hourglass"></i>
-                </div>
-                <div
-                    style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
-                    SEDANG MENUNGGU</div>
-                <div style="font-size: 1.8rem; font-weight: 800; color: #0f172a;">{{ stats.pending|default:0 }}</div>
+        <div class="riwayat-stat-card">
+            <div class="riwayat-stat-icon" style="background: #f1f5f9; color: #64748b;">
+                <i class="far fa-hourglass"></i>
+            </div>
+            <div>
+                <div class="riwayat-stat-label">Menunggu</div>
+                <div class="riwayat-stat-val">{{ stats.pending|default:0 }}</div>
             </div>
         </div>
         <!-- Card 3 -->
-        <div class="col-12 col-md-4">
-            <div
-                style="background: #fff; height: 100%; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                <div style="color: #ef4444; margin-bottom: 1rem; font-size: 1.2rem;"><i class="far fa-times-circle"></i>
-                </div>
-                <div
-                    style="font-size: 0.65rem; color: #64748b; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
-                    DIBATALKAN</div>
-                <div style="font-size: 1.8rem; font-weight: 800; color: #0f172a;">{{ stats.cancelled|default:0 }}</div>
+        <div class="riwayat-stat-card">
+            <div class="riwayat-stat-icon" style="background: #fef2f2; color: #ef4444;">
+                <i class="far fa-times-circle"></i>
+            </div>
+            <div>
+                <div class="riwayat-stat-label">Dibatalkan</div>
+                <div class="riwayat-stat-val">{{ stats.cancelled|default:0 }}</div>
             </div>
         </div>
-    </div>
-
-    <!-- FILTER BUTTON (Moved) -->
-    <div class="d-flex justify-content-end mb-3">
-        <button class="btn shadow-sm" data-bs-toggle="collapse" data-bs-target="#filterPanel"
-            style="background: #fff; color: #1e293b; border: 1px solid #e2e8f0; font-weight: 700; border-radius: 8px; font-size: 0.85rem; padding: 0.6rem 1.25rem; display: flex; align-items: center; gap: 0.6rem; transition: 0.2s;">
-            <i class="fas fa-filter" style="color: #3b82f6;"></i> Filter Lanjutan
-        </button>
     </div>
 
     <!-- FILTER BAR -->
     <div id="filterPanel"
         class="collapse {% if request.GET.status or request.GET.q or request.GET.date %}show{% endif %}"
-        style="background: #fff; border-radius: 12px; padding: 1rem; border: 1px solid #e2e8f0; margin-bottom: 1.5rem;">
+        style="background: #fff; border-radius: 12px; padding: 1rem; border: 1px solid #e2e8f0; margin-bottom: 1.25rem;">
         <form method="get" class="d-flex flex-column flex-md-row gap-2 align-items-stretch align-items-md-center">
             <div style="flex: 1; position: relative;">
                 <i class="fas fa-search"
@@ -113,15 +365,14 @@
 
             {% if request.GET.status or request.GET.q or request.GET.date %}
             <a href="{% url 'tamu:riwayat' %}" class="btn"
-                style="color: #64748b; font-size: 0.85rem; text-decoration: none; border: 1px solid #e2e8f0; border-radius: 8px;">Reset</a>
+                style="color: #64748b; font-size: 0.85rem; text-decoration: none; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center;">Reset</a>
             {% endif %}
         </form>
     </div>
 
     <!-- TABLE -->
-    <div class="table-responsive"
-        style="background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.5rem;">
-        <table class="table mb-0" style="width: 100%; border-collapse: collapse; text-align: left; min-width: 800px;">
+    <div class="table-responsive riwayat-table-card">
+        <table class="table mb-0 riwayat-table">
             <thead>
                 <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                     <th
@@ -195,7 +446,7 @@
     <div id="paginationContainer">
     {% if is_paginated %}
     <div
-        style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; font-size: 0.8rem; color: #64748b;">
+        style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; font-size: 0.8rem; color: #64748b;">
         <div>Menampilkan {{ page_obj.start_index }}-{{ page_obj.end_index }} dari {{ page_obj.paginator.count }}
             kunjungan Anda</div>
         <div style="display: flex; gap: 0.5rem;">
@@ -220,9 +471,9 @@
 
     <!-- FOOTER -->
     <div
-        style="display: flex; justify-content: space-between; align-items: center; margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; font-size: 0.75rem; color: #94a3b8;">
+        style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; font-size: 0.75rem; color: #94a3b8;">
         <div>© 2026 DISKOMINFOSATIK - DIGITAL DIPLOMAT SYSTEM</div>
-        <div style="display: flex; gap: 1.5rem;">
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
             <a href="#" style="color: #94a3b8; text-decoration: none;">SYARAT & KETENTUAN</a>
             <a href="#" style="color: #94a3b8; text-decoration: none;">KEBIJAKAN PRIVASI</a>
             <a href="#" style="color: #94a3b8; text-decoration: none;">BANTUAN TEKNIS</a>

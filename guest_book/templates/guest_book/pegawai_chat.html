@@ -141,10 +141,11 @@
         padding: 0.85rem 1.25rem !important;
         border-radius: 18px !important;
         font-size: 0.925rem !important;
-        line-height: 1.5 !important;
+        line-height: 1.6 !important;
         position: relative !important;
         overflow-wrap: break-word !important;
         word-break: break-word !important;
+        white-space: pre-wrap !important;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
     }
     .sent .msg-bubble { 
@@ -158,6 +159,37 @@
         color: #1e293b !important; 
         border-bottom-left-radius: 4px !important; 
         border: 1px solid #e2e8f0 !important; 
+    }
+    .msg-group.is-ai-msg .msg-bubble,
+    .sent.is-ai-msg .msg-bubble,
+    .received.is-ai-msg .msg-bubble {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border: 1.5px solid #bfdbfe !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08) !important;
+    }
+    .sent:not(.is-ai-msg) .msg-bubble strong {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    .received .msg-bubble strong,
+    .is-ai-msg .msg-bubble strong {
+        color: #0f172a !important;
+        font-weight: 700 !important;
+    }
+    .ai-chat-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.75rem;
+        font-weight: 800;
+        color: #1d4ed8;
+        background: #eff6ff;
+        padding: 0.35rem 0.7rem;
+        border-radius: 8px;
+        margin-bottom: 0.65rem;
+        border: 1px solid #bfdbfe;
+        white-space: nowrap;
     }
     
     .msg-time { font-size: 0.7rem !important; color: #94a3b8 !important; font-weight: 500 !important; margin: 0 4px !important; }
@@ -250,17 +282,48 @@
         background: #e2e8f0 !important;
     }
 
+    .chat-back-btn {
+        display: none !important;
+        color: #64748b !important;
+        font-size: 1.15rem !important;
+        text-decoration: none !important;
+        padding: 0.25rem 0.4rem !important;
+        border-radius: 8px !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .chat-back-btn:hover {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+    }
+
     @media (max-width: 900px) {
-        .chat-card { grid-template-columns: 1fr !important; height: 85vh !important; }
+        .chat-card { grid-template-columns: minmax(0, 1fr) !important; height: calc(100dvh - 115px) !important; border-radius: 16px !important; }
+        .chat-back-btn { display: inline-flex !important; }
         
-        .chat-sidebar { display: flex !important; }
-        .chat-window { display: none !important; }
+        .chat-sidebar { display: flex !important; min-width: 0 !important; width: 100% !important; }
+        .chat-window { display: none !important; min-width: 0 !important; width: 100% !important; overflow: hidden !important; }
         
         .chat-card.chat-active .chat-sidebar { display: none !important; }
-        .chat-card.chat-active .chat-window { display: flex !important; height: 100% !important; }
+        .chat-card.chat-active .chat-window { display: flex !important; height: 100% !important; min-width: 0 !important; width: 100% !important; }
+    }
+
+    @media (max-width: 576px) {
+        .chat-card { height: calc(100dvh - 100px) !important; border-radius: 14px !important; }
+        .chat-header { padding: 0.75rem 0.9rem !important; gap: 0.5rem !important; }
+        .active-user-info { gap: 0.6rem !important; min-width: 0 !important; flex: 1 1 auto !important; }
+        .active-user-info .name { font-size: 0.88rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+        .message-area { padding: 1rem 0.85rem !important; gap: 0.85rem !important; }
+        .msg-group { max-width: 88% !important; }
+        .msg-bubble { padding: 0.75rem 0.95rem !important; font-size: 0.86rem !important; }
+        .chat-input-area { padding: 0.75rem 0.85rem !important; }
+        .input-wrapper { padding: 0.3rem 0.35rem 0.3rem 0.65rem !important; gap: 0.4rem !important; }
+        .input-wrapper input { font-size: 0.85rem !important; }
+        .btn-send { width: 38px !important; height: 38px !important; border-radius: 10px !important; flex-shrink: 0 !important; }
+        .action-btn-circle { width: 34px !important; height: 34px !important; flex-shrink: 0 !important; }
     }
 </style>
-<div class="chat-card {% if request.GET.session %}chat-active{% endif %}">
+<div class="chat-card {% if request.GET.session %}chat-active{% endif %}" id="pegawaiChatCard">
     <!-- Sidebar -->
     <div class="chat-sidebar">
         <div class="sidebar-header" style="padding: 1rem !important; background: #ffffff !important; border-bottom: 1px solid #f1f5f9 !important;">
@@ -302,11 +365,11 @@
         {% if active_conversation %}
         <div class="chat-header">
             <div class="active-user-info">
-                <a href="{% url 'tamu:pegawai_chat' %}" class="d-inline-block d-md-none me-3" style="color: #64748b; font-size: 1.25rem; text-decoration: none;"><i class="fas fa-arrow-left"></i></a>
-                <div class="avatar initials-avatar" data-name="{{ active_conversation.name }}" style="width:40px; height:40px; font-size:0.8rem;">
+                <a href="{% url 'tamu:pegawai_chat' %}" class="chat-back-btn" id="btnPegawaiMobileBack"><i class="fas fa-arrow-left"></i></a>
+                <div class="avatar initials-avatar" data-name="{{ active_conversation.name }}" style="width:40px; height:40px; font-size:0.8rem; flex-shrink:0;">
                     {{ active_conversation.avatar_letters }}
                 </div>
-                <div>
+                <div style="min-width: 0;">
                     <div class="name">{{ active_conversation.name }}</div>
                     <div class="status">Online</div>
                 </div>
@@ -320,7 +383,7 @@
             </div>
         </div>
 
-        <div class="message-area" id="messageArea" style="flex: 1 !important; padding: 2rem !important; overflow-y: auto !important; display: flex !important; flex-direction: column !important; gap: 1.25rem !important; background-color: #f8fafc !important; background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') !important; background-repeat: repeat !important; background-size: 400px !important; min-height: 0 !important;">
+        <div class="message-area" id="messageArea" style="flex: 1 !important; overflow-y: auto !important; display: flex !important; flex-direction: column !important; background-color: #f8fafc !important; background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') !important; background-repeat: repeat !important; background-size: 400px !important; min-height: 0 !important;">
             {% for msg in messages_list %}
             
             <!-- DATE SEPARATOR -->
@@ -330,24 +393,8 @@
             </div>
             {% endifchanged %}
 
-            <div class="msg-group {% if msg.sender_type == 'pegawai' %}sent{% else %}received{% endif %}" data-id="{{ msg.id }}" data-created-at="{{ msg.created_at|date:'c' }}">
-                <div class="msg-bubble">
-                    {% if msg.message_type == 'deleted' %}
-                        <span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>
-                    {% elif msg.message_type == 'image' and msg.attachment %}
-                        <img src="{{ msg.attachment.url }}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">
-                    {% elif msg.message_type == 'file' and msg.attachment %}
-                        <a href="{{ msg.attachment.url }}" target="_blank" rel="noopener noreferrer" class="file-card">
-                            <i class="fas fa-file-alt"></i>
-                            <div class="file-info">
-                                <span class="file-name">{{ msg.attachment.name|cut:"chat_attachments/" }}</span>
-                                <span class="file-size">Klik untuk mengunduh</span>
-                            </div>
-                        </a>
-                    {% else %}
-                        {{ msg.content }}
-                    {% endif %}
-                </div>
+            <div class="msg-group {% if msg.sender_type == 'pegawai' %}sent{% else %}received{% endif %}{% if '🤖' in msg.content or 'Asisten AI' in msg.content %} is-ai-msg{% endif %}" data-id="{{ msg.id }}" data-created-at="{{ msg.created_at|date:'c' }}">
+                <div class="msg-bubble">{% if msg.message_type == 'deleted' %}<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>{% elif msg.message_type == 'image' and msg.attachment %}<img src="{{ msg.attachment.url }}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">{% elif msg.message_type == 'file' and msg.attachment %}<a href="{{ msg.attachment.url }}" target="_blank" rel="noopener noreferrer" class="file-card"><i class="fas fa-file-alt"></i><div class="file-info"><span class="file-name">{{ msg.attachment.name|cut:"chat_attachments/" }}</span><span class="file-size">Klik untuk mengunduh</span></div></a>{% else %}{{ msg.content }}{% endif %}</div>
                 <div class="msg-time" style="display: flex; gap: 0.5rem; align-items: center;">
                     <span>{{ msg.created_at|date:"H:i" }}</span>
                     {% if msg.sender_type == 'pegawai' %}
@@ -374,7 +421,7 @@
             {% endfor %}
         </div>
 
-        <div class="chat-input-area" style="padding: 1.5rem !important; background: #ffffff !important; border-top: 1px solid #f1f5f9 !important; z-index: 10 !important;">
+        <div class="chat-input-area" style="background: #ffffff !important; border-top: 1px solid #f1f5f9 !important; z-index: 10 !important;">
             <div id="editModeIndicator" style="display: none; background: #fef08a; padding: 0.5rem 1rem; border-radius: 12px; font-size: 0.85rem; margin-bottom: 0.75rem; justify-content: space-between; align-items: center; border: 1px solid #fde047; color: #713f12;">
                 <span><i class="fas fa-pencil-alt"></i> Sedang mengedit pesan...</span>
                 <button type="button" id="btnCancelEdit" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem;"><i class="fas fa-times"></i></button>
@@ -455,7 +502,9 @@
                     if (msgEl) {
                         const bubble = msgEl.querySelector('.msg-bubble');
                         if (data.action === 'edit') {
-                            bubble.innerText = data.message;
+                            const isAi = (data.message || '').indexOf('🤖') !== -1 || (data.message || '').indexOf('Asisten AI') !== -1;
+                            if (isAi) msgEl.classList.add('is-ai-msg');
+                            bubble.innerHTML = formatChatMessageHtml(data.message, msgEl.classList.contains('sent') && !isAi);
                         } else if (data.action === 'delete') {
                             bubble.innerHTML = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
                             const btns = msgEl.querySelectorAll('.edit-msg-btn, .delete-msg-btn');
@@ -573,14 +622,53 @@
         return div.innerHTML;
     }
 
+    function formatChatMessageHtml(rawText, isPureSent = false) {
+        if (!rawText) return '';
+        let cleaned = rawText.trim();
+
+        cleaned = cleaned.replace(
+            /•\s*\[[A-F0-9]+\]\s*([^\s—]+)\s+([^\s—]+)\s*—\s*Pegawai:\s*([^→\n]+)\s*→\s*Status:\s*([^\n]+)/gi,
+            (match, tgl, jam, peg, st) => {
+                return `📌 **Kunjungan (${tgl} pukul ${jam.trim()} WIB)**\n   • Pegawai : ${peg.trim()}\n   • Status  : **${st.trim()}**`;
+            }
+        );
+
+        let safe = escapeHtml(cleaned);
+
+        safe = safe.replace(
+            /🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/gi,
+            '<div class="ai-chat-badge"><i class="fas fa-robot"></i> <span>Asisten AI Diskominfosantik</span></div>'
+        );
+
+        const strongColor = isPureSent ? 'color:#ffffff;' : 'color:#0f172a;';
+        safe = safe.replace(/\*\*([^*]+)\*\*/g, `<strong style="${strongColor}font-weight:700;">$1</strong>`);
+
+        return safe;
+    }
+
+    // Format ulang riwayat pesan yang sudah dirender saat halaman dimuat
+    document.querySelectorAll('#messageArea .msg-group .msg-bubble').forEach(bubble => {
+        if (!bubble.querySelector('img, a.file-card, span')) {
+            const raw = bubble.textContent;
+            const msgGroup = bubble.closest('.msg-group');
+            const isAi = raw.indexOf('🤖') !== -1 || raw.indexOf('Asisten AI') !== -1;
+            if (isAi && msgGroup) {
+                msgGroup.classList.add('is-ai-msg');
+            }
+            const isSent = msgGroup && msgGroup.classList.contains('sent');
+            bubble.innerHTML = formatChatMessageHtml(raw, isSent && !isAi);
+        }
+    });
+
     function addMessageToUI(content, type, time, messageType = 'text', fileUrl = null, messageId = null) {
         const msgArea = document.getElementById('messageArea');
         const msgGroup = document.createElement('div');
-        msgGroup.className = `msg-group ${type}`;
+        const isAi = (content || '').indexOf('🤖') !== -1 || (content || '').indexOf('Asisten AI') !== -1;
+        msgGroup.className = `msg-group ${type}${isAi ? ' is-ai-msg' : ''}`;
         if (messageId) msgGroup.setAttribute('data-id', messageId);
         msgGroup.setAttribute('data-created-at', new Date().toISOString()); 
         
-        let bubbleContent = escapeHtml(content);
+        let bubbleContent = '';
         if (messageType === 'deleted') {
             bubbleContent = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
         } else if (messageType === 'image') {
@@ -595,6 +683,8 @@
                     <span class="file-size">Klik untuk mengunduh</span>
                 </div>
             </a>`;
+        } else {
+            bubbleContent = formatChatMessageHtml(content, type === 'sent' && !isAi);
         }
         
         const isSent = type === 'sent';

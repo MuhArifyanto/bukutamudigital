@@ -13,8 +13,12 @@
         border-radius: 20px !important;
         height: calc(100vh - 130px) !important; /* Diperbesar kebawah agar lebih lega */
         min-height: 550px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
         display: grid !important;
-        grid-template-columns: 340px 1fr !important;
+        grid-template-columns: 340px minmax(0, 1fr) !important;
         grid-template-rows: minmax(0, 1fr) !important;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
         border: 1px solid #f1f5f9 !important;
@@ -110,6 +114,11 @@
         flex-direction: column !important;
         background: #fbfcfe !important;
         min-height: 0 !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
     }
     .chat-header {
         padding: 1.25rem 1.5rem !important;
@@ -120,9 +129,13 @@
         justify-content: space-between !important;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
         z-index: 10 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
     }
-    .active-user-info { display: flex !important; align-items: center !important; gap: 1rem !important; }
-    .active-user-info .name { font-size: 1.05rem !important; font-weight: 800 !important; color: #0f172a !important; }
+    .active-user-info { display: flex !important; align-items: center !important; gap: 1rem !important; min-width: 0 !important; flex: 1 1 0% !important; overflow: hidden !important; }
+    .active-user-info .name { font-size: 1.05rem !important; font-weight: 800 !important; color: #0f172a !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
     .active-user-info .status { font-size: 0.8rem !important; color: var(--accent) !important; display: flex !important; align-items: center !important; gap: 6px !important; font-weight: 600 !important; }
     .active-user-info .status::before { content: '' !important; width: 8px !important; height: 8px !important; background: var(--accent) !important; border-radius: 50% !important; }
 
@@ -130,25 +143,38 @@
         flex: 1 !important;
         padding: 2rem !important;
         overflow-y: auto !important;
+        overflow-x: hidden !important;
         display: flex !important;
         flex-direction: column !important;
         gap: 1.25rem !important;
         background: #f8fafc !important;
         min-height: 0 !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .chat-date-sep {
+        text-align: center;
+        margin: 0.75rem 0;
+        position: relative;
+        z-index: 1;
     }
     
-    .msg-group { display: flex !important; flex-direction: column !important; gap: 0.4rem !important; max-width: 65% !important; }
+    .msg-group { display: flex !important; flex-direction: column !important; gap: 0.3rem !important; max-width: 68% !important; width: fit-content !important; }
     .msg-group.sent { align-self: flex-end !important; align-items: flex-end !important; }
     .msg-group.received { align-self: flex-start !important; align-items: flex-start !important; }
 
     .msg-bubble {
-        padding: 0.85rem 1.25rem !important;
+        padding: 0.8rem 1.15rem !important;
         border-radius: 18px !important;
-        font-size: 0.925rem !important;
+        font-size: 0.92rem !important;
         line-height: 1.5 !important;
         position: relative !important;
         overflow-wrap: break-word !important;
         word-break: break-word !important;
+        width: fit-content !important;
+        max-width: 100% !important;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
     }
     .sent .msg-bubble { 
@@ -162,6 +188,48 @@
         color: #1e293b !important; 
         border-bottom-left-radius: 4px !important; 
         border: 1px solid #e2e8f0 !important; 
+        white-space: pre-wrap !important;
+    }
+    .sent .msg-bubble {
+        white-space: pre-wrap !important;
+    }
+    .ai-quick-chips {
+        display: flex !important;
+        gap: 0.5rem !important;
+        flex-wrap: wrap !important;
+        margin-bottom: 0.75rem !important;
+    }
+    .ai-chip-btn {
+        background: #eff6ff !important;
+        color: #1d4ed8 !important;
+        border: 1px solid #bfdbfe !important;
+        border-radius: 99px !important;
+        padding: 0.35rem 0.75rem !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+    }
+    .ai-chip-btn:hover {
+        background: #dbeafe !important;
+        border-color: #93c5fd !important;
+        transform: translateY(-1px) !important;
+    }
+    .ai-mode-btn {
+        border: 1px solid #bfdbfe;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.35rem 0.75rem;
+        border-radius: 99px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .ai-mode-btn.human-mode {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #475569;
     }
     
     .msg-time { font-size: 0.7rem !important; color: #94a3b8 !important; font-weight: 500 !important; margin: 0 4px !important; }
@@ -172,6 +240,11 @@
         background: #ffffff !important;
         border-top: 1px solid #f1f5f9 !important;
         z-index: 10 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
     }
     .input-wrapper {
         display: flex !important;
@@ -182,6 +255,10 @@
         align-items: center !important;
         border: 1px solid #e2e8f0 !important;
         transition: all 0.2s !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
     }
     .input-wrapper:focus-within {
         border-color: #bfdbfe !important;
@@ -190,6 +267,8 @@
     }
     .input-wrapper input {
         flex: 1 !important;
+        min-width: 0 !important;
+        width: 100% !important;
         background: transparent !important;
         border: none !important;
         padding: 0.5rem !important;
@@ -254,19 +333,169 @@
         background: #e2e8f0 !important;
     }
 
+    .chat-back-btn {
+        display: none !important;
+        color: #64748b !important;
+        font-size: 1.15rem !important;
+        text-decoration: none !important;
+        padding: 0.25rem 0.4rem !important;
+        border-radius: 8px !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .chat-back-btn:hover {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+    }
+
     @media (max-width: 900px) {
-        .chat-card { grid-template-columns: 1fr !important; height: 85vh !important; }
+        .page-content { padding: 0.75rem !important; }
+        .chat-card {
+            grid-template-columns: minmax(0, 1fr) !important;
+            height: calc(100dvh - 82px) !important;
+            min-height: 0 !important;
+            margin-top: 0 !important;
+            border-radius: 16px !important;
+        }
+        .chat-back-btn { display: inline-flex !important; }
         
-        .chat-sidebar { display: flex !important; }
-        .chat-window { display: none !important; }
+        .chat-sidebar { display: flex !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; height: 100% !important; border-right: none !important; }
+        .chat-window { display: none !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
         
         .chat-card.chat-active .chat-sidebar { display: none !important; }
-        .chat-card.chat-active .chat-window { display: flex !important; height: 100% !important; }
+        .chat-card.chat-active .chat-window { display: flex !important; height: 100% !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+    }
+
+    @media (max-width: 576px) {
+        .page-content { padding: 0.5rem !important; }
+        .chat-card {
+            grid-template-columns: minmax(0, 1fr) !important;
+            height: calc(100dvh - 72px) !important;
+            min-height: 0 !important;
+            margin-top: 0 !important;
+            border-radius: 14px !important;
+        }
+        .chat-header {
+            padding: 0.6rem 0.75rem !important;
+            flex-wrap: nowrap !important;
+            justify-content: space-between !important;
+            gap: 0.45rem !important;
+        }
+        .active-user-info {
+            gap: 0.45rem !important;
+            min-width: 0 !important;
+            flex: 1 1 0% !important;
+            overflow: hidden !important;
+        }
+        .active-user-info > div:last-child {
+            min-width: 0 !important;
+            flex: 1 1 0% !important;
+            overflow: hidden !important;
+        }
+        .active-user-info .avatar {
+            width: 34px !important;
+            height: 34px !important;
+            border-radius: 10px !important;
+            font-size: 0.72rem !important;
+            flex-shrink: 0 !important;
+        }
+        .active-user-info .name {
+            font-size: 0.82rem !important;
+            line-height: 1.2 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 100% !important;
+        }
+        .active-user-info .status {
+            font-size: 0.68rem !important;
+            gap: 4px !important;
+        }
+        .active-user-info .status::before {
+            width: 6px !important;
+            height: 6px !important;
+        }
+        .header-actions {
+            width: auto !important;
+            flex-shrink: 0 !important;
+            border-top: none !important;
+            padding-top: 0 !important;
+        }
+        .header-actions .badge.bg-primary {
+            display: none !important;
+        }
+        .ai-mode-btn {
+            padding: 0.26rem 0.55rem !important;
+            font-size: 0.64rem !important;
+            white-space: nowrap !important;
+        }
+        .message-area {
+            padding: 0.75rem 0.7rem !important;
+            gap: 0.55rem !important;
+        }
+        .chat-date-sep {
+            margin: 0.25rem 0 !important;
+        }
+        .msg-group {
+            max-width: 85% !important;
+            gap: 0.2rem !important;
+        }
+        .msg-bubble {
+            padding: 0.6rem 0.85rem !important;
+            font-size: 0.82rem !important;
+            line-height: 1.45 !important;
+            border-radius: 14px !important;
+        }
+        .msg-time {
+            font-size: 0.64rem !important;
+        }
+        .chat-input-area {
+            padding: 0.55rem 0.65rem !important;
+        }
+        .ai-quick-chips {
+            width: 0 !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            margin-bottom: 0.45rem !important;
+            padding-bottom: 0.15rem !important;
+            gap: 0.35rem !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .ai-quick-chips::-webkit-scrollbar { display: none; }
+        .ai-chip-btn {
+            flex-shrink: 0 !important;
+            font-size: 0.68rem !important;
+            padding: 0.28rem 0.6rem !important;
+        }
+        .input-wrapper {
+            padding: 0.2rem 0.25rem 0.2rem 0.4rem !important;
+            gap: 0.3rem !important;
+            border-radius: 12px !important;
+        }
+        .input-wrapper input {
+            font-size: 0.82rem !important;
+            padding: 0.35rem 0.2rem !important;
+        }
+        .btn-send {
+            width: 34px !important;
+            height: 34px !important;
+            border-radius: 9px !important;
+            flex-shrink: 0 !important;
+            font-size: 0.8rem !important;
+        }
+        .action-btn-circle {
+            width: 30px !important;
+            height: 30px !important;
+            flex-shrink: 0 !important;
+            font-size: 0.82rem !important;
+        }
     }
 </style>
 
-<div style="padding: 1.5rem 2rem;">
-<div class="chat-card {% if request.GET.session %}chat-active{% endif %}">
+<div class="chat-card {% if request.GET.session or conversations|length == 1 %}chat-active{% endif %}" id="tamuChatCard">
     <!-- Sidebar -->
     <div class="chat-sidebar">
         <div class="sidebar-header" style="padding: 1rem !important; background: #ffffff !important; border-bottom: 1px solid #f1f5f9 !important;">
@@ -308,17 +537,24 @@
         {% if active_conv %}
         <div class="chat-header">
             <div class="active-user-info">
-                <a href="{% url 'tamu:user_chat' %}" class="d-inline-block d-md-none me-3" style="color: #64748b; font-size: 1.25rem; text-decoration: none;"><i class="fas fa-arrow-left"></i></a>
-                <div class="avatar initials-avatar" data-name="{{ active_conv.name }}" style="width:40px; height:40px; font-size:0.8rem; border-radius:14px;">
+                <a href="{% url 'tamu:user_chat' %}" class="chat-back-btn" id="btnMobileBackToList" title="Daftar Percakapan"><i class="fas fa-arrow-left"></i></a>
+                <div class="avatar initials-avatar" data-name="{{ active_conv.name }}" style="width:40px; height:40px; font-size:0.8rem; border-radius:14px; flex-shrink:0;">
                     {{ active_conv.avatar_letters }}
                 </div>
-                <div>
+                <div style="min-width: 0;">
                     <div class="name">{{ active_conv.name }}</div>
                     <div class="status">Online</div>
                 </div>
             </div>
-            <div class="header-actions">
+            <div class="header-actions" style="display: flex; align-items: center; gap: 0.5rem;">
                 {% if active_conv.type == 'admin' %}
+                    <button type="button" id="btnToggleAiMode" class="ai-mode-btn {% if ai_handoff_active %}human-mode{% endif %}" title="{% if ai_handoff_active %}Saat ini terhubung langsung dengan Admin. Klik jika ingin kembali ke Asisten AI.{% else %}Dilayani oleh Asisten AI terlebih dahulu (otomatis beralih ke Admin jika 3x belum terjawab/kurang sesuai){% endif %}">
+                        {% if ai_handoff_active %}
+                            <i class="fas fa-user-shield"></i> <span class="d-none d-sm-inline">Terhubung ke </span>Admin
+                        {% else %}
+                            <i class="fas fa-robot"></i> <span class="d-none d-sm-inline">Dilayani </span>Asisten AI
+                        {% endif %}
+                    </button>
                     <span class="badge bg-primary">Admin</span>
                 {% else %}
                     <span class="badge" style="background:#10b981;">Pegawai</span>
@@ -326,35 +562,19 @@
             </div>
         </div>
 
-        <div class="message-area" id="messageArea" style="flex: 1 !important; padding: 2rem !important; overflow-y: auto !important; display: flex !important; flex-direction: column !important; gap: 1.25rem !important; background-color: #f8fafc !important; background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') !important; background-repeat: repeat !important; background-size: 400px !important; min-height: 0 !important; overscroll-behavior: contain;">
+        <div class="message-area" id="messageArea" style="flex: 1 !important; overflow-y: auto !important; display: flex !important; flex-direction: column !important; background-color: #f8fafc !important; background-image: linear-gradient(rgba(248, 250, 252, 0.9), rgba(248, 250, 252, 0.9)), url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') !important; background-repeat: repeat !important; background-size: 400px !important; min-height: 0 !important; overscroll-behavior: contain;">
             {% for msg in messages_list %}
             
             <!-- DATE SEPARATOR -->
             {% ifchanged msg.created_at.date %}
-            <div style="text-align: center; margin: 1.5rem 0; position: relative; z-index: 1;">
-                <span style="background: #eff6ff; color: #1e40af; font-size: 0.65rem; font-weight: 800; padding: 0.35rem 0.85rem; border-radius: 99px; letter-spacing: 0.05em; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">{{ msg.created_at|smart_date }}</span>
+            <div class="chat-date-sep">
+                <span style="background: #eff6ff; color: #1e40af; font-size: 0.65rem; font-weight: 800; padding: 0.3rem 0.75rem; border-radius: 99px; letter-spacing: 0.05em; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">{{ msg.created_at|smart_date }}</span>
             </div>
             {% endifchanged %}
 
             <div class="msg-group {% if msg.sender_type == 'tamu' %}sent{% else %}received{% endif %}" data-id="{{ msg.id }}" data-created-at="{{ msg.created_at|date:'c' }}">
-                <div class="msg-bubble">
-                    {% if msg.message_type == 'deleted' %}
-                        <span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>
-                    {% elif msg.message_type == 'image' and msg.attachment %}
-                        <img src="{{ msg.attachment.url }}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">
-                    {% elif msg.message_type == 'file' and msg.attachment %}
-                        <a href="{{ msg.attachment.url }}" target="_blank" rel="noopener noreferrer" class="file-card">
-                            <i class="fas fa-file-alt"></i>
-                            <div class="file-info">
-                                <span class="file-name">{{ msg.attachment.name|cut:"chat_attachments/" }}</span>
-                                <span class="file-size">Klik untuk mengunduh</span>
-                            </div>
-                        </a>
-                    {% else %}
-                        {{ msg.content }}
-                    {% endif %}
-                </div>
-                <div class="msg-time" style="display: flex; gap: 0.5rem; align-items: center;">
+                <div class="msg-bubble">{% if msg.message_type == 'deleted' %}<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>{% elif msg.message_type == 'image' and msg.attachment %}<img src="{{ msg.attachment.url }}" style="max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 8px;" alt="Gambar">{% elif msg.message_type == 'file' and msg.attachment %}<a href="{{ msg.attachment.url }}" target="_blank" rel="noopener noreferrer" class="file-card"><i class="fas fa-file-alt"></i><div class="file-info"><span class="file-name">{{ msg.attachment.name|cut:"chat_attachments/" }}</span><span class="file-size">Klik untuk mengunduh</span></div></a>{% else %}{{ msg.content }}{% endif %}</div>
+                <div class="msg-time" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                     <span>{{ msg.created_at|date:"H:i" }}</span>
                     {% if msg.sender_type == 'tamu' %}
                         {% if msg.is_read %}
@@ -380,7 +600,19 @@
             {% endfor %}
         </div>
 
-        <div class="chat-input-area" style="padding: 1.5rem !important; background: #ffffff !important; border-top: 1px solid #f1f5f9 !important; z-index: 10 !important;">
+        <div class="chat-input-area" style="background: #ffffff !important; border-top: 1px solid #f1f5f9 !important; z-index: 10 !important;">
+            <div id="aiTypingIndicator" style="display: none; font-size: 0.78rem; color: #2563eb; font-weight: 600; margin-bottom: 0.6rem; align-items: center; gap: 0.4rem;">
+                <i class="fas fa-circle-notch fa-spin"></i> <span>Asisten AI sedang memproses jawaban...</span>
+            </div>
+            {% if active_conv.type == 'admin' %}
+            <div class="ai-quick-chips" id="aiQuickChips" {% if ai_handoff_active %}style="display: none;"{% endif %}>
+                <button type="button" class="ai-chip-btn" data-prompt="Cek status kunjungan saya saat ini">📅 Cek Status Kunjungan</button>
+                <button type="button" class="ai-chip-btn" data-prompt="Berapa sisa kuota kunjungan dan jam operasional hari ini?">📊 Jadwal & Sisa Kuota</button>
+                <button type="button" class="ai-chip-btn" data-prompt="Informasi bidang layanan dan pegawai yang bertugas">🏢 Info Layanan & Pegawai</button>
+                <button type="button" class="ai-chip-btn" data-fill="Buatkan saya daftar kunjungan untuk hari Senin jam 09:00 keperluan ">📝 Buat Kunjungan</button>
+                <button type="button" class="ai-chip-btn" data-fill="Saya ingin menyampaikan masukan/keluhan: ">💬 Keluhan & Masukan</button>
+            </div>
+            {% endif %}
             <div id="editModeIndicator" style="display: none; background: #fef08a; padding: 0.5rem 1rem; border-radius: 12px; font-size: 0.85rem; margin-bottom: 0.75rem; justify-content: space-between; align-items: center; border: 1px solid #fde047; color: #713f12;">
                 <span><i class="fas fa-pencil-alt"></i> Sedang mengedit pesan...</span>
                 <button type="button" id="btnCancelEdit" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem;"><i class="fas fa-times"></i></button>
@@ -404,17 +636,50 @@
         {% endif %}
     </div>
 </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/chat_client.js' %}"></script>
 <script>
     let activeSession = "{% if active_conv %}{{ active_conv.session_id }}{% endif %}";
+    let isAdminConv = "{% if active_conv and active_conv.type == 'admin' %}true{% else %}false{% endif %}" === "true";
+    let isHandoffActive = "{% if ai_handoff_active %}true{% else %}false{% endif %}" === "true";
+    let aiAssistantEnabled = isAdminConv && !isHandoffActive;
+    let aiTypingTimeout = null;
     let tamuId = "{{ tamu_id }}";
     let chatSocket;
     let editingMessageId = null;
     let lastMsgId = "{% if active_conv %}{% with last=active_conv.messages|last %}{{ last.id }}{% endwith %}{% endif %}";
+
+    function switchUiToAdminHandoff() {
+        isHandoffActive = true;
+        aiAssistantEnabled = false;
+        const btnToggleAi = document.getElementById('btnToggleAiMode');
+        const aiChips = document.getElementById('aiQuickChips');
+        const chatInput = document.getElementById('chatInput');
+        if (btnToggleAi) {
+            btnToggleAi.classList.add('human-mode');
+            btnToggleAi.innerHTML = '<i class="fas fa-user-shield"></i> <span class="d-none d-sm-inline">Terhubung ke </span>Admin';
+            btnToggleAi.title = 'Saat ini terhubung langsung dengan Admin. Klik jika ingin kembali ke Asisten AI.';
+        }
+        if (aiChips) aiChips.style.display = 'none';
+        if (chatInput) chatInput.placeholder = 'Ketik pesan langsung untuk Petugas Admin...';
+    }
+
+    function switchUiToAiAssistant() {
+        isHandoffActive = false;
+        aiAssistantEnabled = true;
+        const btnToggleAi = document.getElementById('btnToggleAiMode');
+        const aiChips = document.getElementById('aiQuickChips');
+        const chatInput = document.getElementById('chatInput');
+        if (btnToggleAi) {
+            btnToggleAi.classList.remove('human-mode');
+            btnToggleAi.innerHTML = '<i class="fas fa-robot"></i> <span class="d-none d-sm-inline">Dilayani </span>Asisten AI';
+            btnToggleAi.title = 'Dilayani oleh Asisten AI terlebih dahulu (otomatis beralih ke Admin jika 3x belum terjawab/kurang sesuai)';
+        }
+        if (aiChips) aiChips.style.display = 'flex';
+        if (chatInput) chatInput.placeholder = 'Tanya Asisten AI atau ketik pesan...';
+    }
     
     (function() {
         "use strict";
@@ -429,6 +694,26 @@
             el.style.alignItems = 'center';
             el.style.justifyContent = 'center';
             el.style.fontWeight = 'bold';
+        });
+
+        // Mobile back button to show conversation list
+        const btnMobileBack = document.getElementById('btnMobileBackToList');
+        const tamuChatCard = document.getElementById('tamuChatCard');
+        if (btnMobileBack && tamuChatCard) {
+            btnMobileBack.addEventListener('click', function(e) {
+                if (window.innerWidth <= 900) {
+                    e.preventDefault();
+                    tamuChatCard.classList.remove('chat-active');
+                }
+            });
+        }
+        document.querySelectorAll('.chat-sidebar .chat-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                if (window.innerWidth <= 900 && item.classList.contains('active') && tamuChatCard) {
+                    e.preventDefault();
+                    tamuChatCard.classList.add('chat-active');
+                }
+            });
         });
 
         // Scroll to bottom
@@ -450,6 +735,14 @@
                 historyApiUrl: '/api/chat/messages/',
                 onMessageReceived: (data, isLive = true) => {
                     const type = data.sender_type === 'tamu' ? 'sent' : 'received';
+                    if (type === 'received') {
+                        const typingEl = document.getElementById('aiTypingIndicator');
+                        if (typingEl) typingEl.style.display = 'none';
+                        if (aiTypingTimeout) clearTimeout(aiTypingTimeout);
+                        if (data.handoff_active || (data.message && data.message.indexOf('[Dialihkan Otomatis ke Petugas Admin]') !== -1) || (data.sender_type === 'admin' && data.message && data.message.indexOf('🤖 Asisten AI') === -1)) {
+                            switchUiToAdminHandoff();
+                        }
+                    }
                     if (type === 'received' && isLive) {
                         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
                         audio.play().catch(e => console.log('Autoplay diblokir browser'));
@@ -493,16 +786,55 @@
                         document.getElementById('editModeIndicator').style.display = 'none';
                         chatInput.placeholder = "Ketik pesan balasan di sini...";
                     } else {
+                        if (aiAssistantEnabled && isAdminConv) {
+                            const typingEl = document.getElementById('aiTypingIndicator');
+                            if (typingEl) typingEl.style.display = 'flex';
+                            if (aiTypingTimeout) clearTimeout(aiTypingTimeout);
+                            aiTypingTimeout = setTimeout(() => {
+                                if (typingEl) typingEl.style.display = 'none';
+                            }, 12000);
+                        }
                         chatSocket.send(JSON.stringify({
                             'action': 'create',
                             'message': text,
                             'sender_id': tamuId,
                             'sender_type': 'tamu',
-                            'message_type': 'text'
+                            'message_type': 'text',
+                            'ai_assistant': Boolean(aiAssistantEnabled && isAdminConv)
                         }));
                     }
                 };
             }
+
+            // Status Mode Asisten AI (otomatis ke Admin setelah 3x tidak terjawab/kurang puas)
+            const btnToggleAi = document.getElementById('btnToggleAiMode');
+            if (btnToggleAi) {
+                btnToggleAi.addEventListener('click', () => {
+                    if (isHandoffActive) {
+                        switchUiToAiAssistant();
+                        if (chatSocket) {
+                            chatSocket.send(JSON.stringify({ action: 'reset_ai' }));
+                        }
+                    } else {
+                        alert('Silakan sampaikan pertanyaan Anda kepada Asisten AI terlebih dahulu. Jika 3 kali jawaban AI belum sesuai atau tidak dapat menjawab, obrolan akan otomatis dialihkan langsung ke Petugas Admin.');
+                    }
+                });
+            }
+
+            // Tombol Pertanyaan Cepat (Quick Chips)
+            document.querySelectorAll('.ai-chip-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const promptText = btn.getAttribute('data-prompt');
+                    const fillText = btn.getAttribute('data-fill');
+                    if (fillText && chatInput) {
+                        chatInput.value = fillText;
+                        chatInput.focus();
+                    } else if (promptText && chatInput && chatForm) {
+                        chatInput.value = promptText;
+                        chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
+                    }
+                });
+            });
 
             // File Upload Handle
             const btnAttach = document.getElementById('btnAttach');
@@ -579,6 +911,44 @@
         return div.innerHTML;
     }
 
+    function formatChatMessageHtml(rawText) {
+        if (!rawText) return '';
+        let cleaned = rawText.trim();
+
+        // Rapikan format pesan lama jika masih ada di riwayat database
+        cleaned = cleaned.replace(
+            /•\s*\[[A-F0-9]+\]\s*([^\s—]+)\s+([^\s—]+)\s*—\s*Pegawai:\s*([^→\n]+)\s*→\s*Status:\s*([^\n]+)/gi,
+            (match, tgl, jam, peg, st) => {
+                return `📌 **Kunjungan (${tgl} pukul ${jam.trim()} WIB)**\n   • Pegawai : ${peg.trim()}\n   • Status  : **${st.trim()}**`;
+            }
+        );
+
+        let safe = escapeHtml(cleaned);
+
+        // Render badge header Asisten AI agar rapi terpisah di bagian atas bubble
+        safe = safe.replace(
+            /^🤖\s*Asisten AI Diskominfosantik:?\s*\n*/i,
+            '<div style="display:flex;align-items:center;gap:0.45rem;font-size:0.75rem;font-weight:800;color:#1d4ed8;background:#eff6ff;padding:0.35rem 0.7rem;border-radius:8px;margin-bottom:0.65rem;border:1px solid #bfdbfe;"><i class="fas fa-robot"></i> <span>Asisten AI Diskominfosantik</span></div>'
+        );
+
+        // Render **bold** menjadi <strong>
+        safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:#0f172a;font-weight:700;">$1</strong>');
+
+        return safe;
+    }
+
+    // Format ulang riwayat pesan yang sudah dirender dari database saat halaman dimuat
+    document.querySelectorAll('.msg-group.received .msg-bubble').forEach(bubble => {
+        if (!bubble.querySelector('img, a.file-card, span')) {
+            bubble.innerHTML = formatChatMessageHtml(bubble.textContent);
+        }
+    });
+    document.querySelectorAll('.msg-group.sent .msg-bubble').forEach(bubble => {
+        if (!bubble.querySelector('img, a.file-card, span')) {
+            bubble.textContent = (bubble.textContent || '').trim();
+        }
+    });
+
     function addMessageToUI(content, type, time, messageType = 'text', fileUrl = null, messageId = null) {
         const msgArea = document.getElementById('messageArea');
         const msgGroup = document.createElement('div');
@@ -586,7 +956,7 @@
         if (messageId) msgGroup.setAttribute('data-id', messageId);
         msgGroup.setAttribute('data-created-at', new Date().toISOString()); 
         
-        let bubbleContent = escapeHtml(content);
+        let bubbleContent = type === 'received' ? formatChatMessageHtml(content) : escapeHtml((content || '').trim());
         if (messageType === 'deleted') {
             bubbleContent = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
         } else if (messageType === 'image') {
@@ -614,6 +984,12 @@
                 ${editBtn}
                 <a href="#" class="delete-msg-btn" style="color: #64748b; text-decoration: none;"><i class="fas fa-trash" style="font-size: 0.6rem;"></i></a>
             `;
+        } else if (!isSent && messageType === 'text' && content && content.indexOf('🤖 Asisten AI') !== -1 && content.indexOf('[Dialihkan Otomatis ke Petugas Admin]') === -1 && !isHandoffActive) {
+            actionButtons = `
+                <button type="button" onclick="sendAiUnsatisfiedFeedback(this)" style="background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; border-radius: 99px; padding: 0.15rem 0.55rem; font-size: 0.68rem; font-weight: 600; cursor: pointer; margin-left: 0.35rem;">
+                    👎 Jawaban kurang sesuai
+                </button>
+            `;
         }
 
         let ticks = '';
@@ -623,7 +999,7 @@
 
         msgGroup.innerHTML = `
             <div class="msg-bubble">${bubbleContent}</div>
-            <div class="msg-time" style="display: flex; gap: 0.5rem; align-items: center;">
+            <div class="msg-time" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                 <span>${time}</span>
                 ${ticks}
                 ${actionButtons}
@@ -636,6 +1012,20 @@
         
         msgArea.appendChild(msgGroup);
         msgArea.scrollTop = msgArea.scrollHeight;
+    }
+
+    function sendAiUnsatisfiedFeedback(btn) {
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.innerText = '👎 Dilaporkan kurang sesuai';
+        }
+        const chatInput = document.getElementById('chatInput');
+        const chatForm = document.getElementById('chatForm');
+        if (chatInput && chatForm) {
+            chatInput.value = 'Jawaban kurang sesuai';
+            chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
     }
 
     // Handle Edit Click

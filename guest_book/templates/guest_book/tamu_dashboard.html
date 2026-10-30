@@ -202,11 +202,19 @@
         text-transform: uppercase;
         padding: 0.25rem 0.5rem;
         border-radius: 99px;
+        display: inline-block;
+        white-space: nowrap;
     }
-    .badge-status.pending { background: #fef3c7; color: #d97706; }
-    .badge-status.in_progress { background: #dbeafe; color: #2563eb; }
+    .badge-status.pending,
+    .badge-status.menunggu_admin { background: #fef3c7; color: #b45309; }
+    .badge-status.menunggu_pegawai { background: #e0f2fe; color: #0369a1; }
+    .badge-status.disetujui_pegawai,
+    .badge-status.disetujui,
+    .badge-status.in_progress { background: #dbeafe; color: #1d4ed8; }
     .badge-status.completed { background: #dcfce7; color: #16a34a; }
-    .badge-status.cancelled { background: #fee2e2; color: #dc2626; }
+    .badge-status.cancelled,
+    .badge-status.ditolak_admin,
+    .badge-status.ditolak_pegawai { background: #fee2e2; color: #dc2626; }
 
     .search-input {
         background: #f8fafc;
@@ -223,19 +231,180 @@
         box-shadow: 0 0 0 3px var(--accent-glow);
     }
     
-    @media (max-width: 576px) {
-        .data-card-header .d-flex {
+    @media (max-width: 640px) {
+        .greeting-section {
+            margin-bottom: 1.15rem;
+        }
+        .greeting-section h1 {
+            font-size: 1.35rem;
+            line-height: 1.25;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+        }
+        .greeting-section p {
+            font-size: 0.8rem;
+            margin-bottom: 0;
+        }
+        .stats-container {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+        .stat-card-custom {
+            padding: 1rem;
+            border-radius: 14px;
+        }
+        .stat-card-custom .badge-top {
+            align-self: flex-start;
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+            margin-bottom: 0.35rem;
+        }
+        .stat-card-custom .value {
+            font-size: 1.75rem;
+            margin: 0.15rem 0 0.25rem;
+        }
+        .stat-card-custom .label {
+            font-size: 0.75rem;
+            line-height: 1.25;
+        }
+        .active-status-card {
+            grid-column: 1 / -1;
+            padding: 1.15rem;
+            border-radius: 14px;
+        }
+        .active-status-card .company-name {
+            font-size: 1.1rem;
+            margin: 0.35rem 0 0.2rem;
+        }
+        .active-status-card .btn-detail {
+            align-self: stretch;
+            text-align: center;
+            margin-top: 0.85rem;
+            padding: 0.55rem 1rem;
+            background: rgba(59, 130, 246, 0.22);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            border-radius: 10px;
+            font-size: 0.78rem;
+        }
+        .data-card {
+            padding: 1rem;
+            border-radius: 14px;
+        }
+        .data-card-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .data-card-header h5 {
+            font-size: 1rem;
+        }
+        .data-card-header form.d-flex {
             flex-direction: column;
             width: 100%;
+            gap: 0.6rem !important;
         }
         .search-input {
             width: 100%;
+            height: 40px;
+            border-radius: 10px;
         }
         .data-card-header .btn {
             width: 100%;
-            justify-content: center;
-            padding: 0.75rem;
-            font-size: 0.85rem;
+            display: inline-flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 0.45rem !important;
+            height: 40px;
+            padding: 0 1rem;
+            font-size: 0.84rem;
+            font-weight: 700;
+            border-radius: 10px !important;
+        }
+        /* Transformasi Tabel menjadi Kartu Presisi di HP */
+        .table-responsive {
+            overflow-x: visible;
+        }
+        .table-custom {
+            min-width: 0 !important;
+            border-spacing: 0 !important;
+            display: block;
+        }
+        .table-custom thead {
+            display: none;
+        }
+        .table-custom tbody {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .table-custom tbody tr {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-areas:
+                "purpose status"
+                "staff staff"
+                "date action";
+            gap: 0.4rem 0.65rem;
+            padding: 0.95rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            align-items: center;
+        }
+        .table-custom tbody td {
+            padding: 0 !important;
+            border: none !important;
+            background: transparent !important;
+        }
+        .table-custom tbody td:nth-child(1) {
+            grid-area: purpose;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.35;
+        }
+        .table-custom tbody td:nth-child(4) {
+            grid-area: status;
+            justify-self: end;
+            align-self: start;
+        }
+        .table-custom tbody td:nth-child(2) {
+            grid-area: staff;
+            font-size: 0.78rem;
+            color: #475569;
+            padding-bottom: 0.45rem !important;
+            border-bottom: 1px dashed #e2e8f0 !important;
+        }
+        .table-custom tbody td:nth-child(2)::before {
+            content: "Petugas: ";
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        .table-custom tbody td:nth-child(3) {
+            grid-area: date;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.76rem;
+            color: #64748b;
+            padding-top: 0.15rem !important;
+        }
+        .table-custom tbody td:nth-child(3) > div {
+            display: inline;
+            font-size: 0.76rem !important;
+        }
+        .table-custom tbody td:nth-child(5) {
+            grid-area: action;
+            justify-self: end;
+            padding-top: 0.15rem !important;
+        }
+        .table-custom tbody td[colspan] {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 1.5rem 0.5rem !important;
         }
     }
 </style>

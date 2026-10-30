@@ -68,16 +68,46 @@ _ADMIN_USER_CACHE_TTL   = 60 * 5   # 5 menit
 _INSTANSI_CACHE_TTL     = 60 * 10  # 10 menit
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def safe_cache_get(key, default=None):
+    """Ambil data dari cache secara aman tanpa pernah melempar exception."""
+    try:
+        return cache.get(key, default)
+    except Exception as e:
+        logger.warning(f"safe_cache_get error for {key}: {e}")
+        return default
+
+
+def safe_cache_set(key, value, timeout=None):
+    """Simpan data ke cache secara aman."""
+    try:
+        cache.set(key, value, timeout)
+    except Exception as e:
+        logger.warning(f"safe_cache_set error for {key}: {e}")
+
+
+def safe_cache_delete(key):
+    """Hapus kunci dari cache secara aman."""
+    try:
+        cache.delete(key)
+    except Exception as e:
+        logger.warning(f"safe_cache_delete error for {key}: {e}")
+
+
 def _get_cached_instansi():
     """Ambil Instansi dari cache; fallback ke DB jika miss."""
-    instansi = cache.get('instansi_utama')
+    instansi = safe_cache_get('instansi_utama')
     if instansi is None:
         try:
             instansi = Instansi.objects.first()
         except Exception:
             instansi = None
         if instansi:
-            cache.set('instansi_utama', instansi, _INSTANSI_CACHE_TTL)
+            safe_cache_set('instansi_utama', instansi, _INSTANSI_CACHE_TTL)
     return instansi
 
 
@@ -89,24 +119,24 @@ def _get_cached_admin_user(tamu_id=None):
     - tamu_id tersedia (Tamu.is_admin via session) → cache per tamu_id
     - tamu_id None (Django Auth staff)              → cache admin pertama
     """
-    if tamu_id:
-        cache_key = f'admin_user_{tamu_id}'
-        admin_user = cache.get(cache_key)
-        if admin_user is None:
-            admin_user = Tamu.objects.filter(pk=tamu_id).first()
+    cache_key = f'admin_user_{tamu_id}' if tamu_id else 'admin_user_primary'
+    admin_user = safe_cache_get(cache_key)
+
+    if admin_user is None:
+        try:
+            if tamu_id:
+                admin_user = Tamu.objects.filter(pk=tamu_id).first()
+            else:
+                admin_user = (
+                    Tamu.objects.filter(is_admin=True).first()
+                    or Tamu.objects.filter(nik='admin').first()
+                )
             if admin_user:
-                cache.set(cache_key, admin_user, _ADMIN_USER_CACHE_TTL)
-    else:
-        cache_key = 'admin_user_primary'
-        admin_user = cache.get(cache_key)
-        if admin_user is None:
-            # 1 query dengan OR — tidak perlu 2 query terpisah
-            admin_user = (
-                Tamu.objects.filter(is_admin=True).first()
-                or Tamu.objects.filter(nik='admin').first()
-            )
-            if admin_user:
-                cache.set(cache_key, admin_user, _ADMIN_USER_CACHE_TTL)
+                safe_cache_set(cache_key, admin_user, _ADMIN_USER_CACHE_TTL)
+        except Exception as e:
+            logger.warning(f"Error fetching admin user: {e}")
+            admin_user = None
+
     return admin_user
 
 
@@ -115,10 +145,10 @@ def invalidate_admin_cache(tamu_id=None):
     Hapus cache admin saat profil atau data instansi berubah.
     Panggil ini di view yang menyimpan perubahan profil admin atau instansi.
     """
-    cache.delete('instansi_utama')
-    cache.delete('admin_user_primary')
+    safe_cache_delete('instansi_utama')
+    safe_cache_delete('admin_user_primary')
     if tamu_id:
-        cache.delete(f'admin_user_{tamu_id}')
+        safe_cache_delete(f'admin_user_{tamu_id}')
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -246,6 +246,17 @@
         transform: translateY(-2px);
         box-shadow: 0 8px 15px rgba(0,0,0,0.1);
     }
+
+    @media (max-width: 576px) {
+        .card-header-custom { padding: 1.15rem; flex-wrap: wrap; gap: 0.5rem; }
+        .card-body-custom { padding: 1.15rem; }
+        .action-radio-group { flex-direction: column; gap: 0.65rem; }
+        .action-radio-group .form-check,
+        .action-radio-group .form-check-label { width: 100%; text-align: center; padding: 0.65rem 1rem; }
+        .chat-callout { padding: 1.35rem; border-radius: 16px; }
+        .chat-callout .btn-chat { width: 100%; justify-content: center; }
+        .timeline-title { flex-direction: column; gap: 0.15rem; }
+    }
 </style>
 
 <div class="container-fluid py-2">

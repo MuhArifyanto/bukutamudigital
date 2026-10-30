@@ -193,6 +193,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         sender_id = self.identity['id']
         sender_type = self.identity['type']
 
+        if action == 'reset_ai':
+            from .utils import set_session_handoff_to_admin
+            set_session_handoff_to_admin(self.session_id, active=False)
+            return
+
         if action == 'create':
             raw_message = text_data_json.get('message')
             if not raw_message or not isinstance(raw_message, str) or not raw_message.strip():
@@ -229,11 +234,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             msg = await self.save_message(sender_id, sender_type, message, message_type, file_path)
 
             # Create notification based on server identity & session context
-            if sender_type == 'tamu':
+            if self.session_id.startswith('kunjungan_') and sender_type in ('tamu', 'pegawai'):
+                await self._notify_kunjungan_counterpart(sender_type, message)
+            elif sender_type == 'tamu' and (not (bool(text_data_json.get('ai_assistant')) and message_type == 'text') or self._is_handed_off()):
                 await self._notify_admin_new_message(sender_id, message, sender_label='Tamu')
             elif sender_type == 'pegawai':
                 await self._notify_admin_new_message(sender_id, message, sender_label='Pegawai')
             elif sender_type == 'admin':
+                from .utils import set_session_handoff_to_admin
+                set_session_handoff_to_admin(self.session_id, active=True)
                 await self._notify_recipient_from_admin(message)
 
             # Broadcast message to room group
@@ -250,6 +259,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'created_at': timezone.localtime(msg.created_at).strftime('%H:%M')
                 }
             )
+
+            from .utils import is_session_handed_off_to_admin, process_n8n_chat_assistant
+            if (
+                sender_type == 'tamu'
+                and not self.session_id.startswith('kunjungan_')
+                and bool(text_data_json.get('ai_assistant'))
+                and message_type == 'text'
+                and not is_session_handed_off_to_admin(self.session_id)
+            ):
+                import threading
+                threading.Thread(
+                    target=process_n8n_chat_assistant,
+                    args=(self.session_id, sender_id, message, self.room_group_name),
+                    daemon=True,
+                ).start()
 
         elif action == 'edit':
             message_id = text_data_json.get('message_id')
@@ -314,6 +338,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'message': error_msg or "Gagal menghapus pesan"
                 }))
 
+    def _is_handed_off(self):
+        from .utils import is_session_handed_off_to_admin
+        return is_session_handed_off_to_admin(self.session_id)
+
     # Receive message from room group
     async def chat_message(self, event):
         # Send message to WebSocket
@@ -324,7 +352,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'sender_type': event['sender_type'],
             'message_type': event.get('message_type', 'text'),
             'file_url': event.get('file_url'),
-            'created_at': event['created_at']
+            'created_at': event['created_at'],
+            'handoff_active': event.get('handoff_active', False),
+            'strike_count': event.get('strike_count', 0),
         }))
 
     # Receive update from room group
@@ -346,6 +376,41 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message_type=message_type,
             attachment=file_path
         )
+
+    @database_sync_to_async
+    def _notify_kunjungan_counterpart(self, sender_type, message):
+        """
+        Kirim notifikasi saat Tamu atau Pegawai mengirim pesan di ruang chat kunjungan_{id}.
+        - Tamu mengirim -> notifikasi ke Pegawai yang ditugaskan.
+        - Pegawai mengirim -> notifikasi ke Tamu pemilik kunjungan.
+        """
+        from .utils import send_notification
+        kunjungan_id = self.session_id.replace('kunjungan_', '')
+        try:
+            kunjungan = Kunjungan.objects.select_related('tamu', 'pegawai').get(id=kunjungan_id)
+        except Exception:
+            return
+
+        if sender_type == 'tamu' and kunjungan.pegawai:
+            tamu_name = kunjungan.tamu.name if kunjungan.tamu else 'Tamu'
+            send_notification(
+                recipient_id=str(kunjungan.pegawai.id),
+                recipient_type='pegawai',
+                notification_type='message_received',
+                title='Pesan Baru dari Tamu',
+                message=f'{tamu_name}: {message}',
+                related_object_id=self.session_id
+            )
+        elif sender_type == 'pegawai' and kunjungan.tamu:
+            pegawai_name = kunjungan.pegawai.name if kunjungan.pegawai else 'Pegawai'
+            send_notification(
+                recipient_id=str(kunjungan.tamu.id),
+                recipient_type='tamu',
+                notification_type='message_received',
+                title='Pesan Baru dari Pegawai',
+                message=f'{pegawai_name}: {message}',
+                related_object_id=self.session_id
+            )
 
     @database_sync_to_async
     def _notify_admin_new_message(self, sender_id, message, sender_label='Tamu'):

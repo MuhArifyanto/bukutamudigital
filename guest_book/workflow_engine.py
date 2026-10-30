@@ -144,8 +144,8 @@ class WorkflowEngine:
                 note_type='rejection'
             )
         
-        # Kirim notifikasi
-        self._send_notifications(old_status, new_status)
+        # Kirim notifikasi & pesan chat otomatis
+        self._send_notifications(old_status, new_status, notes=notes, rejection_reason=rejection_reason)
         
         logger.info(f"Successful transition: {old_status} → {new_status}", extra={
             'kunjungan_id': str(self.kunjungan.id),
@@ -155,7 +155,7 @@ class WorkflowEngine:
         
         return True
     
-    def _send_notifications(self, old_status, new_status):
+    def _send_notifications(self, old_status, new_status, notes=None, rejection_reason=None):
         """Mengirim notifikasi ke pihak terkait berdasarkan transisi."""
         from .utils import send_notification
         
@@ -172,6 +172,12 @@ class WorkflowEngine:
             )
         except Exception as notif_err:
             logger.warning("Gagal mengirim notifikasi workflow ke tamu: %s", notif_err)
+
+        # Kirim juga pesan chat otomatis real-time ke ruang Chat Tamu
+        try:
+            self._send_tamu_chat_status_update(new_status, notes=notes, rejection_reason=rejection_reason)
+        except Exception as chat_err:
+            logger.warning("Gagal mengirim pesan chat otomatis status kunjungan ke tamu: %s", chat_err)
         
         # Notifikasi pegawai
         if self.kunjungan.pegawai:
@@ -203,6 +209,80 @@ class WorkflowEngine:
                 )
             except Exception as notif_err:
                 logger.warning("Gagal mengirim notifikasi workflow ke admin: %s", notif_err)
+
+    def _send_tamu_chat_status_update(self, new_status, notes=None, rejection_reason=None):
+        """Kirim pesan pembaruan status kunjungan secara real-time ke ruang Chat Tamu."""
+        if not self.kunjungan or not self.kunjungan.tamu:
+            return
+
+        from .models import ChatMessage
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        ticket_code = str(self.kunjungan.id)[:8].upper()
+        pegawai_name = self.kunjungan.pegawai.name if self.kunjungan.pegawai else "Pegawai Tujuan"
+        dt_str = (
+            timezone.localtime(self.kunjungan.arrival_time).strftime('%d/%m/%Y %H:%M')
+            if self.kunjungan.arrival_time else '-'
+        )
+
+        status_badges = {
+            'menunggu_pegawai': ('⏳ Diteruskan ke Pegawai Tujuan', f'Pengajuan kunjungan Anda telah diverifikasi oleh Admin dan diteruskan kepada **{pegawai_name}** untuk konfirmasi jadwal.'),
+            'disetujui_pegawai': ('✅ Disetujui Pegawai (Menunggu ACC Admin)', f'**{pegawai_name}** telah menyetujui jadwal kunjungan Anda. Saat ini menunggu penerbitan Tiket/ACC Final dari Admin, dan Anda sudah dapat memulai percakapan dengan **{pegawai_name}** di menu Chat.'),
+            'disetujui': ('🎉 DISETUJUI / ACC FINAL (Tiket Aktif)', 'Selamat! Kunjungan Anda telah di-ACC sepenuhnya oleh Admin.\n• **Tiket / Kartu Kunjungan** Anda sudah aktif dan dapat diunduh/dicetak melalui menu **Dashboard** atau **Aktifitas**.\n• Anda juga dapat mengirim pesan langsung kepada **' + pegawai_name + '** di daftar kontak Chat.'),
+            'ditolak_admin': ('❌ Ditolak oleh Admin', 'Mohon maaf, pengajuan kunjungan Anda belum dapat disetujui oleh Admin.'),
+            'ditolak_pegawai': ('❌ Ditolak / Usulan Jadwal Ulang dari Pegawai', f'Mohon maaf, **{pegawai_name}** belum dapat menerima kunjungan pada jadwal tersebut.'),
+            'in_progress': ('🟢 Kunjungan Sedang Berlangsung', 'Status kunjungan Anda kini tercatat sedang berlangsung (Check-In). Selamat bertamu di Diskominfosantik Kabupaten Bekasi!'),
+            'completed': ('🏁 Kunjungan Selesai', 'Kunjungan Anda telah selesai (Check-Out). Terima kasih telah berkunjung ke Diskominfosantik Kabupaten Bekasi!'),
+            'cancelled': ('🚫 Kunjungan Dibatalkan', 'Jadwal kunjungan ini telah dibatalkan.'),
+        }
+
+        badge_title, detail_desc = status_badges.get(
+            new_status,
+            (f'ℹ️ Status Diperbarui: {new_status}', self._get_tamu_notification_message(new_status))
+        )
+
+        lines = [
+            "🤖 Asisten AI Diskominfosantik:",
+            f"🔔 **Pembaruan Status Kunjungan #{ticket_code}**",
+            "",
+            f"• **Status Terbaru**: {badge_title}",
+            f"• **Jadwal**: {dt_str} WIB",
+            f"• **Pegawai Tujuan**: {pegawai_name}",
+            f"• **Keperluan**: {(self.kunjungan.purpose or '-')[:120]}",
+        ]
+        if rejection_reason:
+            lines.append(f"• **Alasan / Catatan**: {rejection_reason}")
+        elif notes:
+            lines.append(f"• **Catatan**: {notes}")
+
+        lines.extend(["", detail_desc])
+        chat_text = "\n".join(lines)
+
+        session_id = str(self.kunjungan.tamu.id)
+        chat_msg = ChatMessage.objects.create(
+            session_id=session_id,
+            sender_id='admin',
+            sender_type='admin',
+            message_type='text',
+            content=chat_text,
+        )
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{session_id}",
+                {
+                    'type': 'chat_message',
+                    'message_id': str(chat_msg.id),
+                    'message': chat_text,
+                    'sender_id': 'admin',
+                    'sender_type': 'admin',
+                    'message_type': 'text',
+                    'file_url': None,
+                    'created_at': timezone.localtime(chat_msg.created_at).strftime('%H:%M'),
+                },
+            )
     
     def _get_notification_type(self, status):
         """Mapping status ke tipe notifikasi."""

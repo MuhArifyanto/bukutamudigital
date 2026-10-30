@@ -3,11 +3,11 @@
 
 {% block title %}Manajemen Pegawai - Admin Portal{% endblock %}
 {% block page_title %}MANAJEMEN PEGAWAI{% endblock %}
-{% block page_subtitle %}Kelola daftar, hak akses role, dan status akun pegawai/tuan rumah{% endblock %}
+{% block page_subtitle %}Kelola daftar, hak akses role, dan status operasional akun pegawai/tuan rumah{% endblock %}
 
 {% block extra_css %}
 <style>
-    /* Stats Bar */
+    /* ── Stats Bar ── */
     .stats-grid-pegawai {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -23,12 +23,17 @@
         display: flex;
         align-items: center;
         gap: 0.9rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card-mini:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(15,23,42,0.06);
     }
     .stat-card-mini .icon-box {
         width: 44px; height: 44px;
         border-radius: 12px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 1.1rem;
+        font-size: 1.15rem;
         flex-shrink: 0;
     }
     .icon-total { background: #eff6ff; color: #2563eb; }
@@ -38,149 +43,325 @@
     .icon-manager { background: #fae8ff; color: #9333ea; }
     .icon-admin { background: #fee2e2; color: #dc2626; }
     .stat-val { font-size: 1.35rem; font-weight: 800; color: #0f172a; line-height: 1.2; }
-    .stat-label { font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-label { font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
 
-    /* Search & Filter Bar */
+    /* ── Search & Filter Card ── */
     .filter-card-pegawai {
         background: #fff;
         border-radius: 20px;
         padding: 1.25rem 1.5rem;
         margin-bottom: 1.5rem;
         box-shadow: 0 4px 20px rgba(15,23,42,0.04);
-        border: 1px solid rgba(15,23,42,0.05);
+        border: 1px solid rgba(15,23,42,0.06);
+    }
+    .filter-form-grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 2fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(160px, 1.2fr) auto;
+        gap: 0.85rem;
+        align-items: center;
     }
     .search-input-wrap {
         position: relative;
-        flex: 1;
+        width: 100%;
     }
-    .search-input-wrap i {
+    .search-input-wrap i.search-icon {
         position: absolute;
         left: 14px;
         top: 50%;
         transform: translateY(-50%);
         color: #94a3b8;
-        font-size: 0.9rem;
+        font-size: 0.95rem;
+        pointer-events: none;
     }
     .search-input-wrap input {
         width: 100%;
-        padding: 0.72rem 1rem 0.72rem 2.5rem;
+        padding: 0.72rem 2.2rem 0.72rem 2.5rem;
         border-radius: 12px;
         border: 1.5px solid #e2e8f0;
         background: #f8fafc;
         font-size: 0.88rem;
         color: #1e293b;
         outline: none;
-        transition: border-color 0.2s;
+        transition: all 0.2s;
     }
     .search-input-wrap input:focus {
         border-color: #3b82f6;
         background: #fff;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
     }
-    .filter-select {
-        padding: 0.72rem 1rem;
+    .clear-search-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        text-decoration: none;
+        font-size: 0.8rem;
+        padding: 4px;
+    }
+    .clear-search-btn:hover { color: #0f172a; }
+
+    .filter-select-modern {
+        width: 100%;
+        padding: 0.72rem 2.2rem 0.72rem 1rem;
         border-radius: 12px;
         border: 1.5px solid #e2e8f0;
-        background: #f8fafc;
+        background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 12px center;
+        appearance: none;
+        -webkit-appearance: none;
         font-size: 0.85rem;
         font-weight: 600;
         color: #334155;
         outline: none;
+        cursor: pointer;
+        transition: all 0.2s;
     }
-
-    /* Table Container */
-    .table-container-pegawai {
-        background: #fff;
-        border-radius: 24px;
-        box-shadow: 0 10px 40px rgba(15,23,42,0.06);
-        border: 1px solid rgba(15,23,42,0.05);
-        overflow-x: auto;
+    .filter-select-modern:focus {
+        border-color: #3b82f6;
+        background-color: #fff;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
     }
-    .table-pegawai {
-        width: 100%;
-        min-width: 900px;
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-    .table-pegawai th {
-        background: #fafbff;
-        padding: 1.15rem 1.4rem;
-        font-size: 0.72rem;
-        font-weight: 800;
-        color: #94a3b8;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        text-align: left;
-        border-bottom: 1px solid #f1f5f9;
-    }
-    .table-pegawai td {
-        padding: 1.15rem 1.4rem;
-        border-bottom: 1px solid #f8fafc;
-        vertical-align: middle;
-    }
-    .table-pegawai tr:hover td {
-        background: #fafbff;
-    }
-
-    /* User Avatar */
-    .pegawai-avatar-box {
-        width: 42px; height: 42px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #3b82f6, #6366f1);
-        display: flex; align-items: center; justify-content: center;
-        color: #fff; font-weight: 700; font-size: 0.95rem;
-        flex-shrink: 0;
-    }
-
-    /* Status Pills */
-    .status-pill {
+    .btn-reset-modern {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 0.78rem;
+        padding: 0.72rem 1.15rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
         font-weight: 700;
+        color: #64748b;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: all 0.2s;
     }
-    .pill-active { background: #dcfce7; color: #15803d; }
-    .pill-inactive { background: #fef9c3; color: #a16207; }
-    .pill-suspended { background: #fee2e2; color: #b91c1c; }
-    .dot-sm { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .btn-reset-modern:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
 
-    /* Role Badges */
-    .role-badge {
+    /* ── Table Container & Structure ── */
+    .table-container-pegawai {
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 8px 30px rgba(15,23,42,0.05);
+        border: 1px solid rgba(15,23,42,0.06);
+        overflow: hidden;
+    }
+    .table-responsive-pegawai {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .table-pegawai {
+        width: 100%;
+        min-width: 980px;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 0;
+    }
+    .table-pegawai th {
+        background: #f8fafc;
+        padding: 1.1rem 1.25rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        text-align: left;
+        border-bottom: 1.5px solid #e2e8f0;
+        white-space: nowrap;
+    }
+    .table-pegawai td {
+        padding: 1.15rem 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+        background: #fff;
+        transition: background 0.15s;
+    }
+    .table-pegawai tr:last-child td {
+        border-bottom: none;
+    }
+    .table-pegawai tr:hover td {
+        background: #f8fafc;
+    }
+
+    /* ── Column 1: Pegawai Info ── */
+    .pegawai-cell-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        min-width: 0;
+    }
+    .pegawai-avatar-circle {
+        width: 44px; height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3b82f6, #6366f1);
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-weight: 800; font-size: 1rem;
+        flex-shrink: 0;
+        box-shadow: 0 4px 10px rgba(59,130,246,0.25);
+    }
+    .pegawai-text-block {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+    .pegawai-name-title {
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.94rem;
+        line-height: 1.3;
+        white-space: nowrap;
+    }
+    .pegawai-meta-pills {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+    }
+    .pill-nip {
+        font-size: 0.74rem;
+        color: #64748b;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+    }
+    .pill-jabatan {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #f1f5f9;
+        color: #334155;
+        padding: 2px 7px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* ── Column 2: Kontak ── */
+    .contact-block {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+    .contact-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+    .contact-email {
+        color: #1e293b;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .contact-email:hover {
+        color: #2563eb;
+        text-decoration: underline;
+    }
+    .contact-phone {
+        color: #64748b;
+        font-weight: 500;
+        font-size: 0.78rem;
+    }
+
+    /* ── Column 3: Bidang ── */
+    .dept-badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #15803d;
+        padding: 5px 12px;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    /* ── Column 4 & 5: Custom Select Actions ── */
+    .select-pill-wrap {
+        position: relative;
+        display: inline-block;
+        width: 100%;
+        max-width: 140px;
+    }
+    .select-pill-wrap select {
+        width: 100%;
+        padding: 0.45rem 1.8rem 0.45rem 0.75rem;
+        border-radius: 10px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        border: 1.5px solid #e2e8f0;
+        background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center;
+        appearance: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.2s;
+    }
+    .select-pill-wrap select:focus,
+    .select-pill-wrap select:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    }
+    /* Role colors */
+    select.role-sel-staff { background-color: #f8fafc; color: #334155; }
+    select.role-sel-supervisor { background-color: #fefce8; color: #854d0e; border-color: #fef08a; }
+    select.role-sel-manager { background-color: #faf5ff; color: #6b21a8; border-color: #e9d5ff; }
+    select.role-sel-admin { background-color: #fef2f2; color: #991b1b; border-color: #fecaca; }
+
+    /* Status colors */
+    select.status-sel-active { background-color: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+    select.status-sel-inactive { background-color: #fefce8; color: #854d0e; border-color: #fef08a; }
+    select.status-sel-suspended { background-color: #fef2f2; color: #991b1b; border-color: #fecaca; }
+
+    /* ── Column 6: Kunjungan ── */
+    .visits-pill {
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        padding: 4px 10px;
-        border-radius: 8px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-    }
-    .role-staff { background: #f1f5f9; color: #475569; }
-    .role-supervisor { background: #fef3c7; color: #b45309; }
-    .role-manager { background: #fae8ff; color: #7e22ce; }
-    .role-admin { background: #fee2e2; color: #b91c1c; }
-
-    /* Action Dropdowns */
-    .select-action-table {
-        padding: 0.45rem 0.75rem;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #1e293b;
+        padding: 5px 11px;
         border-radius: 10px;
         font-size: 0.8rem;
-        font-weight: 600;
-        border: 1.5px solid #e2e8f0;
-        background: #fff;
-        color: #1e293b;
-        cursor: pointer;
-        outline: none;
-        transition: 0.2s;
-    }
-    .select-action-table:hover, .select-action-table:focus {
-        border-color: #3b82f6;
+        font-weight: 700;
+        white-space: nowrap;
     }
 
+    /* ── Responsive Rules ── */
+    @media (max-width: 1024px) {
+        .filter-form-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .search-input-wrap {
+            grid-column: span 2;
+        }
+    }
     @media (max-width: 768px) {
         .filter-card-pegawai { padding: 1rem; }
+        .filter-form-grid {
+            grid-template-columns: 1fr;
+            gap: 0.65rem;
+        }
+        .search-input-wrap {
+            grid-column: span 1;
+        }
+        .stats-grid-pegawai {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+        .stat-card-mini { padding: 0.9rem; }
     }
 </style>
 {% endblock %}
@@ -234,14 +415,17 @@
 
 <!-- Search & Filter Card -->
 <div class="filter-card-pegawai">
-    <form method="GET" class="d-flex flex-wrap gap-3 align-items-center">
+    <form method="GET" class="filter-form-grid">
         <div class="search-input-wrap">
-            <i class="fas fa-search"></i>
+            <i class="fas fa-search search-icon"></i>
             <input type="text" name="q" placeholder="Cari nama, NIP, atau email pegawai..." value="{{ query }}">
+            {% if query %}
+            <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if role_filter %}role={{ role_filter }}&{% endif %}{% if dept_filter %}dept={{ dept_filter }}{% endif %}" class="clear-search-btn" title="Hapus pencarian"><i class="fas fa-times"></i></a>
+            {% endif %}
         </div>
 
         <div>
-            <select name="status" class="filter-select" onchange="this.form.submit()">
+            <select name="status" class="filter-select-modern" onchange="this.form.submit()">
                 <option value="">Semua Status</option>
                 {% for code, label in status_choices %}
                 <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
@@ -250,7 +434,7 @@
         </div>
 
         <div>
-            <select name="role" class="filter-select" onchange="this.form.submit()">
+            <select name="role" class="filter-select-modern" onchange="this.form.submit()">
                 <option value="">Semua Role</option>
                 {% for code, label in role_choices %}
                 <option value="{{ code }}" {% if role_filter == code %}selected{% endif %}>{{ label }}</option>
@@ -259,7 +443,7 @@
         </div>
 
         <div>
-            <select name="dept" class="filter-select" onchange="this.form.submit()">
+            <select name="dept" class="filter-select-modern" onchange="this.form.submit()">
                 <option value="">Semua Bidang</option>
                 {% for d in departemen_list %}
                 <option value="{{ d.id }}" {% if dept_filter == d.id|stringformat:"s" %}selected{% endif %}>{{ d.nama }}</option>
@@ -269,100 +453,134 @@
 
         {% if query or status_filter or role_filter or dept_filter %}
         <div>
-            <a href="{% url 'tamu:admin_pegawai' %}" class="btn btn-outline-secondary btn-sm" style="border-radius: 10px; padding: 0.65rem 1rem;">
-                <i class="fas fa-redo me-1"></i> Reset
+            <a href="{% url 'tamu:admin_pegawai' %}" class="btn-reset-modern">
+                <i class="fas fa-redo"></i> Reset
             </a>
         </div>
         {% endif %}
     </form>
 </div>
 
-<!-- Table Pegawai -->
+<!-- Table Pegawai (Presisi & Rapi) -->
 <div class="table-container-pegawai">
-    <table class="table-pegawai">
-        <thead>
-            <tr>
-                <th>Pegawai</th>
-                <th>Kontak</th>
-                <th>Bidang / Instansi</th>
-                <th>Role Akses</th>
-                <th>Status Akun</th>
-                <th>Kunjungan</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in pegawai_list %}
-            <tr>
-                <td>
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="pegawai-avatar-box">
-                            {{ p.name|slice:":1"|upper }}
-                        </div>
-                        <div>
-                            <div style="font-weight: 700; color: #0f172a; font-size: 0.92rem;">{{ p.name }}</div>
-                            <div style="font-size: 0.78rem; color: #64748b;">
-                                NIP: {{ p.nip|default:"-" }} &bull; Jabatan: {{ p.jabatan|default:"Pegawai" }}
+    <div class="table-responsive-pegawai">
+        <table class="table-pegawai">
+            <thead>
+                <tr>
+                    <th style="width: 30%; min-width: 280px;">Pegawai</th>
+                    <th style="width: 23%; min-width: 220px;">Kontak</th>
+                    <th style="width: 19%; min-width: 180px;">Bidang / Instansi</th>
+                    <th style="width: 11%; min-width: 125px;">Role Akses</th>
+                    <th style="width: 11%; min-width: 125px;">Status Akun</th>
+                    <th style="width: 6%; min-width: 95px; text-align: center;">Kunjungan</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pegawai_list %}
+                <tr>
+                    <!-- 1. Pegawai -->
+                    <td>
+                        <div class="pegawai-cell-wrap">
+                            <div class="pegawai-avatar-circle">
+                                {{ p.name|slice:":1"|upper }}
+                            </div>
+                            <div class="pegawai-text-block">
+                                <div class="pegawai-name-title">{{ p.name }}</div>
+                                <div class="pegawai-meta-pills">
+                                    {% if p.nip %}
+                                    <span class="pill-nip"><i class="far fa-id-badge text-muted"></i>{{ p.nip }}</span>
+                                    {% endif %}
+                                    <span class="pill-jabatan"><i class="fas fa-briefcase text-muted"></i>{{ p.jabatan|default:"Pegawai" }}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </td>
-                <td>
-                    <div style="font-size: 0.84rem; color: #1e293b; font-weight: 600;">{{ p.email }}</div>
-                    <div style="font-size: 0.78rem; color: #64748b;">{{ p.phone|default:"-" }}</div>
-                </td>
-                <td>
-                    <span style="font-weight: 600; color: #334155; font-size: 0.85rem;">
-                        {{ p.department_rel.nama|default:p.department|default:"Umum" }}
-                    </span>
-                </td>
-                <td>
-                    <select class="select-action-table" onchange="changePegawaiRole('{{ p.id }}', this.value, '{{ p.name|escapejs }}')">
-                        {% for code, label in role_choices %}
-                        <option value="{{ code }}" {% if p.role == code %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </td>
-                <td>
-                    <select class="select-action-table" onchange="changePegawaiStatus('{{ p.id }}', this.value, '{{ p.name|escapejs }}')">
-                        {% for code, label in status_choices %}
-                        <option value="{{ code }}" {% if p.account_status == code %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </td>
-                <td>
-                    <span style="background: #f1f5f9; padding: 4px 10px; border-radius: 8px; font-weight: 700; color: #0f172a; font-size: 0.82rem;">
-                        {{ p.total_visits|default:0 }} Diterima
-                    </span>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="6" style="text-align: center; padding: 4rem; color: #94a3b8; font-weight: 600;">
-                    <i class="fas fa-user-slash fa-2x mb-2 d-block"></i>
-                    Tidak ada data pegawai yang sesuai dengan filter pencarian.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+                    </td>
 
-<!-- Pagination jika diperlukan -->
-{% if pegawai_list.has_other_pages %}
-<div class="d-flex justify-content-between align-items-center mt-3 px-2">
-    <div style="font-size: 0.84rem; color: #64748b;">
-        Halaman {{ pegawai_list.number }} dari {{ pegawai_list.paginator.num_pages }}
+                    <!-- 2. Kontak -->
+                    <td>
+                        <div class="contact-block">
+                            <div class="contact-item">
+                                <i class="far fa-envelope text-primary opacity-75"></i>
+                                <a href="mailto:{{ p.email }}" class="contact-email">{{ p.email }}</a>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-phone-alt text-muted opacity-75"></i>
+                                <span class="contact-phone">{{ p.phone|default:"-" }}</span>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- 3. Bidang / Instansi -->
+                    <td>
+                        <span class="dept-badge-pill">
+                            <i class="far fa-building"></i>
+                            {{ p.department_rel.nama|default:p.department|default:"Sekretariat" }}
+                        </span>
+                    </td>
+
+                    <!-- 4. Role Akses -->
+                    <td>
+                        <div class="select-pill-wrap">
+                            <select class="role-sel-{{ p.role }}" onchange="changePegawaiRole('{{ p.id }}', this.value, '{{ p.name|escapejs }}')">
+                                {% for code, label in role_choices %}
+                                <option value="{{ code }}" {% if p.role == code %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </td>
+
+                    <!-- 5. Status Akun -->
+                    <td>
+                        <div class="select-pill-wrap">
+                            <select class="status-sel-{{ p.account_status }}" onchange="changePegawaiStatus('{{ p.id }}', this.value, '{{ p.name|escapejs }}')">
+                                {% for code, label in status_choices %}
+                                <option value="{{ code }}" {% if p.account_status == code %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </td>
+
+                    <!-- 6. Kunjungan -->
+                    <td style="text-align: center;">
+                        <span class="visits-pill" title="Total kunjungan diterima">
+                            <i class="fas fa-check-circle text-primary"></i>
+                            {{ p.total_visits|default:0 }} Selesai
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 4rem; color: #94a3b8; font-weight: 600;">
+                        <i class="fas fa-user-slash fa-2x mb-2 d-block opacity-50"></i>
+                        Tidak ada data pegawai yang sesuai dengan filter pencarian.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-    <div class="d-flex gap-2">
-        {% if pegawai_list.has_previous %}
-        <a href="?page={{ pegawai_list.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if dept_filter %}&dept={{ dept_filter }}{% endif %}" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Sebelumnya</a>
-        {% endif %}
-        {% if pegawai_list.has_next %}
-        <a href="?page={{ pegawai_list.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if dept_filter %}&dept={{ dept_filter }}{% endif %}" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">Selanjutnya</a>
-        {% endif %}
+
+    <!-- Pagination jika diperlukan -->
+    {% if pegawai_list.has_other_pages %}
+    <div class="d-flex justify-content-between align-items-center p-3 px-4 bg-light border-top flex-wrap gap-2">
+        <div style="font-size: 0.84rem; color: #64748b; font-weight: 600;">
+            Halaman {{ pegawai_list.number }} dari {{ pegawai_list.paginator.num_pages }} (Total {{ pegawai_list.paginator.count }} Pegawai)
+        </div>
+        <div class="d-flex gap-2">
+            {% if pegawai_list.has_previous %}
+            <a href="?page={{ pegawai_list.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if dept_filter %}&dept={{ dept_filter }}{% endif %}" class="btn btn-sm btn-outline-primary" style="border-radius: 8px; font-weight: 600;">
+                <i class="fas fa-chevron-left me-1"></i> Sebelumnya
+            </a>
+            {% endif %}
+            {% if pegawai_list.has_next %}
+            <a href="?page={{ pegawai_list.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if dept_filter %}&dept={{ dept_filter }}{% endif %}" class="btn btn-sm btn-primary" style="border-radius: 8px; font-weight: 600;">
+                Selanjutnya <i class="fas fa-chevron-right ms-1"></i>
+            </a>
+            {% endif %}
+        </div>
     </div>
+    {% endif %}
 </div>
-{% endif %}
 
 {% endblock %}
 

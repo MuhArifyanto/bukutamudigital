@@ -325,7 +325,7 @@ def login_view(request):
                 email=tamu.email,
                 user_type='tamu',
                 success=True,
-                ip_address=request.META.get('REMOTE_ADDR')
+                ip_address=ip_address
             )
             
             messages.success(request, f"Selamat datang kembali, {tamu.name}!")
@@ -788,7 +788,7 @@ def admin_login_view(request):
     form = AuthenticationForm()
     
     if request.method == 'POST':
-        ip_address = request.META.get('REMOTE_ADDR')
+        ip_address = get_client_ip(request)
         from django.utils import timezone
         from datetime import timedelta
 
@@ -826,7 +826,7 @@ def admin_login_view(request):
                     email=admin_email,
                     user_type='admin',
                     success=True,
-                    ip_address=request.META.get('REMOTE_ADDR')
+                    ip_address=ip_address
                 )
                 
                 login(request, user)
@@ -973,7 +973,18 @@ def pegawai_login_view(request):
             return render(request, 'guest_book/pegawai_login.html')
 
         # Verifikasi password (hashed dengan Django's check_password)
-        if not check_password(password, pegawai.password):
+        password_valid = check_password(password, pegawai.password)
+        if not password_valid and pegawai.password and '$' not in pegawai.password and len(pegawai.password) == 64:
+            import hashlib
+            import hmac
+            from django.contrib.auth.hashers import make_password
+            legacy_sha256 = hashlib.sha256(password.encode()).hexdigest()
+            if hmac.compare_digest(pegawai.password, legacy_sha256):
+                password_valid = True
+                pegawai.password = make_password(password)
+                pegawai.save(update_fields=['password'])
+
+        if not password_valid:
             record_failed_login(ip, email=login_id, user_type='pegawai')
             messages.error(request, 'Email/Username atau password yang Anda masukkan salah.')
             return render(request, 'guest_book/pegawai_login.html')

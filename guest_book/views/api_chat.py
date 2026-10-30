@@ -215,8 +215,12 @@ def api_get_chat_messages(request):
     elif session_id.startswith('kunjungan_'):
         kunjungan_id = session_id.replace('kunjungan_', '')
         from ..models import Kunjungan
-        kunjungan = Kunjungan.objects.filter(id=kunjungan_id).first()
-        if kunjungan:
+        from ..permissions import PermissionManager
+        try:
+            kunjungan = Kunjungan.objects.filter(id=kunjungan_id).first()
+        except Exception:
+            kunjungan = None
+        if kunjungan and PermissionManager.can_access_chat_pegawai_tamu(kunjungan):
             if pegawai_id and str(kunjungan.pegawai_id) == pegawai_id:
                 has_permission = True
             elif tamu_id and str(kunjungan.tamu_id) == tamu_id:
@@ -251,9 +255,16 @@ def api_get_chat_messages(request):
             'file_url': m.attachment.url if m.attachment else None,
             'created_at': timezone.localtime(m.created_at).strftime('%H:%M') if m.created_at else ''
         })
-        if is_admin and m.sender_type == 'tamu':
-            m.is_read = True
-            m.save(update_fields=['is_read'])
+        if not m.is_read:
+            if is_admin and m.sender_type != 'admin' and not session_id.startswith('kunjungan_'):
+                m.is_read = True
+                m.save(update_fields=['is_read'])
+            elif pegawai_id and not is_admin and m.sender_type != 'pegawai':
+                m.is_read = True
+                m.save(update_fields=['is_read'])
+            elif tamu_id and not is_admin and m.sender_type != 'tamu':
+                m.is_read = True
+                m.save(update_fields=['is_read'])
 
     return JsonResponse({
         'success': True,
