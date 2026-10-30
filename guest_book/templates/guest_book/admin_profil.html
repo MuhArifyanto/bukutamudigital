@@ -108,7 +108,8 @@
                 <div class="card-body text-center p-4">
                     <div class="position-relative d-inline-block mb-3">
                         <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}" 
-                             class="rounded-circle border border-4 border-primary" style="width: 100px; height: 100px; object-fit: cover;" alt="Avatar">
+                             class="rounded-circle border border-4 border-primary" style="width: 100px; height: 100px; object-fit: cover;" alt="Avatar"
+                             onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff';">
                     </div>
                     <h5 class="fw-bold mb-1">{{ admin_name }}</h5>
                     <p class="text-secondary-light small mb-3">NIP: 19880421 201503 1 002</p>

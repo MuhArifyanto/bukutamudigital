@@ -302,7 +302,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Gunakan Cloudinary jika ada URL-nya (untuk production / PaaS)
-CLOUDINARY_URL = os.getenv('CLOUDINARY_URL')
+CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', 'cloudinary://672274521828876:qY107Z6jl16WSR1uODivlW0aJrc@mst31frx').strip()
 if CLOUDINARY_URL:
     DEFAULT_FILE_STORAGE = 'guest_book.storage.DynamicMediaCloudinaryStorage'
     CLOUDINARY_STORAGE = {

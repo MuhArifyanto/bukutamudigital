@@ -625,7 +625,8 @@
         <!-- Sidebar Footer -->
         <div class="sidebar-footer">
             <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}"
-                 class="admin-avatar-sidebar" alt="Avatar Admin">
+                 class="admin-avatar-sidebar" alt="Avatar Admin"
+                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff';">
             <div class="admin-info">
                 <p class="name">{{ admin_name }}</p>
                 <p class="role">Administrator</p>
@@ -694,7 +695,8 @@
                 <!-- Admin Chip -->
                 <div class="admin-chip">
                     <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}"
-                         alt="Avatar">
+                         alt="Avatar"
+                         onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff';">
                     <span>{{ admin_name }}</span>
                 </div>
             </div>

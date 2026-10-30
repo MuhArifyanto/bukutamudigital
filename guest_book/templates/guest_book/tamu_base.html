@@ -467,7 +467,8 @@
         <!-- Sidebar Footer -->
         <div class="sidebar-footer">
             <img src="{% if tamu.profile_picture %}{{ tamu.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff{% endif %}"
-                 class="admin-avatar-sidebar" alt="Avatar Tamu">
+                 class="admin-avatar-sidebar" alt="Avatar Tamu"
+                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff';">
             <div class="admin-info">
                 <p class="name">{{ tamu.name }}</p>
                 <p class="role">Tamu</p>
@@ -520,7 +521,8 @@
                 <!-- User Chip -->
                 <div class="admin-chip">
                     <img src="{% if tamu.profile_picture %}{{ tamu.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff{% endif %}"
-                         alt="Avatar">
+                         alt="Avatar"
+                         onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff';">
                     <span>{{ tamu.name }}</span>
                 </div>
             </div>

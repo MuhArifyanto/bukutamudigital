@@ -344,7 +344,7 @@
                     </div>
                 {% else %}
                     {% if conv.guest.profile_picture %}
-                        <img src="{{ conv.guest.profile_picture.url }}" class="avatar" style="width: 48px; height: 48px; border-radius: 14px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                        <img src="{{ conv.guest.profile_picture.url }}" class="avatar" style="width: 48px; height: 48px; border-radius: 14px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ conv.name|urlencode }}&background=3b82f6&color=fff';">
                     {% else %}
                         <div class="avatar initials-avatar" data-name="{{ conv.name }}">
                             {{ conv.name|slice:":2"|upper }}
@@ -386,7 +386,7 @@
                     </div>
                 {% else %}
                     {% if first_conv.guest.profile_picture %}
-                        <img src="{{ first_conv.guest.profile_picture.url }}" class="avatar" style="width: 40px; height: 40px; border-radius: 14px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                        <img src="{{ first_conv.guest.profile_picture.url }}" class="avatar" style="width: 40px; height: 40px; border-radius: 14px; object-fit: cover; flex-shrink: 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ first_conv.name|urlencode }}&background=3b82f6&color=fff';">
                     {% else %}
                         <div class="avatar initials-avatar" data-name="{{ first_conv.name }}" style="width:40px; height:40px; font-size:0.8rem; flex-shrink:0;">
                             {{ first_conv.name|slice:":2"|upper }}

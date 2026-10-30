@@ -237,7 +237,7 @@
                 <td>
                     <div class="visitor-info">
                         {% if k.tamu.profile_picture %}
-                            <img src="{{ k.tamu.profile_picture.url }}" class="v-avatar" style="object-fit: cover;" alt="{{ k.tamu.name }}">
+                            <img src="{{ k.tamu.profile_picture.url }}" class="v-avatar" style="object-fit: cover;" alt="{{ k.tamu.name }}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ k.tamu.name|urlencode }}&background=3b82f6&color=fff';">
                         {% else %}
                             <div class="v-avatar initials-avatar" data-name="{{ k.tamu.name }}">
                                 {{ k.tamu.name|slice:":2"|upper }}
