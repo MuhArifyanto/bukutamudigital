@@ -145,6 +145,38 @@ class Command(BaseCommand):
             has_errors = True
             self.stdout.write(self.style.WARNING(f"Peringatan saat sinkronisasi Tamu Admin: {e}"))
 
+        # 5. Inisialisasi Hari Libur dan Akhir Pekan Kalender jika masih kosong di database produksi
+        try:
+            from guest_book.models import CalendarSettings
+            from guest_book.validators import get_default_holiday_status
+            from datetime import date, timedelta
+            from django.utils import timezone
+
+            if CalendarSettings.objects.count() == 0:
+                self.stdout.write("Tabel CalendarSettings kosong. Menginisialisasi kalender libur otomatis...")
+                today = timezone.localtime().date()
+                start_date = date(today.year, 1, 1)
+                end_date = date(today.year + 1, 12, 31)
+
+                records_to_create = []
+                cur = start_date
+                while cur <= end_date:
+                    is_h, h_name = get_default_holiday_status(cur)
+                    if is_h:
+                        records_to_create.append(CalendarSettings(
+                            date=cur,
+                            daily_quota=50,
+                            is_holiday=True,
+                            holiday_name=h_name
+                        ))
+                    cur += timedelta(days=1)
+
+                if records_to_create:
+                    CalendarSettings.objects.bulk_create(records_to_create, ignore_conflicts=True)
+                    self.stdout.write(self.style.SUCCESS(f"Berhasil menginisialisasi {len(records_to_create)} hari libur & akhir pekan kalender."))
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f"Peringatan saat inisialisasi kalender: {e}"))
+
         if has_errors:
             self.stdout.write(self.style.ERROR("================================================"))
             self.stdout.write(self.style.ERROR("SETUP SELESAI DENGAN CATATAN/ERROR."))

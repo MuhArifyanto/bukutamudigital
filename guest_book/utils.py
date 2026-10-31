@@ -120,55 +120,113 @@ def validate_uploaded_file(file_obj, max_size_bytes=5 * 1024 * 1024, allowed_ext
 
 
 def get_google_calendar_holidays(year):
-    """Ambil hari libur nasional dari Google Calendar API atau fallback lokal."""
-    # Cache per tahun
+    """
+    Ambil hari libur nasional Indonesia secara real-time dan otomatis dari:
+    1. Google Calendar REST API v3 (jika ada GOOGLE_CALENDAR_API_KEY)
+    2. Google Calendar Public iCal Feed resmi Indonesia (bebas API key, real-time dari Google)
+    3. Daftar hari libur nasional komprehensif sebagai fallback offline.
+    """
     cache_key = f"holidays_{year}"
     cached = safe_cache_get(cache_key)
     if cached:
         return cached
 
+    holidays = []
+    import urllib.request
+    import re
+    import json
+
     api_key = os.getenv('GOOGLE_CALENDAR_API_KEY')
-    if not api_key:
-        return _fallback_holidays(year)
+    if api_key:
+        try:
+            calendar_id = 'id.indonesian#holiday@group.v.calendar.google.com'
+            time_min = f"{year}-01-01T00:00:00Z"
+            time_max = f"{year}-12-31T23:59:59Z"
+            url = (
+                f"https://www.googleapis.com/calendar/v3/calendars/{calendar_id}/events"
+                f"?key={api_key}&timeMin={time_min}&timeMax={time_max}&singleEvents=true"
+            )
+            req = urllib.request.Request(url, headers={'User-Agent': 'BukuDigital/1.0'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            for item in data.get('items', []):
+                start = item.get('start', {})
+                dt = start.get('date') or (start.get('dateTime', '')[:10])
+                if dt and dt.startswith(str(year)):
+                    holidays.append({
+                        'date': dt,
+                        'name': item.get('summary', 'Hari Libur Nasional')
+                    })
+        except Exception as e:
+            logger.warning(f"Gagal mengambil hari libur Google Calendar API: {e}")
 
-    try:
-        import urllib.request
-        calendar_id = 'id.indonesian#holiday@group.v.calendar.google.com'
-        time_min = f"{year}-01-01T00:00:00Z"
-        time_max = f"{year}-12-31T23:59:59Z"
-        url = (
-            f"https://www.googleapis.com/calendar/v3/calendars/{calendar_id}/events"
-            f"?key={api_key}&timeMin={time_min}&timeMax={time_max}&singleEvents=true"
-        )
-        req = urllib.request.Request(url, headers={'User-Agent': 'BukuDigital/1.0'})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
+    # Jika belum berhasil (tanpa API key atau API error), gunakan feed iCal resmi Google Calendar Indonesia
+    if not holidays:
+        try:
+            ical_url = 'https://calendar.google.com/calendar/ical/id.indonesian%23holiday%40group.v.calendar.google.com/public/basic.ics'
+            req = urllib.request.Request(ical_url, headers={'User-Agent': 'Mozilla/5.0 (compatible; BukuDigital/1.0)'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                content = resp.read().decode('utf-8', errors='ignore')
 
-        holidays = []
-        for item in data.get('items', []):
-            start = item.get('start', {})
-            dt = start.get('date') or (start.get('dateTime', '')[:10])
-            if dt:
-                holidays.append({
-                    'date': dt,
-                    'name': item.get('summary', 'Hari Libur')
-                })
+            seen = set()
+            year_str = str(year)
+            for ev in content.split('BEGIN:VEVENT')[1:]:
+                dtstart = re.search(r'DTSTART(?:;VALUE=DATE)?:(\d{8})', ev)
+                summary = re.search(r'SUMMARY:(.+?)(?:\r\n|\n)', ev)
+                if dtstart and summary:
+                    d_raw = dtstart.group(1)
+                    if d_raw.startswith(year_str):
+                        date_str = f"{d_raw[:4]}-{d_raw[4:6]}-{d_raw[6:8]}"
+                        name = summary.group(1).strip()
+                        if date_str not in seen:
+                            seen.add(date_str)
+                            holidays.append({'date': date_str, 'name': name})
+            holidays.sort(key=lambda x: x['date'])
+        except Exception as e:
+            logger.warning(f"Gagal mengambil hari libur iCal Google Calendar: {e}")
 
-        safe_cache_set(cache_key, holidays, timeout=86400 * 7)  # 7 hari
-        return holidays
-    except Exception as e:
-        logger.warning(f"Gagal mengambil hari libur Google Calendar: {e}")
-        return _fallback_holidays(year)
+    # Fallback offline komprehensif jika jaringan terputus
+    if not holidays:
+        holidays = _fallback_holidays(year)
+
+    safe_cache_set(cache_key, holidays, timeout=86400 * 7)  # 7 hari
+    return holidays
 
 
 def _fallback_holidays(year):
-    """Daftar hari libur nasional statis sebagai fallback."""
-    return [
+    """Daftar hari libur nasional statis sebagai fallback offline."""
+    base_holidays = [
         {'date': f"{year}-01-01", 'name': 'Tahun Baru Masehi'},
         {'date': f"{year}-05-01", 'name': 'Hari Buruh Internasional'},
+        {'date': f"{year}-06-01", 'name': 'Hari Lahir Pancasila'},
         {'date': f"{year}-08-17", 'name': 'Hari Kemerdekaan RI'},
         {'date': f"{year}-12-25", 'name': 'Hari Raya Natal'},
     ]
+    known_2026 = [
+        {'date': '2026-01-16', 'name': 'Isra Mikraj Nabi Muhammad'},
+        {'date': '2026-02-16', 'name': 'Cuti Bersama Tahun Baru Imlek'},
+        {'date': '2026-02-17', 'name': 'Tahun Baru Imlek'},
+        {'date': '2026-03-18', 'name': 'Cuti Bersama Hari Suci Nyepi'},
+        {'date': '2026-03-19', 'name': 'Hari Suci Nyepi'},
+        {'date': '2026-03-20', 'name': 'Cuti Bersama Idul Fitri'},
+        {'date': '2026-03-21', 'name': 'Hari Raya Idul Fitri'},
+        {'date': '2026-03-22', 'name': 'Hari Raya Idul Fitri'},
+        {'date': '2026-03-23', 'name': 'Cuti Bersama Idul Fitri'},
+        {'date': '2026-03-24', 'name': 'Cuti Bersama Idul Fitri'},
+        {'date': '2026-04-03', 'name': 'Wafat Isa Almasih'},
+        {'date': '2026-05-14', 'name': 'Kenaikan Isa Al Masih'},
+        {'date': '2026-05-15', 'name': 'Cuti Bersama Kenaikan Isa Al Masih'},
+        {'date': '2026-05-27', 'name': 'Hari Raya Idul Adha'},
+        {'date': '2026-05-31', 'name': 'Hari Raya Waisak'},
+        {'date': '2026-06-17', 'name': 'Tahun Baru Islam (1 Muharam)'},
+        {'date': '2026-08-25', 'name': 'Maulid Nabi Muhammad'},
+        {'date': '2026-12-24', 'name': 'Cuti Bersama Hari Raya Natal'},
+    ]
+    if year == 2026:
+        all_h = base_holidays + known_2026
+        all_h.sort(key=lambda x: x['date'])
+        return all_h
+    return base_holidays
 
 
 def call_n8n_routing(kunjungan_id, purpose, department, arrival_time):

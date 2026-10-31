@@ -385,8 +385,14 @@ def admin_kalender_view(request):
         quota = s.daily_quota if s else 50
         is_full = booked >= quota
         is_google_holiday = date_iso in holidays_dict
-        holiday_name = holidays_dict.get(date_iso) or (s.holiday_name if s else '')
-        is_holiday = is_google_holiday or (s.is_holiday if s else False)
+        if s is not None:
+            is_holiday = s.is_holiday
+            holiday_name = s.holiday_name if s.holiday_name else (holidays_dict.get(date_iso, '') if s.is_holiday else '')
+        else:
+            is_holiday = is_google_holiday
+            holiday_name = holidays_dict.get(date_iso) or ''
+            if not is_holiday and is_weekend:
+                holiday_name = 'Libur Akhir Pekan (Sabtu)' if curr_date.weekday() == 5 else 'Libur Akhir Pekan (Minggu)'
 
         days.append({
             'day': d, 'date': date_iso,

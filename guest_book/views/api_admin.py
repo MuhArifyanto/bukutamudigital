@@ -51,12 +51,21 @@ def api_toggle_holiday(request):
         try:
             data = json.loads(request.body)
             date_str = data.get('date')
+            if not date_str:
+                return JsonResponse({'error': 'Parameter date diperlukan.'}, status=400)
+
+            from ..validators import get_daily_quota_info
+            current_info = get_daily_quota_info(date_str)
+            effective_is_holiday = current_info['is_holiday']
+
             setting, _ = CalendarSettings.objects.get_or_create(date=date_str)
-            setting.is_holiday = not setting.is_holiday
-            if not setting.is_holiday:
+            setting.is_holiday = not effective_is_holiday
+            if setting.is_holiday:
+                setting.holiday_name = data.get('holiday_name') or current_info.get('holiday_name') or 'Hari Libur / Tutup'
+            else:
                 setting.holiday_name = ''
             setting.save()
-            return JsonResponse({'success': True, 'is_holiday': setting.is_holiday})
+            return JsonResponse({'success': True, 'is_holiday': setting.is_holiday, 'holiday_name': setting.holiday_name})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'Invalid method'}, status=405)

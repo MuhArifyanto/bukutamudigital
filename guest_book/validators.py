@@ -50,6 +50,45 @@ def get_day_range_aware(visit_date):
     return start_of_day, start_of_next_day
 
 
+def get_default_holiday_status(visit_date):
+    """
+    Mengecek status libur bawaan (real-time Google Calendar / Kalender Indonesia & Akhir Pekan)
+    jika belum ada override manual admin di CalendarSettings.
+    Returns: (is_holiday: bool, holiday_name: str)
+    """
+    from .utils import get_google_calendar_holidays
+
+    if isinstance(visit_date, str):
+        visit_date = datetime.strptime(visit_date.strip(), '%Y-%m-%d').date()
+    elif isinstance(visit_date, datetime):
+        visit_date = timezone.localtime(visit_date, JAKARTA_TZ).date()
+
+    # 1. Cek Hari Libur Nasional Indonesia (Google Calendar / Resmi)
+    year_holidays = get_google_calendar_holidays(visit_date.year) or []
+    holidays_map = {h['date']: h['name'] for h in year_holidays}
+    date_iso = visit_date.isoformat()
+    if date_iso in holidays_map:
+        return True, holidays_map[date_iso]
+
+    # 2. Cek Akhir Pekan & Hari Kerja Operasional Instansi
+    instansi = Instansi.objects.first()
+    hari_kerja_raw = instansi.hari_kerja if instansi and instansi.hari_kerja else '0,1,2,3,4'
+    try:
+        hari_kerja_list = [int(h.strip()) for h in hari_kerja_raw.split(',') if h.strip().isdigit()]
+    except Exception:
+        hari_kerja_list = [0, 1, 2, 3, 4]
+
+    if visit_date.weekday() not in hari_kerja_list:
+        if visit_date.weekday() == 5:
+            return True, 'Libur Akhir Pekan (Sabtu)'
+        elif visit_date.weekday() == 6:
+            return True, 'Libur Akhir Pekan (Minggu)'
+        else:
+            return True, 'Di Luar Hari Operasional Instansi'
+
+    return False, ''
+
+
 def get_daily_quota_info(visit_date, exclude_kunjungan_id=None):
     """
     Fungsi pusat untuk menghitung kuota dan status kunjungan harian.
@@ -76,8 +115,15 @@ def get_daily_quota_info(visit_date, exclude_kunjungan_id=None):
     quota = setting.daily_quota if setting else (
         instansi.kapasitas_maksimal if instansi and instansi.kapasitas_maksimal else 50
     )
-    is_holiday = setting.is_holiday if setting else False
-    holiday_name = setting.holiday_name if setting else ''
+
+    default_is_holiday, default_holiday_name = get_default_holiday_status(visit_date)
+
+    if setting is not None:
+        is_holiday = bool(setting.is_holiday)
+        holiday_name = setting.holiday_name or (default_holiday_name if is_holiday else '')
+    else:
+        is_holiday = default_is_holiday
+        holiday_name = default_holiday_name
 
     start_of_day, start_of_next_day = get_day_range_aware(visit_date)
     booked_qs = Kunjungan.objects.filter(
@@ -241,19 +287,25 @@ def validate_kunjungan_schedule(
                     'departure_time': f"Perkiraan waktu pulang di luar jam operasional ({buka_str} - {tutup_str})."
                 })
 
-    # ── 4. Validasi Hari Libur (CalendarSettings) ─────────────────────────────
+    # ── 4. Validasi Hari Libur (CalendarSettings, Kalender Indonesia, Akhir Pekan) ──
+    default_is_holiday, default_h_name = get_default_holiday_status(visit_date)
     calendar_setting = None
     if lock_for_update and transaction.get_connection().in_atomic_block:
         calendar_setting, _ = CalendarSettings.objects.select_for_update().get_or_create(
             date=visit_date,
-            defaults={'daily_quota': instansi.kapasitas_maksimal if instansi and instansi.kapasitas_maksimal else 50}
+            defaults={
+                'daily_quota': instansi.kapasitas_maksimal if instansi and instansi.kapasitas_maksimal else 50,
+                'is_holiday': default_is_holiday,
+                'holiday_name': default_h_name,
+            }
         )
     else:
         calendar_setting = CalendarSettings.objects.filter(date=visit_date).first()
 
     if not is_import and not is_admin:
-        if calendar_setting and calendar_setting.is_holiday:
-            holiday_name = calendar_setting.holiday_name or "Hari Libur Resmi"
+        quota_info = get_daily_quota_info(visit_date)
+        if quota_info['is_holiday']:
+            holiday_name = quota_info['holiday_name'] or "Hari Libur Resmi"
             raise ValidationError({
                 'arrival_time': f"Instansi libur pada tanggal tersebut ({holiday_name})."
             })

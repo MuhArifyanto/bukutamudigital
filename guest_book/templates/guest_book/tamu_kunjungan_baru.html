@@ -297,17 +297,21 @@
             <!-- STATUS KETERSEDIAAN -->
             <div class="form-group-custom">
                 <label>Status Ketersediaan</label>
-                <div class="status-card" style="background: #e6f4ea; border: 1px solid #c3e6cb; border-radius: var(--radius-sm); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; min-height: 42px; flex-wrap: wrap; gap: 0.5rem;">
+                <div class="status-card" id="statusCard" style="background: #e6f4ea; border: 1px solid #c3e6cb; border-radius: var(--radius-sm); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; min-height: 42px; flex-wrap: wrap; gap: 0.5rem; transition: all 0.3s ease;">
                     <div class="status-info" style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span class="status-title" style="font-size: 0.85rem; font-weight: 700; color: #155724; display: flex; align-items: center; gap: 0.25rem;"><i class="fas fa-circle" style="font-size: 0.5rem; color: #28a745;"></i> Tersedia</span>
-                        <span class="status-desc" style="font-size: 0.75rem; color: #155724;">(0/10 Kuota Terisi)</span>
+                        <span class="status-title" style="font-size: 0.85rem; font-weight: 700; color: #155724; display: flex; align-items: center; gap: 0.25rem;"><i class="fas fa-circle" style="font-size: 0.5rem; color: #28a745;"></i> Memeriksa...</span>
+                        <span class="status-desc" style="font-size: 0.75rem; color: #155724;">(Memuat data kuota &amp; hari libur...)</span>
                     </div>
                     <div style="flex: 1; min-width: 140px; display: flex; align-items: center; gap: 0.75rem;">
-                        <div style="font-size: 0.6rem; color: #155724; font-weight: 700; white-space: nowrap;">KAPASITAS</div>
+                        <div class="kapasitas-label" style="font-size: 0.6rem; color: #155724; font-weight: 700; white-space: nowrap;">KAPASITAS</div>
                         <div class="progress" style="height: 8px; background: #c3e6cb; border-radius: 99px; flex: 1;">
                             <div class="progress-bar bg-success" role="progressbar" style="width: 10%; border-radius: 99px;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </div>
+                </div>
+                <!-- Alert Hari Libur / Kuota Penuh -->
+                <div id="holidayAlert" class="alert alert-danger mt-2 py-2 px-3 small d-none" style="border-radius: 10px; font-weight: 600; font-size: 0.8rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;">
+                    <i class="fas fa-exclamation-triangle me-1"></i> <span id="holidayAlertText">Mohon maaf, instansi tutup / libur pada tanggal ini. Silakan pilih hari kerja operasional (Senin - Jumat).</span>
                 </div>
             </div>
         </div>
@@ -396,6 +400,9 @@
 <script>
     // Set min date and default date to today
     const today = new Date().toISOString().split('T')[0];
+    let isCurrentDateHoliday = false;
+    let isCurrentDateFull = false;
+    let currentHolidayMessage = '';
 
     function updateQuotaStatus(selectedDate) {
         if (!selectedDate) return;
@@ -408,38 +415,99 @@
                     const statusDesc = document.querySelector('.status-desc');
                     const progressBar = document.querySelector('.progress-bar');
                     const statusCard = document.querySelector('.status-card');
+                    const kapasitasLabel = document.querySelector('.kapasitas-label');
+                    const holidayAlert = document.getElementById('holidayAlert');
+                    const holidayAlertText = document.getElementById('holidayAlertText');
+                    const submitBtn = document.querySelector('.btn-submit-custom');
+
+                    isCurrentDateHoliday = !!data.is_holiday;
+                    isCurrentDateFull = !!data.is_full && !data.is_holiday;
+                    currentHolidayMessage = data.holiday_name || 'Hari Libur Operasional';
 
                     if (data.is_holiday) {
-                        statusTitle.innerHTML = `<i class="fas fa-circle" style="font-size: 0.5rem; color: #dc3545;"></i> Libur`;
-                        statusDesc.textContent = data.holiday_name || 'Hari Libur';
-                        statusCard.style.background = '#f8d7da';
-                        statusCard.style.borderColor = '#f5c6cb';
-                        statusTitle.style.color = '#721c24';
-                        statusDesc.style.color = '#721c24';
-                        progressBar.style.width = '0%';
+                        statusTitle.innerHTML = `<i class="fas fa-ban" style="font-size: 0.75rem; color: #dc3545;"></i> Tutup / Libur`;
+                        statusDesc.textContent = `${data.holiday_name || 'Tidak Menerima Kunjungan'}`;
+                        statusCard.style.background = '#fef2f2';
+                        statusCard.style.borderColor = '#fca5a5';
+                        statusTitle.style.color = '#991b1b';
+                        statusDesc.style.color = '#991b1b';
+                        progressBar.style.width = '100%';
                         progressBar.classList.remove('bg-success');
                         progressBar.classList.add('bg-danger');
-                    } else {
-                        const percent = Math.round((data.booked / data.quota) * 100);
-                        statusDesc.textContent = `${data.booked}/${data.quota} Kuota Terisi`;
-                        progressBar.style.width = `${percent}%`;
+                        if (kapasitasLabel) {
+                            kapasitasLabel.textContent = 'LIBUR';
+                            kapasitasLabel.style.color = '#991b1b';
+                        }
 
-                        if (percent >= 100) {
-                            statusTitle.innerHTML = `<i class="fas fa-circle" style="font-size: 0.5rem; color: #dc3545;"></i> Penuh`;
-                            statusCard.style.background = '#f8d7da';
-                            statusCard.style.borderColor = '#f5c6cb';
-                            statusTitle.style.color = '#721c24';
-                            statusDesc.style.color = '#721c24';
-                            progressBar.classList.remove('bg-success');
-                            progressBar.classList.add('bg-danger');
-                        } else {
-                            statusTitle.innerHTML = `<i class="fas fa-circle" style="font-size: 0.5rem; color: #28a745;"></i> Tersedia`;
-                            statusCard.style.background = '#e6f4ea';
-                            statusCard.style.borderColor = '#c3e6cb';
-                            statusTitle.style.color = '#155724';
-                            statusDesc.style.color = '#155724';
-                            progressBar.classList.remove('bg-danger');
-                            progressBar.classList.add('bg-success');
+                        // Tampilkan pesan peringatan hari libur
+                        if (holidayAlert && holidayAlertText) {
+                            holidayAlert.classList.remove('d-none');
+                            holidayAlertText.textContent = `Instansi libur / tidak menerima kunjungan pada tanggal ini (${data.holiday_name || 'Hari Libur'}). Silakan pilih hari kerja operasional (Senin - Jumat).`;
+                        }
+
+                        // Nonaktifkan tombol kirim data
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.style.opacity = '0.5';
+                            submitBtn.style.cursor = 'not-allowed';
+                            submitBtn.innerHTML = '<i class="fas fa-ban me-2"></i> Pendaftaran Tutup (Hari Libur)';
+                        }
+                    } else if (data.is_full) {
+                        statusTitle.innerHTML = `<i class="fas fa-exclamation-circle" style="font-size: 0.75rem; color: #dc3545;"></i> Penuh`;
+                        statusDesc.textContent = `(${data.booked}/${data.quota} Kuota Terisi)`;
+                        statusCard.style.background = '#fef2f2';
+                        statusCard.style.borderColor = '#fca5a5';
+                        statusTitle.style.color = '#991b1b';
+                        statusDesc.style.color = '#991b1b';
+                        progressBar.style.width = '100%';
+                        progressBar.classList.remove('bg-success');
+                        progressBar.classList.add('bg-danger');
+                        if (kapasitasLabel) {
+                            kapasitasLabel.textContent = 'PENUH';
+                            kapasitasLabel.style.color = '#991b1b';
+                        }
+
+                        if (holidayAlert && holidayAlertText) {
+                            holidayAlert.classList.remove('d-none');
+                            holidayAlertText.textContent = `Mohon maaf, kuota kunjungan untuk tanggal ${selectedDate} sudah penuh (${data.booked}/${data.quota}). Silakan pilih hari lain.`;
+                        }
+
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.style.opacity = '0.5';
+                            submitBtn.style.cursor = 'not-allowed';
+                            submitBtn.innerHTML = '<i class="fas fa-times-circle me-2"></i> Kuota Penuh';
+                        }
+                    } else {
+                        const booked = data.booked || 0;
+                        const quota = data.quota || 50;
+                        const percent = Math.min(Math.round((booked / quota) * 100), 100);
+
+                        statusTitle.innerHTML = `<i class="fas fa-circle" style="font-size: 0.5rem; color: #28a745;"></i> Tersedia`;
+                        statusDesc.textContent = `(${booked}/${quota} Kuota Terisi)`;
+                        statusCard.style.background = '#e6f4ea';
+                        statusCard.style.borderColor = '#c3e6cb';
+                        statusTitle.style.color = '#155724';
+                        statusDesc.style.color = '#155724';
+                        progressBar.style.width = `${Math.max(percent, 8)}%`;
+                        progressBar.classList.remove('bg-danger');
+                        progressBar.classList.add('bg-success');
+                        if (kapasitasLabel) {
+                            kapasitasLabel.textContent = 'KAPASITAS';
+                            kapasitasLabel.style.color = '#155724';
+                        }
+
+                        // Sembunyikan alert
+                        if (holidayAlert) {
+                            holidayAlert.classList.add('d-none');
+                        }
+
+                        // Aktifkan tombol kirim data
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.style.opacity = '1';
+                            submitBtn.style.cursor = 'pointer';
+                            submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Kirim Data Tamu';
                         }
                     }
                 }
@@ -560,6 +628,18 @@
 
         if (!date || !time) {
             alert('Silakan isi tanggal dan jam kedatangan.');
+            e.preventDefault();
+            return;
+        }
+
+        if (isCurrentDateHoliday) {
+            alert(`Mohon maaf, instansi libur / tidak menerima kunjungan pada tanggal ini (${currentHolidayMessage}). Silakan pilih hari kerja operasional (Senin - Jumat).`);
+            e.preventDefault();
+            return;
+        }
+
+        if (isCurrentDateFull) {
+            alert('Mohon maaf, kuota kunjungan pada tanggal yang dipilih sudah penuh. Silakan pilih tanggal lain.');
             e.preventDefault();
             return;
         }
