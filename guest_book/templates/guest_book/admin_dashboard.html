@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}Dashboard{% endblock %}
-{% block page_title %}VISITOR LOGS{% endblock %}
+{% block page_title %}LOG KUNJUNGAN{% endblock %}
 {% block page_subtitle %}Monitoring real-time kunjungan tamu{% endblock %}
 
 {% block extra_css %}
@@ -10,14 +10,14 @@
     /* ── Stats Cards ── */
     .stats-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
         margin-bottom: 2rem;
     }
     .stat-card {
         background: #fff;
         border-radius: 20px;
-        padding: 1.75rem;
+        padding: 1.5rem;
         display: flex;
         align-items: center;
         gap: 1.25rem;
@@ -26,32 +26,36 @@
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
+        min-width: 0;
     }
     .stat-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 12px 30px rgba(15,23,42,0.08);
     }
     .stat-icon {
-        width: 64px; height: 64px;
+        width: 58px; height: 58px;
         border-radius: 16px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 1.5rem;
+        font-size: 1.4rem;
         flex-shrink: 0;
     }
     .stat-icon.blue   { background: #f0f7ff; color: #3b82f6; }
     .stat-icon.green  { background: #f0fdf4; color: #10b981; }
     .stat-icon.orange { background: #fff7ed; color: #f97316; }
 
-    .stat-body { flex: 1; }
+    .stat-body { flex: 1; min-width: 0; }
     .stat-label { 
         font-size: 0.75rem; font-weight: 700; color: #64748b; 
         text-transform: uppercase; letter-spacing: 0.05em; 
         margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .stat-value { font-size: 2.25rem; font-weight: 800; color: #0f172a; line-height: 1; }
+    .stat-value { font-size: 2rem; font-weight: 800; color: #0f172a; line-height: 1; }
     
     .stat-badge {
-        position: absolute; top: 1.5rem; right: 1.5rem;
+        position: absolute; top: 1.25rem; right: 1.25rem;
         font-size: 0.65rem; font-weight: 800; padding: 4px 10px;
         border-radius: 30px; letter-spacing: 0.02em;
     }
@@ -113,9 +117,12 @@
         box-shadow: 0 4px 20px rgba(15,23,42,0.05);
         border: 1px solid rgba(15,23,42,0.04);
         margin-bottom: 2rem;
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
     }
     .card-header-flex {
-        display: flex; align-items: flex-start; justify-content: space-between;
+        display: flex; align-items: center; justify-content: space-between;
         margin-bottom: 1.75rem; gap: 1rem; flex-wrap: wrap;
     }
     .card-header-flex h5 { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -0.01em; }
@@ -125,13 +132,22 @@
     .chart-container { position: relative; height: 320px; width: 100%; }
     .dropdown-toggle::after { display: none; }
     
-    .chart-legend { display: flex; gap: 1.5rem; margin-top: -10px; margin-bottom: 15px; }
+    .chart-legend { display: flex; gap: 1.5rem; margin-top: -10px; margin-bottom: 15px; flex-wrap: wrap; }
     .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; font-weight: 700; color: #64748b; }
     .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
 
     /* ── Table ── */
-    .visit-table-wrapper { overflow-x: auto; }
-    .visit-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .visit-table-wrapper { 
+        overflow-x: auto; 
+        width: 100%;
+        -webkit-overflow-scrolling: touch;
+    }
+    .visit-table { 
+        width: 100%; 
+        min-width: 620px;
+        border-collapse: separate; 
+        border-spacing: 0; 
+    }
     .visit-table th {
         font-size: 0.75rem; font-weight: 700; color: #94a3b8;
         text-transform: uppercase; letter-spacing: 0.05em;
@@ -168,13 +184,14 @@
     }
     .action-btn-circle:hover { background: #f1f5f9; color: #0f172a; }
 
-    .btn-group-custom { display: flex; gap: 0.5rem; }
+    .btn-group-custom { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
     .btn-action-light {
         display: inline-flex; align-items: center; gap: 0.5rem;
         padding: 0.6rem 1rem; border-radius: 10px;
         border: 1px solid #e2e8f0; background: #fff;
         font-size: 0.8rem; font-weight: 700; color: #475569;
         text-decoration: none; transition: all 0.2s;
+        white-space: nowrap;
     }
     .btn-action-light:hover { border-color: #3b82f6; color: #3b82f6; background: #f0f7ff; }
     .btn-action-primary {
@@ -183,13 +200,15 @@
         background: #3b82f6; font-size: 0.8rem; font-weight: 700; color: #fff;
         text-decoration: none; transition: all 0.2s;
         box-shadow: 0 4px 10px rgba(59,130,246,0.2);
+        white-space: nowrap;
     }
     .btn-action-primary:hover { background: #2563eb; transform: translateY(-1px); color: #fff; }
 
-    @media (max-width: 1024px) {
-        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 1200px) {
+        .card-premium { padding: 1.25rem; }
+        .stats-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
     }
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
         .stats-grid { grid-template-columns: 1fr; gap: 1rem; }
         .stat-card { padding: 1.25rem; }
         .stat-badge { top: 1.25rem; right: 1.25rem; }
@@ -244,7 +263,7 @@
             <p class="stat-label">Menunggu Verifikasi</p>
             <div class="stat-value" id="stat-menunggu-verifikasi">{{ menunggu_verifikasi }}</div>
         </div>
-        <span class="stat-badge urgent">URGENT</span>
+        <span class="stat-badge urgent">VERIFIKASI</span>
     </div>
 </div>
 
