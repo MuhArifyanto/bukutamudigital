@@ -13,3 +13,7 @@ python manage.py migrate
 
 # Pastikan tabel cache database terbuat di production
 python manage.py createcachetable || true
+
+# Buat / pastikan akun administrator siap digunakan di hosting
+python manage.py setup_admin || true
+
