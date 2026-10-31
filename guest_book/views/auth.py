@@ -828,11 +828,16 @@ def admin_login_view(request):
 
         post_data = request.POST.copy()
         raw_username = post_data.get('username', '').strip()
-        if raw_username and '@' in raw_username:
+        if raw_username:
             from django.contrib.auth.models import User
-            user_by_email = User.objects.filter(email__iexact=raw_username).first()
-            if user_by_email:
-                post_data['username'] = user_by_email.username
+            if '@' in raw_username:
+                user_match = User.objects.filter(email__iexact=raw_username).first()
+            else:
+                user_match = User.objects.filter(username__iexact=raw_username).first()
+            if user_match:
+                post_data['username'] = user_match.username
+            else:
+                post_data['username'] = raw_username
 
         form = AuthenticationForm(request, data=post_data)
         if form.is_valid():

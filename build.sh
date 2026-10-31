@@ -15,5 +15,5 @@ python manage.py migrate
 python manage.py createcachetable || true
 
 # Buat / pastikan akun administrator siap digunakan di hosting
-python manage.py setup_admin || true
+python manage.py setup_admin
 
