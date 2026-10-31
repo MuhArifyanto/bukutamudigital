@@ -2,6 +2,8 @@ import os
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
+from django.db import connection
+from django.db.utils import OperationalError
 from guest_book.models import Tamu, Instansi, Admin
 
 
@@ -14,6 +16,18 @@ class Command(BaseCommand):
         parser.add_argument('--email', type=str, default=None, help='Email untuk admin')
 
     def handle(self, *args, **options):
+        # 0. Cek koneksi database terlebih dahulu
+        try:
+            connection.ensure_connection()
+        except OperationalError as err:
+            self.stdout.write(self.style.ERROR("============================================================"))
+            self.stdout.write(self.style.ERROR(f"GAGAL KONEKSI DATABASE: {err}"))
+            self.stdout.write(self.style.WARNING("MySQL di komputer lokal (Laragon) belum dinyalakan."))
+            self.stdout.write(self.style.WARNING("Solusi: Buka aplikasi Laragon, klik tombol 'Start All'."))
+            self.stdout.write(self.style.WARNING("Setelah MySQL aktif, jalankan kembali: python manage.py setup_admin"))
+            self.stdout.write(self.style.ERROR("============================================================"))
+            return
+
         admin_user_env = options['username'] or os.getenv('ADMIN_USERNAME', 'admin').strip()
         admin_pass_env = options['password'] or os.getenv('ADMIN_PASSWORD', 'AdminBekasi2026!').strip()
         admin_email_env = options['email'] or os.getenv('ADMIN_EMAIL', 'admin@diskominfosantik.bekasikab.go.id').strip()
@@ -36,6 +50,8 @@ class Command(BaseCommand):
             }
         ]
 
+        has_errors = False
+
         # 1. Pastikan Instansi ada (hanya gunakan field yang benar-benar ada di model)
         try:
             instansi, created_inst = Instansi.objects.get_or_create(
@@ -49,6 +65,7 @@ class Command(BaseCommand):
             if created_inst:
                 self.stdout.write(self.style.SUCCESS(f"Instansi '{instansi.nama}' berhasil dibuat."))
         except Exception as e:
+            has_errors = True
             self.stdout.write(self.style.WARNING(f"Peringatan saat periksa Instansi: {e}"))
 
         # 2. Buat / Perbarui Akun Django User (auth_user)
@@ -74,6 +91,7 @@ class Command(BaseCommand):
                     user.save()
                     self.stdout.write(self.style.SUCCESS(f"User Django '{acc['username']}' berhasil diperbarui (password disinkronkan)."))
             except Exception as e:
+                has_errors = True
                 self.stdout.write(self.style.ERROR(f"Gagal memproses User Django '{acc['username']}': {e}"))
 
         # 3. Buat / Perbarui di Tabel 'admin' (guest_book.models.Admin)
@@ -98,6 +116,7 @@ class Command(BaseCommand):
                     admin_obj.save(update_fields=['password', 'account_status', 'name', 'phone'])
                     self.stdout.write(self.style.SUCCESS(f"Tabel admin '{acc['name']}' berhasil diperbarui."))
             except Exception as e:
+                has_errors = True
                 self.stdout.write(self.style.WARNING(f"Peringatan saat sinkronisasi tabel admin: {e}"))
 
         # 4. Pastikan Tamu Admin ada (untuk context portal, foto profil, dan instansi)
@@ -123,11 +142,18 @@ class Command(BaseCommand):
                 tamu_admin.save(update_fields=['is_admin', 'account_status', 'password'])
                 self.stdout.write(self.style.SUCCESS("Data Tamu Administrator berhasil diperbarui."))
         except Exception as e:
+            has_errors = True
             self.stdout.write(self.style.WARNING(f"Peringatan saat sinkronisasi Tamu Admin: {e}"))
 
-        self.stdout.write(self.style.SUCCESS("================================================"))
-        self.stdout.write(self.style.SUCCESS("SETUP ADMIN BERHASIL!"))
-        self.stdout.write(self.style.SUCCESS(f"Username / Akun 1 : {admin_user_env} (Email: {admin_email_env})"))
-        self.stdout.write(self.style.SUCCESS("Username / Akun 2 : superadmin (Email: superadmin@diskominfosantik.bekasikab.go.id)"))
-        self.stdout.write(self.style.SUCCESS(f"Password          : {admin_pass_env}"))
-        self.stdout.write(self.style.SUCCESS("================================================"))
+        if has_errors:
+            self.stdout.write(self.style.ERROR("================================================"))
+            self.stdout.write(self.style.ERROR("SETUP SELESAI DENGAN CATATAN/ERROR."))
+            self.stdout.write(self.style.ERROR("Sebagian tabel mungkin belum berhasil tersimpan."))
+            self.stdout.write(self.style.ERROR("================================================"))
+        else:
+            self.stdout.write(self.style.SUCCESS("================================================"))
+            self.stdout.write(self.style.SUCCESS("SETUP ADMIN BERHASIL TERSIMPAN KE DATABASE!"))
+            self.stdout.write(self.style.SUCCESS(f"Username / Akun 1 : {admin_user_env} (Email: {admin_email_env})"))
+            self.stdout.write(self.style.SUCCESS("Username / Akun 2 : superadmin (Email: superadmin@diskominfosantik.bekasikab.go.id)"))
+            self.stdout.write(self.style.SUCCESS(f"Password          : {admin_pass_env}"))
+            self.stdout.write(self.style.SUCCESS("================================================"))
