@@ -381,10 +381,35 @@ def reset_session_ai_mode(session_id):
 def _detect_user_intent_locally(message_text):
     """
     Deteksi intent lokal fallback jika N8N offline atau tidak merespon.
-    Mengembalikan salah satu dari 6 cabang intent N8N.
+    Mengembalikan salah satu dari 6 cabang intent N8N dengan respon ramah dan kontekstual.
     """
     txt = (message_text or '').strip().lower()
 
+    # 1. Basa-basi & Ucapan Terima Kasih (respon hangat, hindari strike)
+    if any(k in txt for k in ('terima kasih', 'makasih', 'terimakasih', 'thanks', 'thx', 'nuhun', 'matur nuwun', 'makasi', 'tengkyu')):
+        return {
+            'intent': 'sapaan',
+            'reply': (
+                "Sama-sama! Senang sekali bisa membantu Anda. 😊\n"
+                "Jika ada hal lain yang ingin Anda tanyakan seputar layanan, jadwal kunjungan, "
+                "atau status antrean di Diskominfosantik Kab. Bekasi, jangan ragu untuk menyapa saya kembali ya. "
+                "Semoga urusan Anda berjalan lancar!"
+            ),
+            'handoff': False,
+        }
+
+    # 2. Persetujuan / Konfirmasi santai pengguna
+    if txt in ('oke', 'ok', 'siap', 'baik', 'baiklah', 'sip', 'noted', 'siap min', 'siap kak', 'oke min', 'oke kak', 'ok min', 'ok kak', 'oke siap', 'siap makasih', 'oke makasih'):
+        return {
+            'intent': 'sapaan',
+            'reply': (
+                "Baik, terima kasih! 👍\n"
+                "Silakan beri tahu saya jika ada hal lain yang ingin Anda konsultasikan atau tanyakan seputar kunjungan."
+            ),
+            'handoff': False,
+        }
+
+    # 3. Sapaan umum
     if any(k in txt for k in ('halo', 'hai', 'hi', 'assalamu', 'selamat pagi', 'selamat siang', 'selamat sore', 'pagi', 'siang', 'sore', 'malam')):
         return {
             'intent': 'sapaan',
@@ -396,6 +421,7 @@ def _detect_user_intent_locally(message_text):
             'handoff': False,
         }
 
+    # 4. Status Kunjungan
     if any(k in txt for k in ('status', 'cek kunjungan', 'tiket', 'antrian', 'kunjungan saya', 'sudah diacc', 'sudah acc', 'disetujui belum')):
         return {
             'intent': 'cek_status_kunjungan',
@@ -403,13 +429,49 @@ def _detect_user_intent_locally(message_text):
             'handoff': False,
         }
 
-    if any(k in txt for k in ('jadwal', 'kuota', 'slot', 'buka jam', 'tutup jam', 'jam operasional', 'hari apa', 'hari kerja', 'libur')):
+    # 5. Jadwal, Kuota & Hari Operasional (termasuk pertanyaan Sabtu/Minggu/Libur)
+    if any(k in txt for k in (
+        'jadwal', 'kuota', 'slot', 'buka jam', 'tutup jam', 'jam operasional', 'hari apa',
+        'hari kerja', 'libur', 'sabtu', 'minggu', 'weekend', 'akhir pekan', 'tanggal merah',
+        'hari ini buka', 'bisa datang hari ini', 'sekarang buka'
+    )):
         return {
             'intent': 'jadwal_kuota',
             'reply': "Berikut informasi jadwal operasional dan kuota kunjungan Diskominfosantik Kab. Bekasi:",
             'handoff': False,
         }
 
+    # 6. Alamat / Lokasi Kantor
+    if any(k in txt for k in ('alamat', 'lokasi', 'dimana kantor', 'di mana kantor', 'gedung mana', 'daerah mana', 'rute')):
+        return {
+            'intent': 'info_layanan_dan_pegawai',
+            'reply': (
+                "📍 **Alamat & Lokasi Kantor Diskominfosantik Kabupaten Bekasi:**\n\n"
+                "Kompleks Perkantoran Pemerintah Kabupaten Bekasi, Gedung Diskominfosantik, Blok B\n"
+                "Desa Sukamahi, Kecamatan Cikarang Pusat, Kabupaten Bekasi, Jawa Barat 17530.\n\n"
+                "🕒 **Waktu Layanan Tatap Muka:**\n"
+                "Senin – Jumat, pukul 08:00 – 16:00 WIB (Hari Sabtu, Minggu & Hari Libur Nasional Tutup).\n\n"
+                "💡 *Patokan: Berada di kawasan pusat pemerintahan Pemkab Bekasi (Delta Mas / Cikarang Pusat).*"
+            ),
+            'handoff': False,
+        }
+
+    # 7. Persyaratan Kunjungan / Berkas
+    if any(k in txt for k in ('syarat', 'persyaratan', 'bawa apa', 'berkas apa', 'dokumen apa', 'dokumen yang harus')):
+        return {
+            'intent': 'info_layanan_dan_pegawai',
+            'reply': (
+                "📋 **Persyaratan Kunjungan ke Diskominfosantik Kab. Bekasi:**\n\n"
+                "1. 🆔 **Identitas Diri**: Membawa KTP / SIM / Kartu Identitas resmi yang masih berlaku.\n"
+                "2. 📄 **Surat Tugas / Pengantar**: Wajib untuk kunjungan kedinasan atau perwakilan lembaga/instansi.\n"
+                "3. 🎫 **Kode Tiket**: Menunjukkan bukti/kode tiket kunjungan yang didaftarkan melalui Buku Tamu Digital ini.\n"
+                "4. 👔 **Tata Tertib**: Berpakaian rapi, sopan (berkerah), dan bersepatu.\n\n"
+                "Pelayanan tatap muka dibuka setiap hari kerja (Senin – Jumat, pukul 08:00 – 16:00 WIB)."
+            ),
+            'handoff': False,
+        }
+
+    # 8. Pendaftaran Kunjungan Baru
     if any(k in txt for k in ('buatkan', 'daftarkan', 'daftar kunjungan', 'buat kunjungan', 'bikin jadwal', 'bikin kunjungan', 'jadwalkan', 'pesan jadwal')):
         return {
             'intent': 'buat_kunjungan',
@@ -425,6 +487,7 @@ def _detect_user_intent_locally(message_text):
             'handoff': False,
         }
 
+    # 9. Informasi Pegawai & Bidang Layanan
     if any(k in txt for k in ('pegawai', 'bidang', 'layanan', 'dinas', 'siapa saja', 'kontak', 'tik', 'persandian', 'statistik', 'ikp')):
         return {
             'intent': 'info_layanan_dan_pegawai',
@@ -432,6 +495,7 @@ def _detect_user_intent_locally(message_text):
             'handoff': False,
         }
 
+    # 10. Pengaduan & Keluhan
     if any(k in txt for k in ('keluhan', 'komplain', 'kendala', 'masukan', 'saran', 'masalah', 'tidak bisa', 'error', 'bantuan admin', 'bicara admin', 'operator', 'antrean', 'antri', 'lama', 'loket')):
         return {
             'intent': 'keluhan_dan_masukan',
@@ -442,6 +506,7 @@ def _detect_user_intent_locally(message_text):
             'handoff': True,
         }
 
+    # 11. Di Luar Konteks (Fallback)
     return {
         'intent': 'di_luar_konteks',
         'reply': (
@@ -449,9 +514,10 @@ def _detect_user_intent_locally(message_text):
             "Buku Tamu Digital Diskominfosantik Kab. Bekasi.\n\n"
             "Anda dapat menanyakan hal seputar:\n"
             "• *Cek Status Kunjungan*\n"
-            "• *Jadwal & Kuota Kunjungan*\n"
-            "• *Informasi Bidang & Pegawai*\n"
-            "• *Pendaftaran Kunjungan Baru*\n\n"
+            "• *Jadwal Operasional & Kuota Kunjungan*\n"
+            "• *Informasi Bidang & Pegawai Tujuan*\n"
+            "• *Pendaftaran Jadwal Kunjungan Baru*\n"
+            "• *Alamat Kantor & Persyaratan Berkunjung*\n\n"
             "Jika Anda membutuhkan bantuan langsung dari petugas manusia, silakan beritahu saya."
         ),
         'handoff': False,
@@ -1094,14 +1160,10 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
     }
 
     sections = []
-    if ai_reply:
-        if ai_reply.startswith("🤖 Asisten AI"):
-            sections.append(ai_reply)
-        else:
-            sections.append(f"🤖 Asisten AI Diskominfosantik:\n{ai_reply}")
 
     # ── 1. Cabang: cek_status_kunjungan ───────────────────────────────────────
     if 'cek_status' in intent or 'status' in intent:
+        sections.append("🤖 Asisten AI Diskominfosantik:\nBerikut adalah informasi status kunjungan terbaru Anda dari sistem:")
         visits = list(
             Kunjungan.objects.filter(tamu_id=tamu_id)
             .select_related('pegawai', 'pegawai__department_rel')
@@ -1145,54 +1207,149 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
         else:
             kuota_line = f"🟢 Tersedia **{quota_info['available']}** dari **{quota_info['quota']}** kuota (Terisi: {quota_info['booked']})"
 
-        sections.append(
-            f"🕒 **Jam Operasional:**\n"
-            f"   • Hari : Senin – Jumat\n"
-            f"   • Pukul : {jam_buka} – {jam_tutup} WIB\n\n"
-            f"📊 **Status Kuota ({tgl_str}):**\n"
-            f"   • {kuota_line}"
+        is_weekend_question = (
+            any(w in txt_lower for w in ('sabtu', 'minggu', 'weekend', 'akhir pekan'))
+            or ('libur' in txt_lower and any(w in txt_lower for w in ('kan', 'ya', 'buka', 'tutup', 'apakah', 'berarti', 'gak', 'nggak', 'bisa')))
         )
+        is_today_question = any(w in txt_lower for w in ('hari ini', 'sekarang', 'saat ini'))
+        is_quota_only_question = any(w in txt_lower for w in ('sisa kuota', 'kuota', 'slot')) and not is_weekend_question
 
-    # ── 3. Cabang: info_layanan ───────────────────────────────────────────────
-    elif 'info_layanan' in intent or 'layanan' in intent:
-        # Cek apakah ada pegawai spesifik yang direkomendasikan AI berdasarkan topik
-        rec_targeted = recommend_pegawai_by_purpose(message_text, pegawai_qs=pegawai_qs)
-        if rec_targeted:
-            b_name = rec_targeted.department_rel.nama if rec_targeted.department_rel else (rec_targeted.department or '-')
-            sections.append(
-                f"🎯 **Rekomendasi Pegawai Tujuan (Otomatis oleh AI):**\n"
-                f"Berdasarkan pertanyaan / topik Anda, pegawai yang paling tepat untuk ditemui adalah:\n"
-                f"• **{rec_targeted.name}**\n"
-                f"  Jabatan : {rec_targeted.jabatan or 'Pegawai'} ({b_name})\n\n"
-                f"💡 *Ingin langsung dibuatkan jadwal kunjungan? Silakan ketik:*\n"
-                f"*\"Buatkan saya kunjungan untuk hari Senin jam 10:00 dengan {rec_targeted.name}\"*"
+        day_names = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+        day_name = day_names[quota_info['date'].weekday()]
+
+        if is_weekend_question:
+            schedule_reply = (
+                "🤖 Asisten AI Diskominfosantik:\n"
+                "**Betul sekali!** Kantor Diskominfosantik Kabupaten Bekasi **tutup / libur pada akhir pekan (hari Sabtu dan Minggu)** serta pada hari libur nasional / tanggal merah.\n\n"
+                "Pelayanan tatap muka dan penerimaan kunjungan tamu hanya dibuka pada hari kerja:\n\n"
+                f"🕒 **Jam Operasional:**\n"
+                f"   • Hari : Senin – Jumat\n"
+                f"   • Pukul : {jam_buka} – {jam_tutup} WIB\n\n"
+                f"📊 **Status Kuota ({tgl_str}):**\n"
+                f"   • {kuota_line}\n\n"
+                "💡 *Saran: Jika Anda memiliki keperluan koordinasi atau konsultasi kedinasan, silakan jadwalkan kunjungan pada hari kerja berikutnya (hari Senin). "
+                "Apakah Anda ingin saya bantu buatkan jadwal kunjungan untuk hari Senin?*"
             )
-
-        bidang_filter = (n8n_res.get('bidang') or '').strip()
-        depts = list(Departemen.objects.all().order_by('nama'))
-        if bidang_filter:
-            matched_peg = [
-                p for p in pegawai_qs
-                if bidang_filter.lower() in (p.department_rel.nama.lower() if p.department_rel else '')
-                or bidang_filter.lower() in (p.name.lower())
-            ][:5]
-        else:
-            matched_peg = list(pegawai_qs[:5])
-
-        dept_names = ", ".join(d.nama for d in depts) if depts else "Umum, TIK, Persandian, Statistik, IKP"
-        info_lines = [
-            f"🏢 **Bidang Layanan:**\n   {dept_names}"
-        ]
-        if matched_peg and not rec_targeted:
-            peg_lines = ["👔 **Daftar Pegawai Aktif:**"]
-            for idx, p in enumerate(matched_peg, start=1):
-                b_name = p.department_rel.nama if p.department_rel else (p.department or '-')
-                peg_lines.append(
-                    f"   {idx}. **{p.name}**\n"
-                    f"      Jabatan: {p.jabatan or 'Pegawai'} ({b_name})"
+        elif is_today_question:
+            if quota_info['is_holiday']:
+                schedule_reply = (
+                    "🤖 Asisten AI Diskominfosantik:\n"
+                    f"Untuk hari ini (**{day_name}, {tgl_str}**), kantor Diskominfosantik Kabupaten Bekasi **sedang libur** ({quota_info['holiday_name'] or 'Hari Libur'}).\n\n"
+                    f"Pelayanan tatap muka kami akan kembali dibuka pada hari kerja berikutnya mulai pukul {jam_buka} WIB.\n\n"
+                    f"🕒 **Jam Operasional:**\n"
+                    f"   • Hari : Senin – Jumat\n"
+                    f"   • Pukul : {jam_buka} – {jam_tutup} WIB\n\n"
+                    f"📊 **Status Kuota ({tgl_str}):**\n"
+                    f"   • {kuota_line}\n\n"
+                    "💡 *Silakan pilih tanggal pada hari kerja berikutnya jika Anda ingin mengajukan kunjungan baru.*"
                 )
-            info_lines.append("\n".join(peg_lines))
-        sections.append("\n\n".join(info_lines))
+            else:
+                schedule_reply = (
+                    "🤖 Asisten AI Diskominfosantik:\n"
+                    f"Hari ini (**{day_name}, {tgl_str}**), kantor Diskominfosantik Kabupaten Bekasi **buka dan beroperasi** melayani kunjungan tamu.\n\n"
+                    f"🕒 **Jam Operasional:**\n"
+                    f"   • Hari : Senin – Jumat\n"
+                    f"   • Pukul : {jam_buka} – {jam_tutup} WIB\n\n"
+                    f"📊 **Status Kuota ({tgl_str}):**\n"
+                    f"   • {kuota_line}\n\n"
+                    "💡 *Pastikan Anda telah mengisi formulir kunjungan atau bisa langsung meminta saya untuk mendaftarkan jadwal Anda.*"
+                )
+        elif is_quota_only_question:
+            schedule_reply = (
+                "🤖 Asisten AI Diskominfosantik:\n"
+                f"Berikut adalah informasi kuota kunjungan Diskominfosantik Kab. Bekasi untuk tanggal **{tgl_str}**:\n\n"
+                f"📊 **Status Kuota ({tgl_str}):**\n"
+                f"   • {kuota_line}\n\n"
+                f"🕒 **Jam Operasional:**\n"
+                f"   • Hari : Senin – Jumat\n"
+                f"   • Pukul : {jam_buka} – {jam_tutup} WIB\n\n"
+                "💡 *Kuota kunjungan diperbarui secara real-time. Anda dapat langsung mengajukan kunjungan melalui menu **Buku Tamu** atau meminta saya membuatkannya.*"
+            )
+        else:
+            schedule_reply = (
+                "🤖 Asisten AI Diskominfosantik:\n"
+                "Berikut informasi jadwal operasional dan kuota kunjungan Diskominfosantik Kab. Bekasi:\n\n"
+                f"🕒 **Jam Operasional:**\n"
+                f"   • Hari : Senin – Jumat\n"
+                f"   • Pukul : {jam_buka} – {jam_tutup} WIB\n"
+                f"   • Hari Sabtu, Minggu & Libur Nasional : **Tutup / Libur**\n\n"
+                f"📊 **Status Kuota ({tgl_str}):**\n"
+                f"   • {kuota_line}\n\n"
+                "💡 *Ada tanggal atau keperluan tertentu yang ingin Anda jadwalkan?*"
+            )
+        sections.append(schedule_reply)
+
+    # ── 3. Cabang: info_layanan_dan_pegawai ────────────────────────────────────
+    elif 'info_layanan' in intent or 'layanan' in intent or 'pegawai' in intent:
+        prefix = "🤖 Asisten AI Diskominfosantik:\n"
+        is_address_query = any(w in txt_lower for w in ('alamat', 'lokasi', 'di mana', 'dimana', 'gedung', 'daerah'))
+        is_req_query = any(w in txt_lower for w in ('syarat', 'persyaratan', 'bawa apa', 'berkas', 'dokumen'))
+
+        if is_address_query:
+            sections.append(
+                f"{prefix}"
+                "📍 **Alamat & Lokasi Kantor Diskominfosantik Kabupaten Bekasi:**\n\n"
+                "Kompleks Perkantoran Pemerintah Kabupaten Bekasi, Gedung Diskominfosantik, Blok B\n"
+                "Desa Sukamahi, Kecamatan Cikarang Pusat, Kabupaten Bekasi, Jawa Barat 17530.\n\n"
+                "🕒 **Waktu Layanan Tatap Muka:**\n"
+                "Senin – Jumat, pukul 08:00 – 16:00 WIB (Hari Sabtu, Minggu & Hari Libur Nasional Tutup).\n\n"
+                "💡 *Patokan: Berada di kawasan pusat pemerintahan Pemkab Bekasi (Delta Mas / Cikarang Pusat).*"
+            )
+        elif is_req_query:
+            sections.append(
+                f"{prefix}"
+                "📋 **Persyaratan Kunjungan ke Diskominfosantik Kab. Bekasi:**\n\n"
+                "1. 🆔 **Identitas Diri**: Membawa KTP / SIM / Kartu Identitas resmi yang masih berlaku.\n"
+                "2. 📄 **Surat Tugas / Pengantar**: Wajib untuk kunjungan dinas, koordinasi lembaga, atau studi banding.\n"
+                "3. 🎫 **Kode Tiket**: Menunjukkan bukti atau kode tiket kunjungan yang diperoleh setelah mendaftar di sistem ini.\n"
+                "4. 👔 **Tata Tertib**: Berpakaian rapi, sopan (berkerah), dan bersepatu.\n\n"
+                "Pelayanan tatap muka dibuka setiap hari kerja (Senin – Jumat, pukul 08:00 – 16:00 WIB)."
+            )
+        else:
+            rec_targeted = recommend_pegawai_by_purpose(message_text, pegawai_qs=pegawai_qs)
+            sec_parts = []
+            if ai_reply and not ai_reply.startswith("Berikut informasi jadwal"):
+                sec_parts.append(f"{prefix}{ai_reply}" if not ai_reply.startswith("🤖") else ai_reply)
+            else:
+                sec_parts.append(f"{prefix}Berikut daftar bidang dan pegawai layanan aktif di Diskominfosantik Kab. Bekasi:")
+
+            if rec_targeted:
+                b_name = rec_targeted.department_rel.nama if rec_targeted.department_rel else (rec_targeted.department or '-')
+                sec_parts.append(
+                    f"🎯 **Rekomendasi Pegawai Tujuan (Otomatis oleh AI):**\n"
+                    f"Berdasarkan pertanyaan / topik Anda, pegawai yang paling tepat untuk ditemui adalah:\n"
+                    f"• **{rec_targeted.name}**\n"
+                    f"  Jabatan : {rec_targeted.jabatan or 'Pegawai'} ({b_name})\n\n"
+                    f"💡 *Ingin langsung dibuatkan jadwal kunjungan? Silakan ketik:*\n"
+                    f"*\"Buatkan saya kunjungan untuk hari Senin jam 10:00 dengan {rec_targeted.name}\"*"
+                )
+
+            bidang_filter = (n8n_res.get('bidang') or '').strip()
+            depts = list(Departemen.objects.all().order_by('nama'))
+            if bidang_filter:
+                matched_peg = [
+                    p for p in pegawai_qs
+                    if bidang_filter.lower() in (p.department_rel.nama.lower() if p.department_rel else '')
+                    or bidang_filter.lower() in (p.name.lower())
+                ][:5]
+            else:
+                matched_peg = list(pegawai_qs[:5])
+
+            dept_names = ", ".join(d.nama for d in depts) if depts else "Umum, TIK, Persandian, Statistik, IKP"
+            info_lines = [
+                f"🏢 **Bidang Layanan:**\n   {dept_names}"
+            ]
+            if matched_peg and not rec_targeted:
+                peg_lines = ["👔 **Daftar Pegawai Aktif:**"]
+                for idx, p in enumerate(matched_peg, start=1):
+                    b_name = p.department_rel.nama if p.department_rel else (p.department or '-')
+                    peg_lines.append(
+                        f"   {idx}. **{p.name}**\n"
+                        f"      Jabatan: {p.jabatan or 'Pegawai'} ({b_name})"
+                    )
+                info_lines.append("\n".join(peg_lines))
+            sec_parts.append("\n\n".join(info_lines))
+            sections.append("\n\n".join(sec_parts))
 
     # ── 4. Cabang: buat_kunjungan ─────────────────────────────────────────────
     elif 'buat_kunjungan' in intent:
@@ -1214,7 +1371,10 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
         if n8n_res.get('pegawai_id'):
             rec_peg = next((p for p in pegawai_qs if str(p.id) == str(n8n_res['pegawai_id'])), None)
         bidang_rec = n8n_res.get('bidang')
-        rec_lines = []
+        rec_lines = [
+            "🤖 Asisten AI Diskominfosantik:\n"
+            "Untuk mengajukan jadwal kunjungan baru, silakan ikuti panduan berikut:"
+        ]
         if rec_peg:
             b_name = rec_peg.department_rel.nama if rec_peg.department_rel else (rec_peg.department or '-')
             rec_lines.append(
@@ -1251,14 +1411,39 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
         except Exception as msg_err:
             logger.warning("Gagal menyimpan pesan keluhan ke Message: %s", msg_err)
         sections.append(
+            "🤖 Asisten AI Diskominfosantik:\n"
+            "Terima kasih atas masukan/kendala yang Anda sampaikan. Pesan Anda telah kami catat "
+            "dan diteruskan ke petugas Admin Diskominfosantik kami.\n\n"
             "💬 **Pusat Bantuan & Layanan Pengaduan:**\n"
-            "Pesan Anda telah kami catat dan diteruskan ke petugas Admin Diskominfosantik. "
             "Admin kami akan segera merespon langsung di ruang chat ini."
         )
 
-    # ── 6. Cabang: di_luar_konteks ────────────────────────────────────────────
+    # ── 6. Cabang: sapaan & basa-basi ─────────────────────────────────────────
+    elif 'sapaan' in intent or 'terima_kasih' in intent or 'konfirmasi' in intent:
+        if ai_reply:
+            sections.append(ai_reply if ai_reply.startswith("🤖") else f"🤖 Asisten AI Diskominfosantik:\n{ai_reply}")
+        else:
+            sections.append(
+                "🤖 Asisten AI Diskominfosantik:\n"
+                "Halo! 👋 Selamat datang di Layanan Buku Tamu Digital Diskominfosantik Kab. Bekasi. Ada yang bisa saya bantu?"
+            )
+
+    # ── 7. Cabang: di_luar_konteks ────────────────────────────────────────────
     else:
         remaining = AI_MAX_STRIKES - strike_count
+        msg_out = ai_reply if ai_reply else (
+            "Mohon maaf, saya belum memahami pertanyaan Anda. Saya adalah Asisten AI untuk layanan "
+            "Buku Tamu Digital Diskominfosantik Kab. Bekasi.\n\n"
+            "Anda dapat menanyakan hal seputar:\n"
+            "• *Cek Status Kunjungan*\n"
+            "• *Jadwal Operasional & Kuota Kunjungan*\n"
+            "• *Informasi Bidang & Pegawai Tujuan*\n"
+            "• *Pendaftaran Jadwal Kunjungan Baru*\n"
+            "• *Alamat Kantor & Persyaratan Berkunjung*"
+        )
+        if not msg_out.startswith("🤖"):
+            msg_out = f"🤖 Asisten AI Diskominfosantik:\n{msg_out}"
+        sections.append(msg_out)
         if remaining > 0:
             sections.append(
                 f"💡 *(Catatan: Jika 3 kali pertanyaan belum sesuai, Anda akan otomatis terhubung ke Petugas Admin. Sisa kesempatan: {remaining}x)*"

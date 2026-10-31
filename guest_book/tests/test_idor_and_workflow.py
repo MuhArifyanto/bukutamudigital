@@ -250,6 +250,29 @@ class IDORAndWorkflowTestCase(BaseSecurityTestCase):
             self.assertFalse(res_greet['handoff'])
             self.assertEqual(res_greet['strike_count'], 0)
 
+            # 4a. Respon luwes & ramah untuk konfirmasi hari libur akhir pekan
+            res_weekend = build_n8n_chat_response(
+                self.tamu_a.id,
+                'berarti untuk hari sabtu dan minggu libur kan?',
+                session_id=sess_id,
+            )
+            self.assertEqual(res_weekend['intent'], 'jadwal_kuota')
+            self.assertIn('Betul sekali', res_weekend['reply_text'])
+            self.assertIn('tutup / libur pada akhir pekan', res_weekend['reply_text'])
+            self.assertIn('Jam Operasional', res_weekend['reply_text'])
+            self.assertIn('Status Kuota', res_weekend['reply_text'])
+            self.assertEqual(res_weekend['strike_count'], 0)
+
+            # 4b. Ucapan terima kasih ditanggapi hangat tanpa memicu strike
+            res_thanks = build_n8n_chat_response(
+                self.tamu_a.id,
+                'terima kasih banyak ya',
+                session_id=sess_id,
+            )
+            self.assertEqual(res_thanks['intent'], 'sapaan')
+            self.assertIn('Sama-sama', res_thanks['reply_text'])
+            self.assertEqual(res_thanks['strike_count'], 0)
+
             # 4b. Percakapan interaktif buat kunjungan di chat
             # Tahap 1: Tamu baru bertanya hari Senin ("anda bisa tidak membuatkan saya daftar kunjungan, untuk hari senin bisa tidak?")
             # AI mengecek kuota dan menanyakan jam & keperluan (tidak langsung membuat kunjungan buta ke database)
