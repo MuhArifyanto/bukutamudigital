@@ -652,6 +652,18 @@
         );
 
         const strongColor = isPureSent ? 'color:#ffffff;' : 'color:#0f172a;';
+        // Render Markdown Link [Teks](URL) menjadi Tombol / Link Interaktif
+        safe = safe.replace(
+            /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+            function(match, text, url) {
+                const isMaps = url.indexOf('maps.google') !== -1 || url.indexOf('goo.gl') !== -1 || url.indexOf('/maps') !== -1;
+                if (isMaps) {
+                    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.45rem;background:#2563eb;color:#ffffff !important;padding:0.5rem 1rem;border-radius:10px;text-decoration:none !important;font-weight:700;font-size:0.85rem;margin:0.45rem 0;box-shadow:0 3px 6px -1px rgba(37,99,235,0.3);"><i class="fas fa-map-marked-alt"></i> <span>${text}</span> <i class="fas fa-external-link-alt" style="font-size:0.7rem;margin-left:3px;opacity:0.85;"></i></a>`;
+                }
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;font-weight:600;">${text} <i class="fas fa-external-link-alt" style="font-size:0.7rem;"></i></a>`;
+            }
+        );
+
         safe = safe.replace(/\*\*([^*]+)\*\*/g, `<strong style="${strongColor}font-weight:700;">$1</strong>`);
 
         return safe;

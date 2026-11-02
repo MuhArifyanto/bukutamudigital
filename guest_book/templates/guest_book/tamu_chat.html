@@ -931,6 +931,18 @@
             '<div style="display:flex;align-items:center;gap:0.45rem;font-size:0.75rem;font-weight:800;color:#1d4ed8;background:#eff6ff;padding:0.35rem 0.7rem;border-radius:8px;margin-bottom:0.65rem;border:1px solid #bfdbfe;"><i class="fas fa-robot"></i> <span>Asisten AI Diskominfosantik</span></div>'
         );
 
+        // Render Markdown Link [Teks](URL) menjadi Tombol / Link Interaktif
+        safe = safe.replace(
+            /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+            function(match, text, url) {
+                const isMaps = url.indexOf('maps.google') !== -1 || url.indexOf('goo.gl') !== -1 || url.indexOf('/maps') !== -1;
+                if (isMaps) {
+                    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.45rem;background:#2563eb;color:#ffffff !important;padding:0.5rem 1rem;border-radius:10px;text-decoration:none !important;font-weight:700;font-size:0.85rem;margin:0.45rem 0;box-shadow:0 3px 6px -1px rgba(37,99,235,0.3);transition:all 0.2s;"><i class="fas fa-map-marked-alt"></i> <span>${text}</span> <i class="fas fa-external-link-alt" style="font-size:0.7rem;margin-left:3px;opacity:0.85;"></i></a>`;
+                }
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;font-weight:600;">${text} <i class="fas fa-external-link-alt" style="font-size:0.7rem;"></i></a>`;
+            }
+        );
+
         // Render **bold** menjadi <strong>
         safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:#0f172a;font-weight:700;">$1</strong>');
 
@@ -939,8 +951,9 @@
 
     // Format ulang riwayat pesan yang sudah dirender dari database saat halaman dimuat
     document.querySelectorAll('.msg-group.received .msg-bubble').forEach(bubble => {
-        if (!bubble.querySelector('img, a.file-card, span')) {
+        if (!bubble.querySelector('img, a.file-card') && !bubble.hasAttribute('data-formatted')) {
             bubble.innerHTML = formatChatMessageHtml(bubble.textContent);
+            bubble.setAttribute('data-formatted', 'true');
         }
     });
     document.querySelectorAll('.msg-group.sent .msg-bubble').forEach(bubble => {

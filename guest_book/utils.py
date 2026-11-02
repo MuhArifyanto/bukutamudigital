@@ -442,13 +442,19 @@ def _detect_user_intent_locally(message_text):
         }
 
     # 6. Alamat / Lokasi Kantor
-    if any(k in txt for k in ('alamat', 'lokasi', 'dimana kantor', 'di mana kantor', 'gedung mana', 'daerah mana', 'rute')):
+    if any(k in txt for k in (
+        'alamat', 'lokasi', 'dimana kantor', 'di mana kantor', 'gedung mana', 'daerah mana',
+        'rute', 'maps', 'peta', 'google maps', 'kantornya dimana', 'dimana lokasinya',
+        'lokasinya dimana', 'lokasi kantor', 'tempatnya dimana', 'arah ke kantor'
+    )):
         return {
             'intent': 'info_layanan_dan_pegawai',
             'reply': (
                 "📍 **Alamat & Lokasi Kantor Diskominfosantik Kabupaten Bekasi:**\n\n"
                 "Kompleks Perkantoran Pemerintah Kabupaten Bekasi, Gedung Diskominfosantik, Blok B\n"
                 "Desa Sukamahi, Kecamatan Cikarang Pusat, Kabupaten Bekasi, Jawa Barat 17530.\n\n"
+                "🗺️ **Petunjuk Arah Google Maps:**\n"
+                "[Buka Rute di Google Maps](https://www.google.com/maps/search/?api=1&query=Diskominfosantik+Kabupaten+Bekasi)\n\n"
                 "🕒 **Waktu Layanan Tatap Muka:**\n"
                 "Senin – Jumat, pukul 08:00 – 16:00 WIB (Hari Sabtu, Minggu & Hari Libur Nasional Tutup).\n\n"
                 "💡 *Patokan: Berada di kawasan pusat pemerintahan Pemkab Bekasi (Delta Mas / Cikarang Pusat).*"
@@ -1282,7 +1288,7 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
     # ── 3. Cabang: info_layanan_dan_pegawai ────────────────────────────────────
     elif 'info_layanan' in intent or 'layanan' in intent or 'pegawai' in intent:
         prefix = "🤖 Asisten AI Diskominfosantik:\n"
-        is_address_query = any(w in txt_lower for w in ('alamat', 'lokasi', 'di mana', 'dimana', 'gedung', 'daerah'))
+        is_address_query = any(w in txt_lower for w in ('alamat', 'lokasi', 'di mana', 'dimana', 'gedung', 'daerah', 'rute', 'maps', 'peta', 'google maps'))
         is_req_query = any(w in txt_lower for w in ('syarat', 'persyaratan', 'bawa apa', 'berkas', 'dokumen'))
 
         if is_address_query:
@@ -1291,6 +1297,8 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
                 "📍 **Alamat & Lokasi Kantor Diskominfosantik Kabupaten Bekasi:**\n\n"
                 "Kompleks Perkantoran Pemerintah Kabupaten Bekasi, Gedung Diskominfosantik, Blok B\n"
                 "Desa Sukamahi, Kecamatan Cikarang Pusat, Kabupaten Bekasi, Jawa Barat 17530.\n\n"
+                "🗺️ **Petunjuk Arah Google Maps:**\n"
+                "[Buka Rute di Google Maps](https://www.google.com/maps/search/?api=1&query=Diskominfosantik+Kabupaten+Bekasi)\n\n"
                 "🕒 **Waktu Layanan Tatap Muka:**\n"
                 "Senin – Jumat, pukul 08:00 – 16:00 WIB (Hari Sabtu, Minggu & Hari Libur Nasional Tutup).\n\n"
                 "💡 *Patokan: Berada di kawasan pusat pemerintahan Pemkab Bekasi (Delta Mas / Cikarang Pusat).*"
