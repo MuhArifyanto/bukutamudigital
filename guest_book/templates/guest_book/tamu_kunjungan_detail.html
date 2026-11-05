@@ -115,6 +115,81 @@
                         </a>
                     {% endif %}
                 </div>
+
+                <!-- TIKET QR CODE (Untuk Status Disetujui & In Progress) -->
+                {% if kunjungan.status == 'disetujui' or kunjungan.status == 'in_progress' %}
+                <div style="background: #f8fafc; border: 1.5px dashed #3b82f6; border-radius: 12px; padding: 1.25rem; margin-top: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1 mb-1" style="font-size: 0.7rem;">
+                            <i class="fas fa-qrcode me-1"></i> TIKET KEHADIRAN DIGITAL
+                        </span>
+                        <div style="font-size: 1.35rem; font-weight: 800; color: #1e3a8a; font-family: monospace;">#{{ ticket_code }}</div>
+                        <p style="color: #64748b; font-size: 0.8rem; margin: 4px 0 0; max-width: 320px;">
+                            Perlihatkan QR Code ini ke petugas satpam / resepsionis di lobi Diskominfosantik untuk check-in kehadiran instan.
+                        </p>
+                    </div>
+                    <div style="text-align: center; background: #fff; padding: 8px; border-radius: 10px; border: 1px solid #cbd5e1; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                        <div id="detailQrCode"></div>
+                        <div style="font-size: 0.6rem; font-weight: 800; color: #64748b; margin-top: 4px;">SCAN RESEPSIONIS</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- SURVEI INDEKS KEPUASAN MASYARAKAT (IKM) (Untuk Status Completed) -->
+                {% if kunjungan.status == 'completed' %}
+                    {% if ikm_survey %}
+                    <div style="background: #f0fdf4; border-radius: 12px; padding: 1.25rem; border: 1px solid #bbf7d0; margin-top: 1.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <h5 style="font-size: 0.95rem; font-weight: 800; color: #166534; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-check-circle text-success"></i> Penilaian IKM Anda Telah Tersimpan
+                            </h5>
+                            <div style="color: #eab308; font-size: 0.95rem;">
+                                {% for i in "12345" %}
+                                    {% if forloop.counter <= ikm_survey.rating %}<i class="fas fa-star"></i>{% else %}<i class="far fa-star text-muted"></i>{% endif %}
+                                {% endfor %}
+                                <span style="font-weight: 800; color: #166534; margin-left: 4px; font-size: 0.85rem;">{{ ikm_survey.rating }}.0</span>
+                            </div>
+                        </div>
+                        {% if ikm_survey.ulasan %}
+                            <p style="font-size: 0.85rem; color: #15803d; margin: 0; font-style: italic;">"{{ ikm_survey.ulasan }}"</p>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div style="background: #fff; border-radius: 12px; padding: 1.5rem; border: 1.5px dashed #f59e0b; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.08); margin-top: 1.5rem;" id="ikmSurveySection">
+                        <div class="mb-3">
+                            <h5 style="font-size: 1rem; font-weight: 800; color: #0f172a; margin: 0 0 4px; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-star text-warning"></i> Survei Indeks Kepuasan Masyarakat (IKM)
+                            </h5>
+                            <small style="color: #64748b;">Kunjungan Anda telah selesai. Berikan penilaian Anda untuk membantu kami meningkatkan kualitas pelayanan.</small>
+                        </div>
+                        
+                        <form id="ikmSurveyForm" onsubmit="submitIkmSurvey(event)">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label style="font-size: 0.72rem; font-weight: 800; color: #475569; text-transform: uppercase; display: block; margin-bottom: 0.4rem;">Rating Kepuasan Pelayanan</label>
+                                <div id="starRatingGroup" style="display: flex; gap: 0.5rem; font-size: 1.6rem; cursor: pointer; color: #cbd5e1;">
+                                    <i class="fas fa-star text-warning rating-star" data-val="1" onclick="setRating(1)"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="2" onclick="setRating(2)"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="3" onclick="setRating(3)"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="4" onclick="setRating(4)"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="5" onclick="setRating(5)"></i>
+                                </div>
+                                <input type="hidden" name="rating" id="ratingInput" value="5">
+                                <small id="ratingLabel" style="color: #f59e0b; font-weight: 700; font-size: 0.8rem; margin-top: 3px; display: block;">5 Bintang — Sangat Baik / Puas</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label style="font-size: 0.72rem; font-weight: 800; color: #475569; text-transform: uppercase; display: block; margin-bottom: 0.4rem;">Ulasan / Kritik & Saran (Opsional)</label>
+                                <textarea name="ulasan" id="ulasanInput" rows="2" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.6rem; font-size: 0.85rem;" placeholder="Bagikan tanggapan Anda mengenai keramahan, fasilitas, atau kecepatan layanan..."></textarea>
+                            </div>
+
+                            <button type="submit" id="btnSubmitIkm" style="background: #f59e0b; color: #000; font-weight: 800; border: none; border-radius: 8px; padding: 0.6rem 1.25rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-paper-plane"></i> Kirim Penilaian IKM
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                {% endif %}
             </div>
 
             <!-- Notes from Staff -->
@@ -179,4 +254,103 @@
         </div>
     </div>
 </div>
+
+<!-- QRCode.js & IKM Survey Script -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 1. Render QR Code Tiket
+        const qrBox = document.getElementById("detailQrCode");
+        if (qrBox && typeof QRCode !== 'undefined') {
+            new QRCode(qrBox, {
+                text: "{{ kunjungan.id }}",
+                width: 90,
+                height: 90,
+                colorDark: "#0f172a",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+    });
+
+    // 2. Rating Handler
+    const ratingLabels = {
+        1: '1 Bintang — Sangat Buruk / Tidak Puas',
+        2: '2 Bintang — Kurang Baik',
+        3: '3 Bintang — Cukup Baik',
+        4: '4 Bintang — Baik / Puas',
+        5: '5 Bintang — Sangat Baik / Sangat Puas'
+    };
+
+    function setRating(val) {
+        document.getElementById('ratingInput').value = val;
+        document.getElementById('ratingLabel').innerText = ratingLabels[val] || (val + ' Bintang');
+        
+        const stars = document.querySelectorAll('.rating-star');
+        stars.forEach((s) => {
+            const v = parseInt(s.getAttribute('data-val'));
+            if (v <= val) {
+                s.className = 'fas fa-star text-warning rating-star';
+            } else {
+                s.className = 'far fa-star text-muted rating-star';
+            }
+        });
+    }
+
+    // 3. Submit IKM Survey via AJAX
+    function submitIkmSurvey(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmitIkm');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
+
+        const rating = document.getElementById('ratingInput').value;
+        const ulasan = document.getElementById('ulasanInput').value;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch("{% url 'tamu:api_submit_ikm_rating' kunjungan.id %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                rating: rating,
+                ulasan: ulasan,
+                kesesuaian_persyaratan: rating,
+                kemudahan_prosedur: rating,
+                kecepatan_layanan: rating,
+                keramahan_petugas: rating,
+                kualitas_sarana: rating
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const section = document.getElementById('ikmSurveySection');
+                section.style.background = '#f0fdf4';
+                section.style.borderColor = '#bbf7d0';
+                section.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.75rem; color: #166534;">
+                        <i class="fas fa-check-circle fs-3 text-success"></i>
+                        <div>
+                            <h5 style="margin: 0; font-weight: 800; font-size: 1rem;">Terima Kasih Atas Penilaian Anda!</h5>
+                            <p style="margin: 3px 0 0; font-size: 0.85rem; color: #15803d;">Aspirasi dan survei kepuasan Anda sangat berharga bagi peningkatan mutu layanan Diskominfosantik.</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Kirim Penilaian IKM';
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Terjadi kesalahan jaringan.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Kirim Penilaian IKM';
+        });
+    }
+</script>
 {% endblock %}

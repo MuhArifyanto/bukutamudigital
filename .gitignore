@@ -41,6 +41,9 @@ node_modules/
 *.bak
 *.tmp
 *.swp
+scratch/
+test.html
+extracted_image*.png
 downloaded_captcha/
 static/images/captcha/
 test_traffic_light_*.jpg

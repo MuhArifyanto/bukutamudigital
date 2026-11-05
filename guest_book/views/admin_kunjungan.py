@@ -269,3 +269,159 @@ def admin_kunjungan_cetak_pdf(request):
     context = get_admin_context(request)
     context.update({'kunjungan_all': kunjungan_all})
     return render(request, 'guest_book/admin_kunjungan_cetak_pdf.html', context)
+
+
+@admin_login_required
+def admin_scan_tiket_view(request):
+    """View Halaman Scanner Kamera QR Code di Pos Resepsionis / Satpam"""
+    ctx = get_admin_context(request)
+    ctx.update({
+        'active_page': 'scan_tiket',
+    })
+    return render(request, 'guest_book/admin_scan_tiket.html', ctx)
+
+
+@admin_login_required
+def api_scan_tiket(request):
+    """
+    API Pemindaian QR Code Tiket Tamu di Pos Resepsionis / Satpam
+    Mencari tiket berdasarkan UUID atau 8-karakter awal kode tiket.
+    Hanya dalam 1 detik pemindaian:
+    - Status kunjungan langsung diubah menjadi 'in_progress' (Hadir di Kantor).
+    - Status history tercatat.
+    - Notifikasi otomatis dikirim ke pegawai tujuan.
+    """
+    import json
+    import re
+    from django.http import JsonResponse
+    from django.db import transaction
+    from ..models import Kunjungan, KunjunganStatusHistory
+    from ..utils import send_notification
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body.decode('utf-8')) if request.body else {}
+    except Exception:
+        data = request.POST
+
+    raw_code = (data.get('code') or data.get('ticket_code') or '').strip()
+    if not raw_code:
+        return JsonResponse({'success': False, 'error': 'Kode tiket / QR code tidak terbaca.'}, status=400)
+
+    # Bersihkan kode jika dalam format JSON atau prefix URL
+    clean_code = raw_code
+    if clean_code.startswith('{') and '}' in clean_code:
+        try:
+            parsed = json.loads(clean_code)
+            clean_code = parsed.get('ticket_id') or parsed.get('code') or clean_code
+        except Exception:
+            pass
+
+    clean_code = clean_code.replace('#', '').strip()
+    m_uuid = re.search(r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}', clean_code, re.IGNORECASE)
+    if m_uuid:
+        clean_code = m_uuid.group(0)
+
+    kunjungan = None
+    if len(clean_code) == 36 and '-' in clean_code:
+        kunjungan = Kunjungan.objects.filter(id=clean_code).select_related('tamu', 'pegawai', 'pegawai__department_rel').first()
+    
+    if not kunjungan:
+        prefix_code = clean_code[:8].lower()
+        kunjungan = Kunjungan.objects.filter(id__istartswith=prefix_code).select_related('tamu', 'pegawai', 'pegawai__department_rel').first()
+
+    if not kunjungan:
+        return JsonResponse({'success': False, 'error': f'Tiket dengan kode "{clean_code[:8].upper()}" tidak ditemukan dalam sistem.'}, status=404)
+
+    tamu = kunjungan.tamu
+    pegawai = kunjungan.pegawai
+    dept_name = pegawai.department_rel.nama if pegawai and pegawai.department_rel else (pegawai.department if pegawai else 'Umum')
+    tgl_local = timezone.localtime(kunjungan.arrival_time)
+    tgl_str = tgl_local.strftime('%d/%m/%Y pukul %H:%M WIB')
+    code_display = str(kunjungan.id)[:8].upper()
+
+    photo_url = None
+    if tamu and hasattr(tamu, 'profile_picture') and tamu.profile_picture:
+        try:
+            photo_url = tamu.profile_picture.url
+        except Exception:
+            photo_url = None
+
+    guest_data = {
+        'id': str(kunjungan.id),
+        'code': code_display,
+        'tamu_name': tamu.name if tamu else 'Tamu',
+        'tamu_instansi': tamu.instansi if tamu and tamu.instansi else 'Pribadi / Umum',
+        'tamu_photo': photo_url,
+        'tamu_phone': tamu.phone if tamu else '-',
+        'pegawai_name': pegawai.name if pegawai else 'Menunggu Penugasan',
+        'pegawai_jabatan': pegawai.jabatan if pegawai else 'Pegawai',
+        'department': dept_name,
+        'purpose': kunjungan.purpose,
+        'arrival_time': tgl_str,
+        'status': kunjungan.status,
+        'status_display': kunjungan.get_status_display(),
+    }
+
+    if kunjungan.status == 'cancelled':
+        return JsonResponse({
+            'success': False,
+            'error': f'Tiket #{code_display} telah Dibatalkan (Cancelled). Tidak dapat melakukan check-in.',
+            'data': guest_data
+        }, status=400)
+
+    if kunjungan.status == 'completed':
+        return JsonResponse({
+            'success': False,
+            'error': f'Kunjungan tiket #{code_display} telah selesai (Completed) sebelumnya.',
+            'data': guest_data
+        }, status=400)
+
+    if kunjungan.status == 'in_progress':
+        return JsonResponse({
+            'success': True,
+            'already_in_progress': True,
+            'message': f'Tamu {tamu.name} sudah berstatus Hadir di Kantor (In Progress).',
+            'data': guest_data
+        })
+
+    old_status = kunjungan.status
+    now_local = timezone.localtime(timezone.now())
+    with transaction.atomic():
+        kunjungan.status = 'in_progress'
+        kunjungan.save(update_fields=['status', 'updated_at'])
+
+        KunjunganStatusHistory.objects.create(
+            kunjungan=kunjungan,
+            old_status=old_status,
+            new_status='in_progress',
+            changed_by_id=str(request.session.get('admin_id') or 'admin'),
+            changed_by_type='admin',
+            notes=f'Check-in Hadir di Kantor via Scan QR Code Pos Resepsionis/Satpam pada {now_local.strftime("%d/%m/%Y %H:%M WIB")}',
+        )
+
+    if pegawai:
+        try:
+            send_notification(
+                recipient_id=str(pegawai.id),
+                recipient_type='pegawai',
+                notification_type='guest_arrived',
+                title='Tamu Anda Telah Tiba di Lobi',
+                message=f'Tamu {tamu.name} ({guest_data["tamu_instansi"]}) telah hadir dan check-in melalui pos resepsionis.',
+                related_object_id=str(kunjungan.id)
+            )
+        except Exception as e:
+            logger.warning("Gagal mengirim notif guest_arrived ke pegawai: %s", e)
+
+    guest_data['status'] = 'in_progress'
+    guest_data['status_display'] = 'Hadir di Kantor (In Progress)'
+    guest_data['checkin_time'] = now_local.strftime('%H:%M WIB')
+
+    return JsonResponse({
+        'success': True,
+        'is_new_checkin': True,
+        'message': f'Verifikasi Berhasil! Tamu {tamu.name} resmi Hadir di Kantor.',
+        'data': guest_data
+    })

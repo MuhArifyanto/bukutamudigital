@@ -1,0 +1,396 @@
+{% extends "guest_book/admin_base.html" %}
+
+{% block title %}Scan Tiket QR — Pos Resepsionis & Satpam{% endblock %}
+{% block page_title %}Pos Resepsionis & Keamanan{% endblock %}
+{% block active_page %}scan_tiket{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Kolom Kiri: Kamera Scanner & Input Manual -->
+    <div class="col-lg-6">
+        <div class="card-premium mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width: 38px; height: 38px; border-radius: 8px; background: #eff6ff; color: #1e3a8a; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                        <i class="fas fa-qrcode"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark">Scanner Kamera QR Code</h6>
+                        <small class="text-muted" style="font-size: 0.75rem;">Arahkan kamera ke QR Code ponsel atau kartu tamu</small>
+                    </div>
+                </div>
+                <span class="badge bg-light text-secondary border px-2 py-1" id="scannerStatusBadge" style="font-size: 0.75rem;">
+                    <i class="fas fa-video me-1"></i> Kamera Siap
+                </span>
+            </div>
+
+            <!-- Viewport Kamera Scanner -->
+            <div class="position-relative overflow-hidden mb-3" style="background: #0f172a; min-height: 300px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <div id="reader" style="width: 100%; border: none;"></div>
+                <div id="scannerOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white" style="pointer-events: none; display: none;">
+                    <div style="width: 180px; height: 180px; border: 2px dashed #38bdf8; border-radius: 12px; box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.45); animation: pulseFrame 2s infinite ease-in-out;"></div>
+                </div>
+            </div>
+
+            <!-- Kontrol Kamera -->
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <button type="button" class="btn btn-dark btn-sm px-3" id="btnToggleCamera" style="border-radius: 6px; font-weight: 600; font-size: 0.8rem;">
+                    <i class="fas fa-camera me-1"></i> <span id="btnCameraText">Mulai Kamera</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3" id="btnSwitchCamera" style="border-radius: 6px; font-size: 0.8rem; display: none;">
+                    <i class="fas fa-sync-alt me-1"></i> Ganti Kamera
+                </button>
+                <button type="button" class="btn btn-light btn-sm px-3 border ms-auto text-secondary" style="border-radius: 6px; font-size: 0.8rem;" onclick="testBeepSound()">
+                    <i class="fas fa-volume-up me-1"></i> Tes Beep
+                </button>
+            </div>
+
+            <!-- Divider Input Manual -->
+            <div class="border-top pt-3">
+                <label class="form-label text-muted fw-bold mb-1" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                    <i class="fas fa-keyboard me-1"></i> Atau Masukkan Kode Tiket Manual (8 Karakter / Barcode Reader)
+                </label>
+                <form id="manualCheckinForm" class="d-flex gap-2">
+                    <input type="text" id="manualTicketInput" class="form-control text-uppercase fw-bold font-monospace" placeholder="Contoh: 7F2A1C3B" maxlength="36" autocomplete="off" style="border-radius: 6px; font-size: 0.85rem;">
+                    <button type="submit" class="btn btn-primary px-3 fw-bold flex-shrink-0" id="btnManualSubmit" style="border-radius: 6px; font-size: 0.82rem; background: #0f172a; border-color: #0f172a;">
+                        <i class="fas fa-check-circle me-1"></i> Hadir
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kolom Kanan: Hasil Verifikasi & Profil Tamu -->
+    <div class="col-lg-6">
+        <div class="card-premium h-100" id="resultCard">
+            <!-- State Default / Kosong -->
+            <div id="stateEmpty" class="text-center py-5">
+                <div style="width: 80px; height: 80px; border-radius: 50%; background: #f8fafc; border: 2px dashed #cbd5e1; display: inline-flex; align-items: center; justify-content: center; font-size: 2.2rem; color: #94a3b8; margin-bottom: 1.25rem;">
+                    <i class="fas fa-id-card-alt"></i>
+                </div>
+                <h5 class="fw-bold text-dark mb-1">Menunggu Pemindaian Tiket</h5>
+                <p class="text-muted small mb-0 px-4">
+                    Pindai QR Code tamu via kamera atau ketik 8 karakter kode tiket di samping. Status kehadiran tamu akan otomatis berganti ke <strong>Hadir di Kantor (In Progress)</strong> dalam 1 detik.
+                </p>
+            </div>
+
+            <!-- State Loading -->
+            <div id="stateLoading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                <h6 class="fw-bold text-dark">Memverifikasi Data Tiket...</h6>
+                <small class="text-muted">Mencocokkan data tamu dengan database Diskominfosantik</small>
+            </div>
+
+            <!-- State Sukses Verifikasi -->
+            <div id="stateSuccess" style="display: none;">
+                <div class="text-center mb-4">
+                    <div class="badge-status-checkin mb-2" id="resStatusBadge">
+                        <i class="fas fa-check-circle me-1"></i> <span id="resStatusText">Hadir di Kantor</span>
+                    </div>
+                    <h3 class="fw-black text-dark mb-0 font-monospace" id="resTicketCode">#--------</h3>
+                    <small class="text-muted" id="resCheckinTime">Check-in: Baru saja</small>
+                </div>
+
+                <div class="bg-white rounded-3 p-3 mb-3 border">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <img id="resTamuAvatar" src="" alt="Foto Tamu" class="rounded-circle object-fit-cover shadow-sm border" style="width: 56px; height: 56px; display: none;">
+                        <div id="resTamuInitial" class="rounded-circle text-white fw-bold shadow-sm d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; font-size: 1.3rem; background: #1e3a8a;">
+                            TM
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0" id="resTamuName">Nama Tamu</h6>
+                            <div class="text-muted small fw-medium" id="resTamuInstansi">Instansi</div>
+                            <div class="text-muted small" id="resTamuPhone" style="font-size: 0.75rem;"><i class="fas fa-phone-alt me-1"></i> -</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 pt-2 border-top">
+                        <div class="col-6">
+                            <span class="text-muted small d-block" style="font-size: 0.72rem;">Pegawai Dituju:</span>
+                            <span class="fw-bold text-dark small" id="resPegawaiName">-</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted small d-block" style="font-size: 0.72rem;">Bidang / Bagian:</span>
+                            <span class="fw-bold text-dark small" id="resDeptName">-</span>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <span class="text-muted small d-block" style="font-size: 0.72rem;">Keperluan Kunjungan:</span>
+                            <span class="fw-medium text-dark small" id="resPurpose">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="d-flex gap-2">
+                    <a href="#" target="_blank" class="btn btn-outline-dark flex-grow-1 rounded-2 fw-bold" id="resBtnPrint" style="font-size: 0.82rem;">
+                        <i class="fas fa-print me-1"></i> Cetak Kartu Tamu
+                    </a>
+                    <button type="button" class="btn btn-dark flex-grow-1 rounded-2 fw-bold" onclick="resetScannerUI()" style="font-size: 0.82rem; background: #0f172a;">
+                        <i class="fas fa-qrcode me-1"></i> Scan Tiket Lain
+                    </button>
+                </div>
+            </div>
+
+            <!-- State Error -->
+            <div id="stateError" class="text-center py-5" style="display: none;">
+                <div style="width: 60px; height: 60px; border-radius: 50%; background: #fef2f2; color: #ef4444; display: inline-flex; align-items: center; justify-content: center; font-size: 1.6rem; margin-bottom: 1rem;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h6 class="fw-bold text-danger mb-2">Verifikasi Gagal</h6>
+                <p class="text-muted small mb-3" id="resErrorMessage">Tiket tidak ditemukan atau sudah tidak berlaku.</p>
+                <button type="button" class="btn btn-outline-secondary rounded-2 px-3 btn-sm" onclick="resetScannerUI()">
+                    <i class="fas fa-redo me-1"></i> Coba Lagi
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes pulseFrame {
+    0% { transform: scale(0.98); opacity: 0.8; }
+    50% { transform: scale(1.02); opacity: 1; }
+    100% { transform: scale(0.98); opacity: 0.8; }
+}
+.badge-status-checkin {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+}
+.badge-status-checkin.already {
+    background: #e0f2fe;
+    color: #0369a1;
+    border-color: #7dd3fc;
+}
+</style>
+
+<!-- Library HTML5-QRCode -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+
+<script>
+let html5QrCode = null;
+let isScannerRunning = false;
+let currentCameraId = null;
+let availableCameras = [];
+let audioCtx = null;
+
+function getAudioContext() {
+    if (!audioCtx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) audioCtx = new AudioCtx();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
+
+function playBeepSuccess() {
+    try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1046.5, now); // C6 tone
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+    } catch (e) {
+        console.warn("Audio beep error:", e);
+    }
+}
+
+function testBeepSound() {
+    playBeepSuccess();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    Html5Qrcode.getCameras().then(cameras => {
+        if (cameras && cameras.length) {
+            availableCameras = cameras;
+            currentCameraId = cameras[cameras.length - 1].id; // Prefer back/environment camera
+            if (cameras.length > 1) {
+                document.getElementById('btnSwitchCamera').style.display = 'inline-flex';
+            }
+        }
+    }).catch(err => {
+        console.log("Kamera tidak terdeteksi:", err);
+    });
+
+    document.getElementById('btnToggleCamera').addEventListener('click', toggleCamera);
+    document.getElementById('btnSwitchCamera').addEventListener('click', switchCamera);
+    document.getElementById('manualCheckinForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const code = document.getElementById('manualTicketInput').value.trim();
+        if (code) {
+            processTicketCode(code);
+        }
+    });
+});
+
+function toggleCamera() {
+    if (isScannerRunning) {
+        stopCamera();
+    } else {
+        startCamera();
+    }
+}
+
+function startCamera() {
+    if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
+    }
+
+    const config = { fps: 15, qrbox: { width: 220, height: 220 } };
+    const cameraIdOrConfig = currentCameraId ? currentCameraId : { facingMode: "environment" };
+
+    html5QrCode.start(
+        cameraIdOrConfig,
+        config,
+        onScanSuccess,
+        onScanFailure
+    ).then(() => {
+        isScannerRunning = true;
+        document.getElementById('btnCameraText').innerText = 'Hentikan Kamera';
+        document.getElementById('btnToggleCamera').classList.replace('btn-primary', 'btn-danger');
+        document.getElementById('scannerOverlay').style.display = 'flex';
+        document.getElementById('scannerStatusBadge').className = 'badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-bold';
+        document.getElementById('scannerStatusBadge').innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Memindai...';
+    }).catch(err => {
+        alert("Gagal membuka kamera: " + err);
+    });
+}
+
+function stopCamera() {
+    if (html5QrCode && isScannerRunning) {
+        html5QrCode.stop().then(() => {
+            isScannerRunning = false;
+            document.getElementById('btnCameraText').innerText = 'Mulai Kamera';
+            document.getElementById('btnToggleCamera').classList.replace('btn-danger', 'btn-primary');
+            document.getElementById('scannerOverlay').style.display = 'none';
+            document.getElementById('scannerStatusBadge').className = 'badge bg-success-subtle text-success px-3 py-2 rounded-pill fw-bold';
+            document.getElementById('scannerStatusBadge').innerHTML = '<i class="fas fa-video me-1"></i> Kamera Siap';
+        }).catch(err => console.log("Stop error:", err));
+    }
+}
+
+function switchCamera() {
+    if (availableCameras.length > 1) {
+        const currentIdx = availableCameras.findIndex(c => c.id === currentCameraId);
+        const nextIdx = (currentIdx + 1) % availableCameras.length;
+        currentCameraId = availableCameras[nextIdx].id;
+        if (isScannerRunning) {
+            stopCamera();
+            setTimeout(startCamera, 400);
+        }
+    }
+}
+
+let lastScannedCode = null;
+let lastScanTime = 0;
+
+function onScanSuccess(decodedText, decodedResult) {
+    const now = Date.now();
+    if (decodedText === lastScannedCode && (now - lastScanTime) < 3000) {
+        return; // debounce 3 detik
+    }
+    lastScannedCode = decodedText;
+    lastScanTime = now;
+
+    playBeepSuccess();
+    processTicketCode(decodedText);
+}
+
+function onScanFailure(error) {
+    // Abaikan frame scan kosong
+}
+
+function showState(stateName) {
+    document.getElementById('stateEmpty').style.display = stateName === 'empty' ? 'block' : 'none';
+    document.getElementById('stateLoading').style.display = stateName === 'loading' ? 'block' : 'none';
+    document.getElementById('stateSuccess').style.display = stateName === 'success' ? 'block' : 'none';
+    document.getElementById('stateError').style.display = stateName === 'error' ? 'block' : 'none';
+}
+
+function processTicketCode(code) {
+    showState('loading');
+
+    fetch("{% url 'tamu:api_scan_tiket' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: JSON.stringify({ code: code })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && data.data) {
+            const d = data.data;
+            document.getElementById('resTicketCode').innerText = '#' + d.code;
+            document.getElementById('resCheckinTime').innerText = 'Check-in: ' + (d.checkin_time || 'Baru saja');
+            document.getElementById('resTamuName').innerText = d.tamu_name;
+            document.getElementById('resTamuInstansi').innerText = d.tamu_instansi;
+            document.getElementById('resTamuPhone').innerHTML = '<i class="fas fa-phone-alt me-1"></i> ' + d.tamu_phone;
+            document.getElementById('resPegawaiName').innerText = d.pegawai_name + ' (' + d.pegawai_jabatan + ')';
+            document.getElementById('resDeptName').innerText = d.department;
+            document.getElementById('resPurpose').innerText = d.purpose;
+            document.getElementById('resBtnPrint').href = '/admin-portal/kunjungan/' + d.id + '/cetak-kartu/';
+
+            const badge = document.getElementById('resStatusBadge');
+            const badgeText = document.getElementById('resStatusText');
+            if (data.already_in_progress) {
+                badge.className = 'badge-status-checkin already';
+                badgeText.innerText = 'Sudah Hadir Sebelumnya';
+            } else {
+                badge.className = 'badge-status-checkin';
+                badgeText.innerText = 'Hadir di Kantor (In Progress)';
+            }
+
+            const avatarImg = document.getElementById('resTamuAvatar');
+            const avatarInitial = document.getElementById('resTamuInitial');
+            if (d.tamu_photo) {
+                avatarImg.src = d.tamu_photo;
+                avatarImg.style.display = 'block';
+                avatarInitial.style.display = 'none';
+            } else {
+                avatarImg.style.display = 'none';
+                avatarInitial.style.display = 'flex';
+                avatarInitial.innerText = d.tamu_name ? d.tamu_name.substring(0, 2).toUpperCase() : 'TM';
+            }
+
+            showState('success');
+            document.getElementById('manualTicketInput').value = '';
+        } else {
+            document.getElementById('resErrorMessage').innerText = data.error || 'Tiket tidak ditemukan dalam sistem.';
+            showState('error');
+        }
+    })
+    .catch(err => {
+        document.getElementById('resErrorMessage').innerText = 'Terjadi kesalahan koneksi server: ' + err;
+        showState('error');
+    });
+}
+
+function resetScannerUI() {
+    showState('empty');
+    lastScannedCode = null;
+    document.getElementById('manualTicketInput').value = '';
+    document.getElementById('manualTicketInput').focus();
+}
+</script>
+{% endblock %}
+

@@ -554,11 +554,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 class NotificationConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer untuk notifikasi real-time.
-    Setiap user bergabung ke channel group unik:
-      - Admin      → 'notif_admin'
-      - Tamu       → 'notif_tamu_{tamu_id}'
-      - Pegawai    → 'notif_pegawai_{pegawai_id}'
-    Koneksi anonim ditolak dengan code 4003.
+    Mendukung channel groups ganda (notif_admin & admin_notifications) dan audio chime alert.
     """
 
     async def connect(self):
@@ -571,11 +567,8 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             or session.get('role') in ['admin', 'super_admin']
         )
 
-        if session.get('pegawai_id'):
-            self.group_name = f"notif_pegawai_{session['pegawai_id']}"
-        elif session.get('tamu_id'):
-            # Cek apakah tamu ini memiliki peran admin
-            is_tamu_admin = False
+        is_tamu_admin = False
+        if session.get('tamu_id'):
             try:
                 from .models import Tamu
                 is_tamu_admin = await database_sync_to_async(
@@ -584,23 +577,30 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             except Exception:
                 pass
 
-            if is_tamu_admin:
-                self.group_name = 'notif_admin'
-            else:
-                self.group_name = f"notif_tamu_{session['tamu_id']}"
-        elif is_admin:
+        self.groups = []
+        if is_admin or is_tamu_admin:
+            self.groups = ['notif_admin', 'admin_notifications']
             self.group_name = 'notif_admin'
+        elif session.get('pegawai_id'):
+            pid = session['pegawai_id']
+            self.groups = [f"notif_pegawai_{pid}", f"notifications_pegawai_{pid}"]
+            self.group_name = f"notif_pegawai_{pid}"
+        elif session.get('tamu_id'):
+            tid = session['tamu_id']
+            self.groups = [f"notif_tamu_{tid}", f"notifications_tamu_{tid}"]
+            self.group_name = f"notif_tamu_{tid}"
         else:
-            # Pengguna anonim dilarang bergabung ke notifikasi sistem
             await self.close(code=4003)
             return
 
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        for grp in self.groups:
+            await self.channel_layer.group_add(grp, self.channel_name)
         await self.accept()
 
     async def disconnect(self, close_code):
-        if hasattr(self, 'group_name'):
-            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if hasattr(self, 'groups'):
+            for grp in self.groups:
+                await self.channel_layer.group_discard(grp, self.channel_name)
 
     async def receive(self, text_data):
         try:
@@ -611,4 +611,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             pass
 
     async def send_notification(self, event):
-        await self.send(text_data=json.dumps(event['data']))
+        payload = event.get('data') or event.get('notification') or event
+        await self.send(text_data=json.dumps(payload))
+
+    async def notification_message(self, event):
+        payload = event.get('notification') or event.get('data') or event
+        await self.send(text_data=json.dumps(payload))

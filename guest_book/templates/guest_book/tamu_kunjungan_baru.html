@@ -353,11 +353,38 @@
                     <select name="pegawai" id="id_pegawai" class="input-custom" required>
                         <option value="">Pilih Pegawai</option>
                         {% for pegawai in pegawai_list %}
-                        <option value="{{ pegawai.pk }}" data-dept="{{ pegawai.department_rel.id }}">
-                            {{ pegawai.name }}
+                        <option value="{{ pegawai.pk }}" 
+                                data-dept="{{ pegawai.department_rel.id }}"
+                                data-name="{{ pegawai.name }}"
+                                data-jabatan="{{ pegawai.jabatan|default:'Staf' }}"
+                                data-nip="{{ pegawai.nip|default:'-' }}"
+                                data-deptname="{{ pegawai.department_rel.nama|default:'Diskominfosantik' }}">
+                            {{ pegawai.name }} — {{ pegawai.jabatan|default:'Staf' }} ({{ pegawai.department_rel.nama|default:'Diskominfosantik' }})
                         </option>
                         {% endfor %}
                     </select>
+                </div>
+                <!-- Kartu Informasi Pegawai Resmi Terpilih (Langsung dari Database MySQL) -->
+                <div id="pegawaiSelectedCard" style="display: none; margin-top: 0.75rem; padding: 0.75rem 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #dcfce7; color: #166534; display: flex; align-items: center; justify-content: center; font-size: 0.95rem;">
+                                <i class="fas fa-id-badge"></i>
+                            </div>
+                            <div>
+                                <div id="cardPegawaiName" style="font-weight: 700; font-size: 0.88rem; color: #14532d;">-</div>
+                                <div id="cardPegawaiDetail" style="font-size: 0.75rem; color: #166534;">-</div>
+                            </div>
+                        </div>
+                        <span style="font-size: 0.65rem; font-weight: 700; background: #16a34a; color: #ffffff; padding: 0.2rem 0.5rem; border-radius: 99px;">
+                            <i class="fas fa-check-circle"></i> Terverifikasi Database MySQL
+                        </span>
+                    </div>
+                </div>
+                <!-- Informasi Alur Persetujuan (ACC) Admin -->
+                <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 0.35rem;">
+                    <i class="fas fa-shield-alt" style="color: #3b82f6;"></i>
+                    <span>Setelah pengajuan dikirim, janji temu akan diverifikasi dan disetujui (ACC) terlebih dahulu oleh Admin.</span>
                 </div>
             </div>
 
@@ -581,7 +608,29 @@
     // Dependent Dropdown: Bidang -> Pegawai
     const selectBidang = document.getElementById('select_bidang');
     const selectPegawai = document.getElementById('id_pegawai');
+    const cardEl = document.getElementById('pegawaiSelectedCard');
+    const cardName = document.getElementById('cardPegawaiName');
+    const cardDetail = document.getElementById('cardPegawaiDetail');
     const originalOptions = Array.from(selectPegawai.options);
+
+    function updatePegawaiCard() {
+        if (!cardEl) return;
+        const selectedOpt = selectPegawai.options[selectPegawai.selectedIndex];
+        if (selectedOpt && selectedOpt.value) {
+            const name = selectedOpt.getAttribute('data-name') || selectedOpt.text;
+            const jab = selectedOpt.getAttribute('data-jabatan') || 'Pegawai';
+            const dept = selectedOpt.getAttribute('data-deptname') || 'Diskominfosantik';
+            const nip = selectedOpt.getAttribute('data-nip') || '-';
+            
+            cardName.textContent = name;
+            cardDetail.textContent = `${jab} • ${dept} (NIP: ${nip})`;
+            cardEl.style.display = 'block';
+        } else {
+            cardEl.style.display = 'none';
+        }
+    }
+
+    selectPegawai.addEventListener('change', updatePegawaiCard);
 
     // Saat halaman pertama dimuat: kosongkan & disable dropdown pegawai
     selectPegawai.innerHTML = '';
@@ -596,6 +645,7 @@
     selectBidang.addEventListener('change', function() {
         const deptId = this.value;
         selectPegawai.innerHTML = '';
+        if (cardEl) cardEl.style.display = 'none';
 
         if (deptId === '') {
             // Belum pilih bidang: tetap kosong & disabled

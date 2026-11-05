@@ -558,6 +558,36 @@
             .hero-title {
                 font-size: 2.2rem; /* Ukuran font yang lebih pas di HP */
             }
+
+            /* ── Footer Centering & Cleanup di HP ── */
+            .footer {
+                text-align: center;
+            }
+            .footer-brand {
+                justify-content: center;
+                text-align: center;
+            }
+            .footer-desc {
+                max-width: 460px;
+                margin-left: auto;
+                margin-right: auto;
+                text-align: center;
+                margin-bottom: 1.5rem;
+            }
+            .footer-heading {
+                text-align: center;
+                margin-top: 0.5rem;
+            }
+            .footer-links {
+                text-align: center;
+                padding-left: 0;
+            }
+            .footer-links li {
+                text-align: center;
+            }
+            .footer-bottom {
+                text-align: center;
+            }
         }
         @media (max-width: 576px) {
             .hero-section { padding: 2.5rem 0; }
@@ -717,28 +747,55 @@
             <div class="col-md-4">
                 <div class="feature-card">
                     <div class="feature-icon" style="background:#eff6ff;">
-                        <i class="fas fa-bolt" style="color:#2563eb;"></i>
+                        <i class="fas fa-robot" style="color:#2563eb;"></i>
                     </div>
-                    <h5>Kemudahan Pendaftaran</h5>
-                    <p>Proses mudah dan yang cepat dan intuitif. Daftarkan kunjungan Anda dalam hitungan detik dari mana saja dan kapan saja di mana pun Anda berada.</p>
+                    <h5>Pendaftaran Cerdas & Chatbot</h5>
+                    <p>Daftarkan janji temu instan via Chatbot pintar atau formulir web interaktif lengkap dengan pemilihan pegawai dan toleransi saltik kata.</p>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="feature-card">
                     <div class="feature-icon" style="background:#f0fdf4;">
-                        <i class="fas fa-shield-alt" style="color:#16a34a;"></i>
+                        <i class="fas fa-qrcode" style="color:#16a34a;"></i>
                     </div>
-                    <h5>Keamanan Data</h5>
-                    <p>Data Anda disimpan dengan aman dan terlindungi dengan standar keamanan tinggi. Informasi pribadi dan data kunjungan terjaga kerahasiaannya.</p>
+                    <h5>Scan QR Code Pos Lobi / Satpam</h5>
+                    <p>Cukup perlihatkan QR Code dari smartphone Anda ke kamera pos resepsionis. Hadir resmi dalam 1 detik tanpa perlu mengisi formulir manual.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background:#fff7ed;">
+                        <i class="fas fa-bell" style="color:#ea580c;"></i>
+                    </div>
+                    <h5>Notifikasi Chime Real-Time</h5>
+                    <p>Admin dan Pegawai tujuan menerima bunyi lonceng (*chime alert*) seketika saat tamu tiba, memastikan pelayanan cepat dan responsif.</p>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="feature-card">
                     <div class="feature-icon" style="background:#fdf4ff;">
-                        <i class="fas fa-chart-line" style="color:#9333ea;"></i>
+                        <i class="fas fa-shield-alt" style="color:#9333ea;"></i>
                     </div>
-                    <h5>Efisiensi Birokrasi</h5>
-                    <p>Minimalkan antrean dan percepat proses administrasi. Dengan panduan yang jelas dan alur yang terstruktur, kunjungan Anda lebih efisien.</p>
+                    <h5>Keamanan & Privasi Data</h5>
+                    <p>Data buku tamu dilindungi enkripsi dan protokol keamanan tinggi. Informasi pribadi terlindungi tanpa kebocoran data publik.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background:#f0f9ff;">
+                        <i class="fas fa-bolt" style="color:#0284c7;"></i>
+                    </div>
+                    <h5>Efisiensi Birokrasi Bebas Antre</h5>
+                    <p>Alur birokrasi terstruktur, nomor antrean digital teratur, dan kepastian jadwal pertemuan dengan pejabat serta staf dinas terkait.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background:#fefce8;">
+                        <i class="fas fa-star" style="color:#ca8a04;"></i>
+                    </div>
+                    <h5>Survei IKM Standar PermenPAN-RB</h5>
+                    <p>Penilaian transparan mutu pelayanan publik melalui survei Indeks Kepuasan Masyarakat (IKM) sesuai PermenPAN-RB No. 14 Tahun 2017.</p>
                 </div>
             </div>
         </div>

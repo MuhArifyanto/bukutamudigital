@@ -271,6 +271,21 @@
             grid-column: 1 / -1;
             padding: 2rem 1rem !important;
         }
+        /* Footer centered di HP */
+        .riwayat-footer {
+            flex-direction: column !important;
+            justify-content: center !important;
+            text-align: center !important;
+            gap: 0.85rem !important;
+        }
+        .riwayat-footer > div {
+            justify-content: center !important;
+            text-align: center !important;
+            width: 100% !important;
+        }
+        .riwayat-footer a {
+            display: inline-block;
+        }
     }
 </style>
 {% endblock %}
@@ -424,9 +439,26 @@
                         {% endif %}
                     </td>
                     <td style="padding: 1rem; text-align: center; border:none; vertical-align: middle;">
-                        <a href="{% url 'tamu:kunjungan_detail' k.pk %}"
-                            style="color: #64748b; font-size: 1.1rem; background: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid #e2e8f0; display: inline-block; transition: all 0.2s;"><i
-                                class="far fa-eye"></i></a>
+                        <div style="display: flex; gap: 0.4rem; justify-content: center; align-items: center;">
+                            <a href="{% url 'tamu:kunjungan_detail' k.pk %}"
+                                title="Lihat Detail"
+                                style="color: #64748b; font-size: 1.05rem; background: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid #e2e8f0; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;"><i
+                                    class="far fa-eye"></i></a>
+                            
+                            {% if k.status == 'disetujui' or k.status == 'in_progress' %}
+                                <a href="{% url 'tamu:kunjungan_detail' k.pk %}"
+                                    title="Tampilkan QR Code Tiket"
+                                    style="color: #2563eb; background: #eff6ff; font-size: 0.95rem; padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid #bfdbfe; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+                                    <i class="fas fa-qrcode"></i>
+                                </a>
+                            {% elif k.status == 'completed' %}
+                                <a href="{% url 'tamu:kunjungan_detail' k.pk %}"
+                                    title="Survei Kepuasan Pelayanan (IKM)"
+                                    style="color: #d97706; background: #fef3c7; font-size: 0.95rem; padding: 0.4rem 0.6rem; border-radius: 8px; border: 1px solid #fde68a; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+                                    <i class="fas fa-star"></i>
+                                </a>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
@@ -470,7 +502,7 @@
     </div>
 
     <!-- FOOTER -->
-    <div
+    <div class="riwayat-footer"
         style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; font-size: 0.75rem; color: #94a3b8;">
         <div>© 2026 DISKOMINFOSATIK - DIGITAL DIPLOMAT SYSTEM</div>
         <div style="display: flex; flex-wrap: wrap; gap: 1rem;">

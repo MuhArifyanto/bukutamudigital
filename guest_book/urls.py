@@ -33,7 +33,11 @@ urlpatterns = [
     path('admin-portal/login/', views.admin_login_view, name='admin_login'),
     path('admin-portal/', views.admin_dashboard_view, name='admin_dashboard'),
     path('admin-portal/statistik/', views.admin_statistik_view, name='admin_statistik'),
+    path('admin-portal/ikm/', views.admin_ikm_view, name='admin_ikm'),
+    path('admin-portal/ikm/cetak/', views.admin_ikm_cetak_view, name='admin_ikm_cetak'),
     path('admin-portal/kunjungan/', views.admin_kunjungan_list_view, name='admin_kunjungan_list'),
+    path('admin-portal/scan-tiket/', views.admin_scan_tiket_view, name='admin_scan_tiket'),
+    path('admin-portal/api/scan-tiket/', views.api_scan_tiket, name='api_scan_tiket'),
     path('admin-portal/kunjungan/manual-create/', views.admin_kunjungan_manual_create, name='admin_kunjungan_manual_create'),
     path('admin-portal/kunjungan/export-excel/', views.admin_kunjungan_export_excel, name='admin_kunjungan_export_excel'),
     path('admin-portal/kunjungan/cetak-pdf/', views.admin_kunjungan_cetak_pdf, name='admin_kunjungan_cetak_pdf'),
@@ -79,6 +83,7 @@ urlpatterns = [
     path('kunjungan/<uuid:pk>/', views.kunjungan_detail_view, name='kunjungan_detail'),
     path('kunjungan/<uuid:pk>/cetak-kartu/', views.tamu_cetak_kartu_view, name='tamu_cetak_kartu'),
     path('kunjungan/<uuid:pk>/batal/', views.kunjungan_batal_view, name='kunjungan_batal'),
+    path('kunjungan/<uuid:pk>/ikm/', views.api_submit_ikm_rating, name='api_submit_ikm_rating'),
 
     # Pesan
     path('pesan/baru/', views.pesan_baru_view, name='pesan_baru'),

@@ -233,10 +233,16 @@
                 <div class="header-text">KARTU PENGUNJUNG</div>
                 <div class="sub-header">{{ instansi.nama|default:"Diskominfosantik Kabupaten Bekasi" }}</div>
                 
-                <!-- Nomor Urut & Nomor Unik -->
-                <div style="display: flex; gap: 1rem; margin: 0.5rem 0 1rem 0; font-size: 0.85rem; color: #64748b; font-weight: 700;">
-                    <div>No. Urut: <span style="color: #1e3a8a; font-size: 1rem;">{{ nomor_urut|default:"01" }}</span></div>
-                    <div>Kode: <span style="color: #1e3a8a; font-size: 1rem;">{{ nomor_unik|default:"ABC12345" }}</span></div>
+                <!-- Nomor Urut & Nomor Unik & QR Code -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 0.5rem 0 1rem 0;">
+                    <div style="display: flex; gap: 1rem; font-size: 0.85rem; color: #64748b; font-weight: 700;">
+                        <div>No. Urut: <span style="color: #1e3a8a; font-size: 1rem;">{{ nomor_urut|default:"01" }}</span></div>
+                        <div>Kode: <span style="color: #1e3a8a; font-size: 1rem; font-family: monospace;">{{ nomor_unik|default:"ABC12345" }}</span></div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div id="qrcodeCard" style="padding: 3px; background: #fff; border-radius: 6px; border: 1px solid #e2e8f0; display: inline-block;"></div>
+                        <div style="font-size: 0.5rem; color: #94a3b8; font-weight: 800; letter-spacing: 0.05em; margin-top: 1px;">SCAN HADIR</div>
+                    </div>
                 </div>
                 
                 <div class="info-item">
@@ -315,5 +321,22 @@
     </script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const qrElem = document.getElementById("qrcodeCard");
+            if (qrElem && typeof QRCode !== 'undefined') {
+                new QRCode(qrElem, {
+                    text: "{{ kunjungan.id }}",
+                    width: 60,
+                    height: 60,
+                    colorDark: "#0f172a",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            }
+        });
+    </script>
 </body>
 </html>

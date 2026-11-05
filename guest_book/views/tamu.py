@@ -27,6 +27,8 @@ def _run_n8n_routing_bg(kunjungan_id, purpose, tamu_name, initial_pegawai_id=Non
         n8n_result = call_n8n_routing(
             kunjungan_id=kunjungan_id,
             purpose=purpose,
+            department=None,
+            arrival_time=None,
             pegawai_queryset=active_pegawai_qs,
         )
         if not n8n_result:
@@ -158,7 +160,8 @@ def dashboard_view(request, tamu):
 @tamu_login_required
 def kunjungan_baru_view(request, tamu):
     form = KunjunganForm(request.POST or None)
-    pegawai_list = Pegawai.objects.filter(account_status='active').select_related('department_rel')
+    pegawai_list = Pegawai.objects.filter(account_status='active').select_related('department_rel').order_by('department_rel__nama', 'name')
+    bidang_list = Departemen.objects.all().order_by('nama')
 
     if request.method == 'POST' and form.is_valid():
         from django.db import transaction
@@ -189,10 +192,13 @@ def kunjungan_baru_view(request, tamu):
                 form.add_error('arrival_time', e.message)
             else:
                 form.add_error('arrival_time', str(e))
-            return render(request, 'guest_book/tamu_kunjungan_baru.html', {
+            ctx = base_context(tamu, 'kunjungan_baru')
+            ctx.update({
                 'form': form,
                 'pegawai_list': pegawai_list,
+                'bidang_list': bidang_list,
             })
+            return render(request, 'guest_book/tamu_kunjungan_baru.html', ctx)
 
         # Tampilkan pesan sukses secara instan tanpa menunggu N8N selesai berpikir
         if kunjungan.pegawai:
@@ -322,6 +328,7 @@ def riwayat_view(request, tamu):
 @tamu_login_required
 def kunjungan_detail_view(request, tamu, pk):
     from ..permissions import PermissionManager
+    from ..models import IKMSurvey
     
     kunjungan = get_object_or_404(Kunjungan, pk=pk, tamu=tamu)
     status_history = kunjungan.status_history.all().order_by('-changed_at')
@@ -336,6 +343,10 @@ def kunjungan_detail_view(request, tamu, pk):
     chat_available = PermissionManager.can_access_chat_pegawai_tamu(kunjungan)
     chat_session_id = f'kunjungan_{kunjungan.id}' if chat_available else None
 
+    # Cek Survei IKM
+    ikm_survey = IKMSurvey.objects.filter(kunjungan=kunjungan).first()
+    ticket_code = str(kunjungan.id)[:8].upper()
+
     ctx = base_context(tamu, 'riwayat')
     ctx.update({
         'kunjungan': kunjungan,
@@ -344,6 +355,8 @@ def kunjungan_detail_view(request, tamu, pk):
         'rejection_note': rejection_note,
         'chat_available': chat_available,
         'chat_session_id': chat_session_id,
+        'ikm_survey': ikm_survey,
+        'ticket_code': ticket_code,
     })
     return render(request, 'guest_book/tamu_kunjungan_detail.html', ctx)
 
@@ -709,3 +722,66 @@ def tamu_cetak_kartu_view(request, tamu, pk):
         'nomor_unik': nomor_unik,
     })
     return render(request, 'guest_book/admin_cetak_kartu.html', ctx)
+
+
+@tamu_login_required
+def api_submit_ikm_rating(request, tamu, pk):
+    """API Tamu untuk mengirim rating & survei IKM untuk kunjungan yang telah selesai"""
+    import json
+    from django.http import JsonResponse
+    from ..models import Kunjungan, IKMSurvey
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    kunjungan = Kunjungan.objects.filter(pk=pk).first()
+    if not kunjungan:
+        return JsonResponse({'success': False, 'error': 'Kunjungan tidak ditemukan.'}, status=404)
+
+    if kunjungan.tamu != tamu:
+        return JsonResponse({'success': False, 'error': 'Akses ditolak. Kunjungan ini bukan milik akun Anda.'}, status=403)
+
+    if kunjungan.status != 'completed':
+        return JsonResponse({'success': False, 'error': 'Survei kepuasan hanya dapat diisi untuk kunjungan yang telah selesai (Completed).'}, status=400)
+
+    if IKMSurvey.objects.filter(kunjungan=kunjungan).exists():
+        return JsonResponse({'success': False, 'error': 'Anda sudah pernah mengisi survei kepuasan untuk kunjungan ini.'}, status=400)
+
+    try:
+        data = json.loads(request.body.decode('utf-8')) if request.body else {}
+    except Exception:
+        data = request.POST
+
+    try:
+        rating = max(1, min(5, int(data.get('rating', 5))))
+        u1 = max(1, min(5, int(data.get('kesesuaian_persyaratan', rating))))
+        u2 = max(1, min(5, int(data.get('kemudahan_prosedur', rating))))
+        u3 = max(1, min(5, int(data.get('kecepatan_layanan', rating))))
+        u4 = max(1, min(5, int(data.get('keramahan_petugas', rating))))
+        u5 = max(1, min(5, int(data.get('kualitas_sarana', rating))))
+    except (ValueError, TypeError):
+        rating = 5
+        u1 = u2 = u3 = u4 = u5 = 5
+
+    ulasan = (data.get('ulasan') or '').strip()
+
+    survey, created = IKMSurvey.objects.update_or_create(
+        kunjungan=kunjungan,
+        defaults={
+            'tamu': tamu,
+            'rating': rating,
+            'kesesuaian_persyaratan': u1,
+            'kemudahan_prosedur': u2,
+            'kecepatan_layanan': u3,
+            'keramahan_petugas': u4,
+            'kualitas_sarana': u5,
+            'ulasan': ulasan,
+        }
+    )
+
+    return JsonResponse({
+        'success': True,
+        'message': 'Terima kasih atas penilaian & masukan Anda untuk peningkatan layanan kami!',
+        'rating': survey.rating,
+        'ulasan': survey.ulasan,
+    })

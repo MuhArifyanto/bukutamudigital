@@ -515,3 +515,37 @@ class Notification(models.Model):
             # Untuk sort & pagination notifikasi terbaru
             models.Index(fields=['recipient_id', 'created_at'], name='idx_notif_recipient_created'),
         ]
+
+
+class IKMSurvey(models.Model):
+    """
+    Model Survei Indeks Kepuasan Masyarakat (IKM) & Rating Pelayanan
+    Mengacu pada standar PermenPAN-RB No. 14 Tahun 2017.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    kunjungan = models.OneToOneField(Kunjungan, on_delete=models.CASCADE, related_name='ikm_survey')
+    tamu = models.ForeignKey(Tamu, on_delete=models.CASCADE, related_name='ikm_surveys')
+    
+    # Rating utama 1-5 bintang
+    rating = models.PositiveSmallIntegerField(default=5, verbose_name='Rating Keseluruhan')
+    
+    # Unsur-unsur Pelayanan Standar IKM PermenPAN-RB (Skala 1 - 5)
+    kesesuaian_persyaratan = models.PositiveSmallIntegerField(default=5, verbose_name='Kesesuaian Persyaratan')
+    kemudahan_prosedur = models.PositiveSmallIntegerField(default=5, verbose_name='Kemudahan Prosedur')
+    kecepatan_layanan = models.PositiveSmallIntegerField(default=5, verbose_name='Kecepatan Layanan')
+    keramahan_petugas = models.PositiveSmallIntegerField(default=5, verbose_name='Keramahan Petugas')
+    kualitas_sarana = models.PositiveSmallIntegerField(default=5, verbose_name='Kualitas Sarana & Prasarana')
+    
+    ulasan = models.TextField(null=True, blank=True, verbose_name='Kritik, Saran & Ulasan')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'ikm_survey'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['rating']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"IKM: {self.tamu.name} ({self.rating}★)"

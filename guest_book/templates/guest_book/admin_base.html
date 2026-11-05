@@ -580,10 +580,24 @@
                     </a>
                 </li>
                 <li>
+                    <a href="{% url 'tamu:admin_ikm' %}"
+                       class="nav-link-custom {% if active_page == 'ikm' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-poll-h"></i></span>
+                        Survei IKM &amp; Rating
+                    </a>
+                </li>
+                <li>
                     <a href="{% url 'tamu:admin_kunjungan_list' %}"
                        class="nav-link-custom {% if active_page == 'kunjungan' %}active{% endif %}">
                         <span class="nav-icon"><i class="fas fa-list-ul"></i></span>
                         Daftar Kunjungan
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'tamu:admin_scan_tiket' %}"
+                       class="nav-link-custom {% if active_page == 'scan_tiket' %}active{% endif %}">
+                        <span class="nav-icon"><i class="fas fa-qrcode"></i></span>
+                        Scan Tiket QR
                     </a>
                 </li>
                 <li>
@@ -707,6 +721,11 @@
                         </div>
                         <div id="notifList" style="max-height: 250px; overflow-y: auto;">
                             <p style="color: #64748b; font-size: 0.85rem; padding: 1rem; text-align: center; margin: 0;">Memuat...</p>
+                        </div>
+                        <div style="padding: 0.5rem 0.75rem; border-top: 1px solid #e2e8f0; background: #f8fafc; text-align: center;">
+                            <button type="button" class="btn btn-sm btn-light w-100" style="font-size: 0.75rem; font-weight: 600; color: #2563eb; border: 1px solid #bfdbfe;" onclick="playAdminChimeAlert()">
+                                <i class="fas fa-volume-up me-1"></i> Uji Bunyi Lonceng (Chime Alert)
+                            </button>
                         </div>
 
                     </div>
@@ -906,6 +925,58 @@
 
         document.addEventListener('DOMContentLoaded', initAdminApp);
 
+        // Audio Chime Alert Khusus Admin (Web Audio API Synthesizer 0-dependency)
+        let adminAudioContext = null;
+        function getAdminAudioContext() {
+            if (!adminAudioContext) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) adminAudioContext = new AudioCtx();
+            }
+            if (adminAudioContext && adminAudioContext.state === 'suspended') {
+                adminAudioContext.resume();
+            }
+            return adminAudioContext;
+        }
+
+        // Buka izin audio context pada gesture klik pertama pengguna
+        document.addEventListener('click', function unlockAudio() {
+            getAdminAudioContext();
+        }, { once: true });
+
+        function playAdminChimeAlert() {
+            try {
+                const ctx = getAdminAudioContext();
+                if (!ctx) return;
+                const now = ctx.currentTime;
+
+                // Nada 1: D5 (587.33 Hz) nada lonceng pembuka lembut
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(587.33, now);
+                gain1.gain.setValueAtTime(0.28, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.45);
+
+                // Nada 2: A5 (880.00 Hz) nada lonceng tinggi bergema (Ding-Dong jernih)
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(880.0, now + 0.12);
+                gain2.gain.setValueAtTime(0.35, now + 0.12);
+                gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(now + 0.12);
+                osc2.stop(now + 1.2);
+            } catch (err) {
+                console.warn('Web Audio Chime alert error:', err);
+            }
+        }
+
         /* ── Real-time Notification WebSocket ── */
         // Pastikan hanya membuat 1 socket
         if (!window.notificationSocket) {
@@ -922,9 +993,15 @@
                 }
                 console.log("Notifikasi Baru:", data);
 
-                // 1. Mainkan bunyi
-                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                audio.play().catch(err => console.log('Autoplay diblokir browser:', err));
+                // 1. Mainkan bunyi lonceng / chime halus real-time
+                playAdminChimeAlert();
+
+                // Animasi getar lonceng notifikasi
+                const notifIcon = document.querySelector('#notifBtn i');
+                if (notifIcon) {
+                    notifIcon.classList.add('fa-shake');
+                    setTimeout(() => notifIcon.classList.remove('fa-shake'), 1500);
+                }
 
             // 2. Update Konten Toast
             document.getElementById('toastTitle').innerText = data.title || "Notifikasi Baru";

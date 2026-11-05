@@ -475,3 +475,147 @@ def admin_kalender_download_template(request):
 
     wb.save(response)
     return response
+
+
+@admin_login_required
+def admin_ikm_view(request):
+    """
+    Dashboard Survei Indeks Kepuasan Masyarakat (IKM) & Rating Pelayanan
+    Mengacu pada Pedoman PermenPAN-RB No. 14 Tahun 2017.
+    """
+    from django.db.models import Avg, Count
+    from ..models import IKMSurvey, Instansi
+
+    inst = Instansi.objects.first()
+    surveys = IKMSurvey.objects.select_related('tamu', 'kunjungan', 'kunjungan__pegawai').all()
+    total_responden = surveys.count()
+
+    # Rata-rata keseluruhan dan per unsur pelayanan
+    agg = surveys.aggregate(
+        avg_rating=Avg('rating'),
+        avg_u1=Avg('kesesuaian_persyaratan'),
+        avg_u2=Avg('kemudahan_prosedur'),
+        avg_u3=Avg('kecepatan_layanan'),
+        avg_u4=Avg('keramahan_petugas'),
+        avg_u5=Avg('kualitas_sarana'),
+    )
+
+    avg_rating = round(agg['avg_rating'] or 0.0, 2)
+    # Konversi ke skala 100 PermenPAN-RB: Nilai Tertimbang * 20
+    ikm_skala_100 = round(avg_rating * 20, 2)
+
+    # Mutu Pelayanan
+    if ikm_skala_100 >= 88.31:
+        mutu_pelayanan = 'A (Sangat Baik)'
+        mutu_class = 'success'
+    elif ikm_skala_100 >= 76.61:
+        mutu_pelayanan = 'B (Baik)'
+        mutu_class = 'primary'
+    elif ikm_skala_100 >= 65.00:
+        mutu_pelayanan = 'C (Kurang Baik)'
+        mutu_class = 'warning'
+    else:
+        mutu_pelayanan = 'D (Buruk)'
+        mutu_class = 'danger'
+
+    # Distribusi Rating Bintang (5, 4, 3, 2, 1)
+    star_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    for row in surveys.values('rating').annotate(total=Count('id')):
+        star_counts[row['rating']] = row['total']
+
+    # Rekapitulasi Tren Bulanan (Tahun berjalan)
+    now = timezone.localtime(timezone.now())
+    current_year = now.year
+    months_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+    monthly_ratings = [0.0] * 12
+    monthly_counts = [0] * 12
+
+    for m in range(1, 13):
+        m_surveys = surveys.filter(created_at__year=current_year, created_at__month=m)
+        m_agg = m_surveys.aggregate(avg=Avg('rating'), cnt=Count('id'))
+        monthly_ratings[m - 1] = round((m_agg['avg'] or 0.0) * 20, 1)  # Skala 100
+        monthly_counts[m - 1] = m_agg['cnt'] or 0
+
+    recent_feedbacks = surveys.filter(ulasan__isnull=False).exclude(ulasan='').order_by('-created_at')[:20]
+
+    ctx = get_admin_context(request)
+    ctx.update({
+        'active_page': 'ikm',
+        'instansi': inst,
+        'total_responden': total_responden,
+        'avg_rating': avg_rating,
+        'ikm_skala_100': ikm_skala_100,
+        'mutu_pelayanan': mutu_pelayanan,
+        'mutu_class': mutu_class,
+        'unsur_scores': {
+            'u1': round(agg['avg_u1'] or 0.0, 2),
+            'u2': round(agg['avg_u2'] or 0.0, 2),
+            'u3': round(agg['avg_u3'] or 0.0, 2),
+            'u4': round(agg['avg_u4'] or 0.0, 2),
+            'u5': round(agg['avg_u5'] or 0.0, 2),
+        },
+        'star_counts': star_counts,
+        'chart_data': {
+            'labels': months_labels,
+            'ratings': monthly_ratings,
+            'counts': monthly_counts,
+        },
+        'recent_feedbacks': recent_feedbacks,
+    })
+    return render(request, 'guest_book/admin_ikm.html', ctx)
+
+
+@admin_login_required
+def admin_ikm_cetak_view(request):
+    """View Cetak Laporan Evaluasi IKM Resmi Standar PermenPAN-RB / Kepala Dinas"""
+    from django.db.models import Avg, Count
+    from ..models import IKMSurvey, Instansi
+
+    inst = Instansi.objects.first()
+    surveys = IKMSurvey.objects.select_related('tamu', 'kunjungan', 'kunjungan__pegawai').all()
+    total_responden = surveys.count()
+
+    agg = surveys.aggregate(
+        avg_rating=Avg('rating'),
+        avg_u1=Avg('kesesuaian_persyaratan'),
+        avg_u2=Avg('kemudahan_prosedur'),
+        avg_u3=Avg('kecepatan_layanan'),
+        avg_u4=Avg('keramahan_petugas'),
+        avg_u5=Avg('kualitas_sarana'),
+    )
+
+    avg_rating = round(agg['avg_rating'] or 0.0, 2)
+    ikm_skala_100 = round(avg_rating * 20, 2)
+
+    if ikm_skala_100 >= 88.31:
+        mutu_pelayanan = 'A (Sangat Baik)'
+    elif ikm_skala_100 >= 76.61:
+        mutu_pelayanan = 'B (Baik)'
+    elif ikm_skala_100 >= 65.00:
+        mutu_pelayanan = 'C (Kurang Baik)'
+    else:
+        mutu_pelayanan = 'D (Buruk)'
+
+    star_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    for row in surveys.values('rating').annotate(total=Count('id')):
+        star_counts[row['rating']] = row['total']
+
+    ctx = get_admin_context(request)
+    ctx.update({
+        'instansi': inst,
+        'total_responden': total_responden,
+        'avg_rating': avg_rating,
+        'ikm_skala_100': ikm_skala_100,
+        'mutu_pelayanan': mutu_pelayanan,
+        'unsur_scores': {
+            'u1': round(agg['avg_u1'] or 0.0, 2),
+            'u2': round(agg['avg_u2'] or 0.0, 2),
+            'u3': round(agg['avg_u3'] or 0.0, 2),
+            'u4': round(agg['avg_u4'] or 0.0, 2),
+            'u5': round(agg['avg_u5'] or 0.0, 2),
+        },
+        'star_counts': star_counts,
+        'surveys_list': surveys.order_by('-created_at')[:50],
+        'tanggal_cetak': timezone.localtime(timezone.now()).strftime('%d %B %Y'),
+    })
+    return render(request, 'guest_book/admin_ikm_cetak.html', ctx)

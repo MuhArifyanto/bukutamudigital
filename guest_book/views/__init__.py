@@ -5,10 +5,13 @@ from .tamu import (
     dashboard_view, kunjungan_baru_view, riwayat_view,
     kunjungan_detail_view, kunjungan_batal_view, pesan_baru_view,
     notifications_view, user_chat_view, tamu_kunjungan_cetak_pdf,
-    profil_view, tamu_cetak_kartu_view, tamu_chat_pegawai_view
+    profil_view, tamu_cetak_kartu_view, tamu_chat_pegawai_view,
+    api_submit_ikm_rating
 )
 from .admin import (
     admin_dashboard_view, admin_statistik_view, admin_kunjungan_list_view,
+    admin_scan_tiket_view, api_scan_tiket,
+    admin_ikm_view, admin_ikm_cetak_view,
     admin_kunjungan_manual_create,
     admin_kunjungan_export_excel, admin_kunjungan_cetak_pdf,
     admin_kalender_view, admin_chat_view, admin_profil_view,

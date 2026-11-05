@@ -157,7 +157,13 @@
         box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
     }
     .page-content .received .msg-bubble { 
-        background: #ffffff !important; 
+        background: #ffffff !important;
+        white-space: normal !important;
+        line-height: 1.55 !important;
+        padding: 0.9rem 1.15rem !important;
+        white-space: normal !important;
+        line-height: 1.55 !important;
+        padding: 0.9rem 1.15rem !important; 
         color: #1e293b !important; 
         border-bottom-left-radius: 4px !important; 
         border: 1px solid #e2e8f0 !important; 
@@ -324,6 +330,224 @@
         .page-content .btn-send { width: 38px !important; height: 38px !important; border-radius: 10px !important; flex-shrink: 0 !important; }
         .page-content .action-btn-circle { width: 34px !important; height: 34px !important; flex-shrink: 0 !important; }
     }
+
+    /* ── Kerapihan Tampilan AI Chatbot (Modern Card & Layouts) ── */
+    .ai-header-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        background: linear-gradient(135deg, #f0f7ff 0%, #e0effe 100%);
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        padding: 0.4rem 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .ai-header-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.76rem;
+        font-weight: 800;
+        color: #1d4ed8;
+        letter-spacing: 0.01em;
+    }
+    .ai-header-live {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #15803d;
+        background: #dcfce7;
+        border: 1px solid #bbf7d0;
+        border-radius: 99px;
+        padding: 0.15rem 0.5rem;
+    }
+    .ai-live-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #16a34a;
+        box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+        animation: pulseDot 2s infinite ease-in-out;
+    }
+    @keyframes pulseDot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .chat-block {
+        margin-bottom: 0.65rem;
+        line-height: 1.55;
+        color: #1e293b;
+    }
+    .chat-block:last-child { margin-bottom: 0; }
+    .chat-text-row { margin-bottom: 0.25rem; }
+    .chat-text-row:last-child { margin-bottom: 0; }
+
+    /* Bullet List & Numbered Items dengan Hanging Indent */
+    .chat-list-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-bottom: 0.35rem;
+        line-height: 1.5;
+    }
+    .chat-list-row:last-child { margin-bottom: 0; }
+    .chat-bullet-symbol {
+        color: #2563eb;
+        font-weight: 800;
+        font-size: 1.05rem;
+        line-height: 1.25;
+        flex-shrink: 0;
+    }
+    .chat-num-symbol {
+        color: #1d4ed8;
+        font-weight: 700;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+        min-width: 1.35rem;
+        line-height: 1.45;
+    }
+    .chat-list-text {
+        flex: 1;
+        color: #334155;
+    }
+
+    .chat-bold { color: #0f172a; font-weight: 700; }
+    .chat-italic { color: #475569; font-style: italic; }
+    .chat-code {
+        background: #f1f5f9;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        padding: 0.1rem 0.35rem;
+        font-size: 0.82rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .chat-link { color: #2563eb; text-decoration: underline; font-weight: 600; }
+    .chat-maps-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        background: #2563eb;
+        color: #ffffff !important;
+        padding: 0.45rem 0.95rem;
+        border-radius: 8px;
+        text-decoration: none !important;
+        font-weight: 700;
+        font-size: 0.82rem;
+        margin: 0.4rem 0;
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+        transition: all 0.15s ease-in-out;
+    }
+    .chat-maps-btn:hover {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.35);
+    }
+    .chat-ext-icon { font-size: 0.7rem; opacity: 0.85; }
+
+    /* Callout Alert Boxes */
+    .chat-callout {
+        border-radius: 10px;
+        padding: 0.65rem 0.85rem;
+        margin: 0.65rem 0;
+        font-size: 0.88rem;
+        line-height: 1.55;
+        border-left: 4px solid #cbd5e1;
+    }
+    .chat-callout:first-child { margin-top: 0; }
+    .chat-callout:last-child { margin-bottom: 0; }
+
+    .callout-warning {
+        background: #fffbeb;
+        border: 1px solid #fef3c7;
+        border-left: 4px solid #f59e0b;
+        color: #92400e;
+    }
+    .callout-warning .chat-bold { color: #78350f; }
+
+    .callout-sla {
+        background: #f0fdf4;
+        border: 1px solid #dcfce7;
+        border-left: 4px solid #10b981;
+        color: #065f46;
+    }
+    .callout-sla .chat-bold { color: #064e3b; }
+
+    .callout-info {
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        border-left: 4px solid #3b82f6;
+        color: #1e40af;
+    }
+    .callout-info .chat-bold { color: #1e3a8a; }
+
+    .callout-tip {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid #6366f1;
+        color: #334155;
+    }
+    .callout-tip .chat-bold { color: #1e293b; }
+
+    .callout-location {
+        background: #f0f9ff;
+        border: 1px solid #e0f2fe;
+        border-left: 4px solid #0284c7;
+        color: #0369a1;
+    }
+    .callout-location .chat-bold { color: #075985; }
+
+    /* Panel Tombol Aksi Cepat (Action Chips Panel) */
+    .chat-action-panel {
+        margin-top: 0.85rem;
+        padding-top: 0.65rem;
+        border-top: 1px dashed #cbd5e1;
+    }
+    .chat-action-title {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.45rem;
+    }
+    .chat-action-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+    }
+    .chat-action-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: #ffffff;
+        color: #1d4ed8;
+        border: 1.5px solid #93c5fd;
+        border-radius: 99px;
+        padding: 0.38rem 0.8rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        transition: all 0.15s ease-in-out;
+        line-height: 1.3;
+        text-align: left;
+    }
+    .chat-action-chip:hover {
+        background: #eff6ff;
+        border-color: #2563eb;
+        color: #1e40af;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 6px -1px rgba(37, 99, 235, 0.2);
+    }
+
 </style>
 <div class="chat-card {% if request.GET.session or request.GET.guest %}chat-active{% endif %}" id="adminChatCard">
     <!-- Sidebar -->
@@ -633,40 +857,143 @@
         return div.innerHTML;
     }
 
+    function formatBlockLines(text) {
+        const lines = text.split('\n');
+        let out = [];
+        for (let line of lines) {
+            let trimLine = line.trim();
+            if (!trimLine) continue;
+
+            // Bullet list item (• or - or *)
+            if (trimLine.startsWith('•') || trimLine.startsWith('-') || trimLine.startsWith('* ')) {
+                let content = trimLine.replace(/^[•\-\*]\s*/, '').trim();
+                out.push(`<div class="chat-list-row"><span class="chat-bullet-symbol">•</span><span class="chat-list-text">${content}</span></div>`);
+            }
+            // Numbered list item (e.g. 1. , 2. )
+            else if (/^\d+\.\s+/.test(trimLine)) {
+                let match = trimLine.match(/^(\d+\.)\s+(.*)$/);
+                if (match) {
+                    out.push(`<div class="chat-list-row"><span class="chat-num-symbol">${match[1]}</span><span class="chat-list-text">${match[2]}</span></div>`);
+                } else {
+                    out.push(`<div class="chat-text-row">${trimLine}</div>`);
+                }
+            }
+            // Normal line
+            else {
+                out.push(`<div class="chat-text-row">${trimLine}</div>`);
+            }
+        }
+        return out.join('');
+    }
+
     function formatChatMessageHtml(rawText, isPureSent = false) {
         if (!rawText) return '';
-        let cleaned = rawText.trim();
+        let cleaned = (rawText || '').trim();
 
+        // Rapikan format pesan tiket lama jika masih ada di database
         cleaned = cleaned.replace(
             /•\s*\[[A-F0-9]+\]\s*([^\s—]+)\s+([^\s—]+)\s*—\s*Pegawai:\s*([^→\n]+)\s*→\s*Status:\s*([^\n]+)/gi,
             (match, tgl, jam, peg, st) => {
-                return `📌 **Kunjungan (${tgl} pukul ${jam.trim()} WIB)**\n   • Pegawai : ${peg.trim()}\n   • Status  : **${st.trim()}**`;
+                return `📌 **Kunjungan (${tgl} pukul ${jam.trim()} WIB)**\n• Pegawai : ${peg.trim()}\n• Status  : **${st.trim()}**`;
             }
         );
 
+        // Ekstrak Action Chips [[chip:...]]
+        let chips = [];
+        cleaned = cleaned.replace(/\[\[chip:([^|\]]+)(?:\|([^\]]+))?\]\]/g, function(match, action, label) {
+            chips.push({ action: action.trim(), label: (label || action).trim() });
+            return '';
+        });
+
+        // Bersihkan teks pemicu tombol tindakan yang menggantung di akhir
+        cleaned = cleaned.replace(/👉\s*\**\s*(?:sentuh\s+)?pilihan\s+tindakan(?:\s+cepat)?:\s*\**\s*$/gim, '').trim();
+
+        // Deteksi apakah ini pesan Asisten AI
+        const isAiMessage = /^🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/i.test(cleaned);
+        if (isAiMessage) {
+            cleaned = cleaned.replace(/^🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/i, '').trim();
+        }
+
         let safe = escapeHtml(cleaned);
 
-        safe = safe.replace(
-            /🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/gi,
-            '<div class="ai-chat-badge"><i class="fas fa-robot"></i> <span>Asisten AI Diskominfosantik</span></div>'
-        );
-
-        const strongColor = isPureSent ? 'color:#ffffff;' : 'color:#0f172a;';
         // Render Markdown Link [Teks](URL) menjadi Tombol / Link Interaktif
         safe = safe.replace(
             /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
             function(match, text, url) {
                 const isMaps = url.indexOf('maps.google') !== -1 || url.indexOf('goo.gl') !== -1 || url.indexOf('/maps') !== -1;
                 if (isMaps) {
-                    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.45rem;background:#2563eb;color:#ffffff !important;padding:0.5rem 1rem;border-radius:10px;text-decoration:none !important;font-weight:700;font-size:0.85rem;margin:0.45rem 0;box-shadow:0 3px 6px -1px rgba(37,99,235,0.3);"><i class="fas fa-map-marked-alt"></i> <span>${text}</span> <i class="fas fa-external-link-alt" style="font-size:0.7rem;margin-left:3px;opacity:0.85;"></i></a>`;
+                    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-maps-btn"><i class="fas fa-map-marked-alt"></i> <span>${text}</span> <i class="fas fa-external-link-alt chat-ext-icon"></i></a>`;
                 }
-                return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;font-weight:600;">${text} <i class="fas fa-external-link-alt" style="font-size:0.7rem;"></i></a>`;
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${text} <i class="fas fa-external-link-alt chat-ext-icon"></i></a>`;
             }
         );
 
-        safe = safe.replace(/\*\*([^*]+)\*\*/g, `<strong style="${strongColor}font-weight:700;">$1</strong>`);
+        // Render **bold**, *italic*, dan `code`
+        const strongColor = isPureSent ? 'color:#ffffff;' : '';
+        safe = safe.replace(/\*\*([^*]+)\*\*/g, `<strong class="chat-bold" style="${strongColor}">$1</strong>`);
+        safe = safe.replace(/(^|[^\*])\*([^\*\n]+)\*([^\*]|$)/g, '$1<em class="chat-italic">$2</em>$3');
+        safe = safe.replace(/`([^`\n]+)`/g, '<code class="chat-code">$1</code>');
 
-        return safe;
+        if (isPureSent && !isAiMessage) {
+            return safe;
+        }
+
+        // Split menjadi blok-blok terstruktur berdasarkan baris kosong ganda
+        const blocks = safe.split(/\n{2,}/);
+        let renderedHtml = '';
+
+        if (isAiMessage) {
+            renderedHtml += `
+                <div class="ai-header-card">
+                    <div class="ai-header-badge">
+                        <i class="fas fa-robot"></i>
+                        <span>Asisten AI Diskominfosantik</span>
+                    </div>
+                    <span class="ai-header-live"><span class="ai-live-dot"></span> Aktif</span>
+                </div>
+            `;
+        }
+
+        for (let block of blocks) {
+            block = block.trim();
+            if (!block) continue;
+
+            if (block.startsWith('⚠️')) {
+                renderedHtml += `<div class="chat-callout callout-warning">${formatBlockLines(block)}</div>`;
+            } else if (block.startsWith('⏱️')) {
+                renderedHtml += `<div class="chat-callout callout-sla">${formatBlockLines(block)}</div>`;
+            } else if (block.startsWith('📌') || block.startsWith('📋') || block.startsWith('✅')) {
+                renderedHtml += `<div class="chat-callout callout-info">${formatBlockLines(block)}</div>`;
+            } else if (block.startsWith('💡')) {
+                renderedHtml += `<div class="chat-callout callout-tip">${formatBlockLines(block)}</div>`;
+            } else if (block.startsWith('📍')) {
+                renderedHtml += `<div class="chat-callout callout-location">${formatBlockLines(block)}</div>`;
+            } else {
+                renderedHtml += `<div class="chat-block">${formatBlockLines(block)}</div>`;
+            }
+        }
+
+        // Render Panel Tombol Aksi Cepat jika terdapat chips
+        if (chips.length > 0) {
+            let chipsHtml = chips.map(c => 
+                `<button type="button" class="chat-action-chip" data-action="${escapeHtml(c.action)}">
+                    ${escapeHtml(c.label)}
+                </button>`
+            ).join('');
+
+            renderedHtml += `
+                <div class="chat-action-panel">
+                    <div class="chat-action-title">
+                        <i class="fas fa-hand-pointer"></i> <span>Pilihan Tindakan Cepat:</span>
+                    </div>
+                    <div class="chat-action-chips">
+                        ${chipsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        return renderedHtml || safe;
     }
 
     // Format ulang riwayat pesan yang sudah dirender saat halaman dimuat

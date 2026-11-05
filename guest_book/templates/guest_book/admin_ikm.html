@@ -1,0 +1,553 @@
+{% extends "guest_book/admin_base.html" %}
+{% load static %}
+
+{% block title %}Survei IKM & Rating Pelayanan{% endblock %}
+{% block page_title %}Survei Kepuasan Masyarakat (IKM){% endblock %}
+{% block page_subtitle %}Evaluasi Mutu Pelayanan Publik Sesuai PermenPAN-RB No. 14 Tahun 2017{% endblock %}
+{% block active_page %}ikm{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Metrics Grid ── */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 1.1rem;
+        margin-bottom: 1.5rem;
+    }
+    .stat-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 1.25rem 1.35rem;
+        display: flex;
+        align-items: center;
+        gap: 1.1rem;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.05);
+        border: 1px solid #e2e8f0;
+        position: relative;
+        overflow: hidden;
+        min-width: 0;
+    }
+    .stat-icon {
+        width: 46px; height: 46px;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+    .stat-icon.blue   { background: #eff6ff; color: #2563eb; }
+    .stat-icon.amber  { background: #fefce8; color: #d97706; }
+    .stat-icon.green  { background: #f0fdf4; color: #16a34a; }
+    .stat-icon.slate  { background: #f1f5f9; color: #475569; }
+
+    .stat-body { flex: 1; min-width: 0; }
+    .stat-label { 
+        font-size: 0.72rem; font-weight: 700; color: #64748b; 
+        text-transform: uppercase; letter-spacing: 0.04em; 
+        margin-bottom: 4px;
+        line-height: 1.3;
+    }
+    .stat-value { font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1.1; }
+    .stat-badge {
+        font-size: 0.7rem; font-weight: 700; padding: 2px 7px;
+        border-radius: 4px; letter-spacing: 0.02em;
+        white-space: nowrap;
+        display: inline-block;
+    }
+    .stat-badge.success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .stat-badge.primary { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .stat-badge.warning { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .stat-badge.danger  { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    /* ── Standard Panel Card ── */
+    .card-premium {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 1.35rem 1.5rem;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.05);
+        border: 1px solid #e2e8f0;
+        margin-bottom: 1.5rem;
+    }
+    .card-header-flex {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 1.1rem; gap: 1rem; flex-wrap: wrap;
+    }
+    .card-header-flex h5 { font-size: 1rem; font-weight: 800; color: #0f172a; margin: 0; }
+    .card-header-flex p { font-size: 0.8rem; color: #64748b; margin: 3px 0 0; }
+
+    /* ── Action Buttons ── */
+    .btn-action-primary {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.5rem 1.1rem; border-radius: 8px;
+        background: #0f172a; font-size: 0.82rem; font-weight: 700; color: #ffffff;
+        text-decoration: none; transition: all 0.2s; border: none;
+    }
+    .btn-action-primary:hover { background: #1e293b; color: #ffffff; }
+
+    /* ── Data Tables ── */
+    .table-admin {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.83rem;
+    }
+    .table-admin thead th {
+        background: #f8fafc;
+        color: #475569;
+        font-weight: 700;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        border-top: none;
+    }
+    .table-admin tbody td {
+        padding: 0.85rem 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
+    }
+    .table-admin tbody tr:last-child td {
+        border-bottom: none;
+    }
+    .table-admin tbody tr:hover td {
+        background: #fbfcfe;
+    }
+
+    .rating-stars-inline {
+        color: #d97706;
+        font-size: 0.75rem;
+        letter-spacing: 1px;
+    }
+
+    /* ── Progress row in Distribution ── */
+    .star-dist-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.6rem;
+        font-size: 0.8rem;
+    }
+    .star-dist-row:last-child {
+        margin-bottom: 0;
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Top Header & Action -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h5 class="fw-bold text-dark mb-1">Rekapitulasi Indeks Kepuasan Masyarakat (IKM)</h5>
+        <span class="text-muted small">
+            Instrumen pengukuran kepuasan pelayanan kedinasan Diskominfosantik Kabupaten Bekasi
+        </span>
+    </div>
+    <div>
+        <a href="{% url 'tamu:admin_ikm_cetak' %}" target="_blank" class="btn-action-primary">
+            <i class="fas fa-print"></i> Cetak Dokumen Evaluasi (PDF)
+        </a>
+    </div>
+</div>
+
+<!-- 4 Metrics Overview Cards -->
+<div class="stats-grid">
+    <!-- Stat 1: Skor IKM Konversi (100) -->
+    <div class="stat-card">
+        <div class="stat-icon blue">
+            <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="stat-body">
+            <p class="stat-label">Nilai IKM (Skala 100)</p>
+            <div class="d-flex align-items-baseline gap-2 mb-1 flex-wrap">
+                <span class="stat-value">{{ ikm_skala_100 }}</span>
+                <span class="stat-badge {{ mutu_class }}">
+                    Mutu {{ mutu_pelayanan }}
+                </span>
+            </div>
+            <small class="text-muted" style="font-size: 0.75rem;">Standar Konversi x 20</small>
+        </div>
+    </div>
+
+    <!-- Stat 2: Rata-Rata Bintang Likert -->
+    <div class="stat-card">
+        <div class="stat-icon amber">
+            <i class="fas fa-star-half-alt"></i>
+        </div>
+        <div class="stat-body">
+            <p class="stat-label">Rata-Rata Kepuasan</p>
+            <div class="stat-value">{{ avg_rating }} <span style="font-size: 0.9rem; font-weight: 500; color: #64748b;">/ 5.0</span></div>
+            <small class="text-muted" style="font-size: 0.75rem;">Skala Likert (1 - 5)</small>
+        </div>
+    </div>
+
+    <!-- Stat 3: Total Responden -->
+    <div class="stat-card">
+        <div class="stat-icon green">
+            <i class="fas fa-user-check"></i>
+        </div>
+        <div class="stat-body">
+            <p class="stat-label">Total Responden</p>
+            <div class="stat-value">{{ total_responden }}</div>
+            <small class="text-muted" style="font-size: 0.75rem;">Kunjungan Selesai Dinilai</small>
+        </div>
+    </div>
+
+    <!-- Stat 4: Regulasi Acuan -->
+    <div class="stat-card">
+        <div class="stat-icon slate">
+            <i class="fas fa-landmark"></i>
+        </div>
+        <div class="stat-body">
+            <p class="stat-label">Standar Regulasi</p>
+            <div style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-top: 2px;">PermenPAN-RB</div>
+            <small class="text-muted" style="font-size: 0.75rem;">No. 14 Tahun 2017</small>
+        </div>
+    </div>
+</div>
+
+<!-- Charts & Breakdown Section -->
+<div class="row g-3 mb-4">
+    <!-- Chart: Tren Bulanan (Col-8) -->
+    <div class="col-lg-8">
+        <div class="card-premium h-100 mb-0">
+            <div class="card-header-flex">
+                <div>
+                    <h5>Tren Nilai IKM Bulanan</h5>
+                    <p>Fluktuasi mutu kepuasan publik pada tahun berjalan (Skala 100)</p>
+                </div>
+                <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.75rem;">
+                    Tahun Berjalan
+                </span>
+            </div>
+            <div style="height: 270px; width: 100%;">
+                <canvas id="ikmMonthlyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rincian Distribusi Bintang (Col-4) -->
+    <div class="col-lg-4">
+        <div class="card-premium h-100 mb-0 d-flex flex-column justify-content-between">
+            <div class="card-header-flex mb-3">
+                <div>
+                    <h5>Distribusi Rating</h5>
+                    <p>Sebaran perolehan bintang responden</p>
+                </div>
+            </div>
+
+            <div class="py-2">
+                <!-- 5 Bintang -->
+                <div class="star-dist-row">
+                    <span style="width: 50px; font-weight: 700; color: #334155;">5 <i class="fas fa-star" style="color: #d97706; font-size: 0.75rem;"></i></span>
+                    <div class="progress flex-grow-1" style="height: 8px; border-radius: 4px; background: #f1f5f9;">
+                        <div class="progress-bar" style="width: {% if total_responden > 0 %}{% widthratio star_counts.5 total_responden 100 %}{% else %}0{% endif %}%; background-color: #d97706;"></div>
+                    </div>
+                    <span style="width: 35px; text-align: right; font-weight: 700; color: #64748b;">{{ star_counts.5 }}</span>
+                </div>
+
+                <!-- 4 Bintang -->
+                <div class="star-dist-row">
+                    <span style="width: 50px; font-weight: 700; color: #334155;">4 <i class="fas fa-star" style="color: #d97706; font-size: 0.75rem;"></i></span>
+                    <div class="progress flex-grow-1" style="height: 8px; border-radius: 4px; background: #f1f5f9;">
+                        <div class="progress-bar" style="width: {% if total_responden > 0 %}{% widthratio star_counts.4 total_responden 100 %}{% else %}0{% endif %}%; background-color: #d97706;"></div>
+                    </div>
+                    <span style="width: 35px; text-align: right; font-weight: 700; color: #64748b;">{{ star_counts.4 }}</span>
+                </div>
+
+                <!-- 3 Bintang -->
+                <div class="star-dist-row">
+                    <span style="width: 50px; font-weight: 700; color: #334155;">3 <i class="fas fa-star" style="color: #d97706; font-size: 0.75rem;"></i></span>
+                    <div class="progress flex-grow-1" style="height: 8px; border-radius: 4px; background: #f1f5f9;">
+                        <div class="progress-bar" style="width: {% if total_responden > 0 %}{% widthratio star_counts.3 total_responden 100 %}{% else %}0{% endif %}%; background-color: #d97706;"></div>
+                    </div>
+                    <span style="width: 35px; text-align: right; font-weight: 700; color: #64748b;">{{ star_counts.3 }}</span>
+                </div>
+
+                <!-- 2 Bintang -->
+                <div class="star-dist-row">
+                    <span style="width: 50px; font-weight: 700; color: #334155;">2 <i class="fas fa-star" style="color: #d97706; font-size: 0.75rem;"></i></span>
+                    <div class="progress flex-grow-1" style="height: 8px; border-radius: 4px; background: #f1f5f9;">
+                        <div class="progress-bar" style="width: {% if total_responden > 0 %}{% widthratio star_counts.2 total_responden 100 %}{% else %}0{% endif %}%; background-color: #d97706;"></div>
+                    </div>
+                    <span style="width: 35px; text-align: right; font-weight: 700; color: #64748b;">{{ star_counts.2 }}</span>
+                </div>
+
+                <!-- 1 Bintang -->
+                <div class="star-dist-row">
+                    <span style="width: 50px; font-weight: 700; color: #334155;">1 <i class="fas fa-star" style="color: #d97706; font-size: 0.75rem;"></i></span>
+                    <div class="progress flex-grow-1" style="height: 8px; border-radius: 4px; background: #f1f5f9;">
+                        <div class="progress-bar" style="width: {% if total_responden > 0 %}{% widthratio star_counts.1 total_responden 100 %}{% else %}0{% endif %}%; background-color: #d97706;"></div>
+                    </div>
+                    <span style="width: 35px; text-align: right; font-weight: 700; color: #64748b;">{{ star_counts.1 }}</span>
+                </div>
+            </div>
+
+            <div class="pt-3 border-top mt-2 text-center" style="font-size: 0.8rem; color: #64748b;">
+                Tingkat Kepuasan Publik: <strong class="text-dark">{{ avg_rating }} / 5.0</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabel Evaluasi 5 Unsur Pelayanan Sesuai PermenPAN-RB -->
+<div class="card-premium">
+    <div class="card-header-flex">
+        <div>
+            <h5>Nilai Per Unsur Pelayanan Publik (PermenPAN-RB No. 14 / 2017)</h5>
+            <p>Rincian rata-rata persepsi masyarakat pada 5 indikator pelayanan</p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table-admin">
+            <thead>
+                <tr>
+                    <th style="width: 60px;" class="text-center">KODE</th>
+                    <th>UNSUR PELAYANAN</th>
+                    <th style="width: 150px;" class="text-center">SKALA LIKERT (1-5)</th>
+                    <th style="width: 150px;" class="text-center">KONVERSI (100)</th>
+                    <th style="width: 160px;" class="text-center">KATEGORI MUTU</th>
+                    <th style="width: 200px;">CAPAIAN</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center font-monospace fw-bold text-secondary">U1</td>
+                    <td>
+                        <div class="fw-bold">Kesesuaian Persyaratan</div>
+                        <small class="text-muted">Kesesuaian dan kejelasan berkas/syarat layanan yang diwajibkan.</small>
+                    </td>
+                    <td class="text-center font-monospace fw-bold">{{ unsur_scores.u1 }}</td>
+                    <td class="text-center font-monospace fw-bold">{% widthratio unsur_scores.u1 1 20 %}</td>
+                    <td class="text-center">
+                        <span class="badge {% if unsur_scores.u1 >= 4.4 %}bg-success-subtle text-success{% elif unsur_scores.u1 >= 3.8 %}bg-primary-subtle text-primary{% elif unsur_scores.u1 >= 3.2 %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %} px-2 py-1">
+                            {% if unsur_scores.u1 >= 4.4 %}A (Sangat Baik){% elif unsur_scores.u1 >= 3.8 %}B (Baik){% elif unsur_scores.u1 >= 3.2 %}C (Kurang Baik){% else %}D (Buruk){% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <div class="progress-bar bg-primary" style="width: {% widthratio unsur_scores.u1 5 100 %}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="text-center font-monospace fw-bold text-secondary">U2</td>
+                    <td>
+                        <div class="fw-bold">Kemudahan Prosedur</div>
+                        <small class="text-muted">Kemudahan tahapan alur janji temu dan penanganan di buku tamu.</small>
+                    </td>
+                    <td class="text-center font-monospace fw-bold">{{ unsur_scores.u2 }}</td>
+                    <td class="text-center font-monospace fw-bold">{% widthratio unsur_scores.u2 1 20 %}</td>
+                    <td class="text-center">
+                        <span class="badge {% if unsur_scores.u2 >= 4.4 %}bg-success-subtle text-success{% elif unsur_scores.u2 >= 3.8 %}bg-primary-subtle text-primary{% elif unsur_scores.u2 >= 3.2 %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %} px-2 py-1">
+                            {% if unsur_scores.u2 >= 4.4 %}A (Sangat Baik){% elif unsur_scores.u2 >= 3.8 %}B (Baik){% elif unsur_scores.u2 >= 3.2 %}C (Kurang Baik){% else %}D (Buruk){% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <div class="progress-bar bg-primary" style="width: {% widthratio unsur_scores.u2 5 100 %}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="text-center font-monospace fw-bold text-secondary">U3</td>
+                    <td>
+                        <div class="fw-bold">Kecepatan Pelayanan</div>
+                        <small class="text-muted">Ketepatan waktu persetujuan, sambutan di pos, dan tanggapnya penanganan.</small>
+                    </td>
+                    <td class="text-center font-monospace fw-bold">{{ unsur_scores.u3 }}</td>
+                    <td class="text-center font-monospace fw-bold">{% widthratio unsur_scores.u3 1 20 %}</td>
+                    <td class="text-center">
+                        <span class="badge {% if unsur_scores.u3 >= 4.4 %}bg-success-subtle text-success{% elif unsur_scores.u3 >= 3.8 %}bg-primary-subtle text-primary{% elif unsur_scores.u3 >= 3.2 %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %} px-2 py-1">
+                            {% if unsur_scores.u3 >= 4.4 %}A (Sangat Baik){% elif unsur_scores.u3 >= 3.8 %}B (Baik){% elif unsur_scores.u3 >= 3.2 %}C (Kurang Baik){% else %}D (Buruk){% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <div class="progress-bar bg-primary" style="width: {% widthratio unsur_scores.u3 5 100 %}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="text-center font-monospace fw-bold text-secondary">U4</td>
+                    <td>
+                        <div class="fw-bold">Keramahan &amp; Kesopanan Petugas</div>
+                        <small class="text-muted">Sikap ramah, sopan santun, dan profesionalisme staf front office &amp; pegawai.</small>
+                    </td>
+                    <td class="text-center font-monospace fw-bold">{{ unsur_scores.u4 }}</td>
+                    <td class="text-center font-monospace fw-bold">{% widthratio unsur_scores.u4 1 20 %}</td>
+                    <td class="text-center">
+                        <span class="badge {% if unsur_scores.u4 >= 4.4 %}bg-success-subtle text-success{% elif unsur_scores.u4 >= 3.8 %}bg-primary-subtle text-primary{% elif unsur_scores.u4 >= 3.2 %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %} px-2 py-1">
+                            {% if unsur_scores.u4 >= 4.4 %}A (Sangat Baik){% elif unsur_scores.u4 >= 3.8 %}B (Baik){% elif unsur_scores.u4 >= 3.2 %}C (Kurang Baik){% else %}D (Buruk){% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <div class="progress-bar bg-primary" style="width: {% widthratio unsur_scores.u4 5 100 %}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="text-center font-monospace fw-bold text-secondary">U5</td>
+                    <td>
+                        <div class="fw-bold">Kualitas Sarana &amp; Prasarana</div>
+                        <small class="text-muted">Kenyamanan ruang tunggu, kebersihan, fasilitas lobi dan perangkat digital.</small>
+                    </td>
+                    <td class="text-center font-monospace fw-bold">{{ unsur_scores.u5 }}</td>
+                    <td class="text-center font-monospace fw-bold">{% widthratio unsur_scores.u5 1 20 %}</td>
+                    <td class="text-center">
+                        <span class="badge {% if unsur_scores.u5 >= 4.4 %}bg-success-subtle text-success{% elif unsur_scores.u5 >= 3.8 %}bg-primary-subtle text-primary{% elif unsur_scores.u5 >= 3.2 %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %} px-2 py-1">
+                            {% if unsur_scores.u5 >= 4.4 %}A (Sangat Baik){% elif unsur_scores.u5 >= 3.8 %}B (Baik){% elif unsur_scores.u5 >= 3.2 %}C (Kurang Baik){% else %}D (Buruk){% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="progress" style="height: 6px; border-radius: 3px;">
+                            <div class="progress-bar bg-primary" style="width: {% widthratio unsur_scores.u5 5 100 %}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Tabel Log Ulasan & Masukan Tamu -->
+<div class="card-premium">
+    <div class="card-header-flex">
+        <div>
+            <h5>Aspirasi &amp; Ulasan Masukan Tamu</h5>
+            <p>Catatan kualitatif dari responden pengguna layanan</p>
+        </div>
+        <span class="badge bg-light text-muted border px-2 py-1" style="font-size: 0.75rem;">
+            {{ recent_feedbacks|length }} Responden
+        </span>
+    </div>
+
+    {% if recent_feedbacks %}
+        <div class="table-responsive">
+            <table class="table-admin">
+                <thead>
+                    <tr>
+                        <th style="width: 140px;">WAKTU</th>
+                        <th style="width: 200px;">NAMA TAMU / ASAL</th>
+                        <th style="width: 180px;">PEGAWAI DITUJU</th>
+                        <th style="width: 130px;">RATING</th>
+                        <th>CATATAN ASPIRASI / MASUKAN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in recent_feedbacks %}
+                        <tr>
+                            <td class="text-muted" style="font-size: 0.78rem;">
+                                {{ item.created_at|date:"d M Y" }}<br>
+                                <small>{{ item.created_at|date:"H:i" }} WIB</small>
+                            </td>
+                            <td>
+                                <div class="fw-bold">{{ item.tamu.name }}</div>
+                                <small class="text-muted">{{ item.tamu.instansi|default:"Pribadi / Umum" }}</small>
+                            </td>
+                            <td>
+                                {% if item.kunjungan and item.kunjungan.pegawai %}
+                                    <div class="fw-semibold">{{ item.kunjungan.pegawai.name }}</div>
+                                    <small class="text-muted">{{ item.kunjungan.pegawai.department|default:"Umum" }}</small>
+                                {% else %}
+                                    <span class="text-muted">–</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="rating-stars-inline">
+                                    {% for s in "12345" %}
+                                        {% if forloop.counter <= item.rating %}
+                                            <i class="fas fa-star"></i>
+                                        {% else %}
+                                            <i class="far fa-star text-muted" style="opacity: 0.4;"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <small class="fw-bold text-dark font-monospace">{{ item.rating }}.0</small>
+                            </td>
+                            <td>
+                                <span class="text-dark">{{ item.ulasan }}</span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-center py-4">
+            <p class="text-muted small mb-0">Belum ada catatan ulasan masuk dari tamu.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const ctx = document.getElementById('ikmMonthlyChart').getContext('2d');
+    const chartLabels = {{ chart_data.labels|safe }};
+    const chartRatings = {{ chart_data.ratings|safe }};
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'Nilai IKM (Skala 100)',
+                data: chartRatings,
+                borderColor: '#1e3a8a',
+                backgroundColor: 'rgba(30, 58, 138, 0.05)',
+                fill: true,
+                tension: 0.25,
+                borderWidth: 2,
+                pointBackgroundColor: '#1e3a8a',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    padding: 10,
+                    titleFont: { size: 12, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    callbacks: {
+                        label: function (context) {
+                            return ` Skor IKM: ${context.parsed.y} / 100`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        font: { size: 11, family: 'Inter, system-ui' },
+                        color: '#64748b'
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11, family: 'Inter, system-ui' }, color: '#64748b' }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

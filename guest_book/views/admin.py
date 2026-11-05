@@ -11,6 +11,8 @@ Logika bisnis sudah dipecah ke:
 from .admin_dashboard import (  # noqa: F401
     admin_dashboard_view,
     admin_statistik_view,
+    admin_ikm_view,
+    admin_ikm_cetak_view,
     admin_kalender_view,
     admin_kalender_download_template,
 )
@@ -19,6 +21,8 @@ from .admin_kunjungan import (  # noqa: F401
     admin_kunjungan_detail_view,
     admin_cetak_kartu_view,
     admin_kunjungan_list_view,
+    admin_scan_tiket_view,
+    api_scan_tiket,
     admin_kunjungan_manual_create,
     admin_kunjungan_export_excel,
     admin_kunjungan_cetak_pdf,
