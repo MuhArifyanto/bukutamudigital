@@ -189,7 +189,7 @@ DATA_PEGAWAI = [
     },
 ]
 
-DUMMY_EMAILS = [
+DUMMY_EMAILS = {
     'tya@gmail.com',
     'hasbih@gmail.com',
     'dimas@gmail.com',
@@ -197,7 +197,18 @@ DUMMY_EMAILS = [
     'agus@gmail.com',
     'firman@gmail.com',
     'bayu@gmail.com',
-]
+}
+
+DUMMY_NAMES = {
+    'lutpiah',
+    'hasbi ardiansyah',
+    'dimas',
+    'suherman',
+    'agus susanto',
+    'firmansyah',
+    'dimas anugrah',
+    'bayu aji',
+}
 
 DEFAULT_PASSWORD = 'Diskominfo@2025'
 
@@ -211,7 +222,7 @@ class Command(BaseCommand):
         # 1. Pastikan setiap Departemen dan 17 Pegawai Resmi ada
         created_count = 0
         updated_count = 0
-
+        official_emails_lower = set()
         first_official_by_dept = {}
 
         for dept_data in DATA_PEGAWAI:
@@ -222,6 +233,7 @@ class Command(BaseCommand):
             )
 
             for p_data in dept_data['pegawai']:
+                official_emails_lower.add(p_data['email'].strip().lower())
                 pegawai, created = Pegawai.objects.get_or_create(
                     email=p_data['email'],
                     defaults={
@@ -260,18 +272,31 @@ class Command(BaseCommand):
             f"Sinkronisasi Pegawai Resmi Selesai: {created_count} dibuat, {updated_count} diperbarui."
         ))
 
-        # 2. Reassign kunjungan dari akun dummy ke pegawai resmi di bidang yang sama, lalu hapus akun dummy
-        dummy_qs = Pegawai.objects.filter(email__in=DUMMY_EMAILS)
+        # 2. Hapus seluruh akun dummy secara case-insensitive (termasuk huruf besar Tya@gmail.com, Hasbih@gmail.com, dll.)
         deleted_count = 0
-        for dummy in dummy_qs:
-            dept_name = dummy.department_rel.nama if dummy.department_rel else dummy.department
-            replacement = first_official_by_dept.get(dept_name) or Pegawai.objects.filter(department_rel__nama=dept_name).first()
+        for p in list(Pegawai.objects.select_related('department_rel').all()):
+            p_email_lower = (p.email or '').strip().lower()
+            p_name_lower = (p.name or '').strip().lower()
 
-            if replacement:
-                Kunjungan.objects.filter(pegawai=dummy).update(pegawai=replacement)
+            is_dummy = (
+                p_email_lower in DUMMY_EMAILS
+                or p_name_lower in DUMMY_NAMES
+                or (p_email_lower.endswith('@gmail.com') and p_email_lower not in official_emails_lower)
+            )
+            if is_dummy:
+                dept_name = p.department_rel.nama if p.department_rel else p.department
+                replacement = (
+                    first_official_by_dept.get(dept_name)
+                    or next(iter(first_official_by_dept.values()), None)
+                )
+                if replacement:
+                    Kunjungan.objects.filter(pegawai=p).update(pegawai=replacement)
 
-            dummy.delete()
-            deleted_count += 1
+                deleted_name = p.name
+                deleted_email = p.email
+                p.delete()
+                deleted_count += 1
+                self.stdout.write(self.style.WARNING(f"   - Dihapus pegawai dummy: {deleted_name} ({deleted_email})"))
 
         if deleted_count > 0:
             self.stdout.write(self.style.SUCCESS(f"Berhasil membersihkan {deleted_count} akun pegawai dummy lama."))

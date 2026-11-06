@@ -358,6 +358,18 @@ def admin_pengguna_view(request):
 @admin_login_required
 def admin_pegawai_view(request):
     """Manajemen Pegawai dengan Role Management"""
+    # Pastikan data pegawai dummy lama otomatis dibersihkan dan 17 pegawai resmi tersedia
+    try:
+        has_dummy = Pegawai.objects.filter(
+            Q(email__icontains='@gmail.com') |
+            Q(name__in=['Lutpiah', 'Hasbi Ardiansyah', 'Dimas', 'Suherman', 'Agus Susanto', 'firmansyah', 'Dimas Anugrah', 'Bayu Aji'])
+        ).exists()
+        if has_dummy or Pegawai.objects.filter(email__icontains='@diskominfosantik.go.id').count() < 17:
+            from django.core.management import call_command
+            call_command('seed_pegawai')
+    except Exception:
+        pass
+
     query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
     role_filter = request.GET.get('role', '')

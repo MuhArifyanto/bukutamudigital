@@ -30,5 +30,5 @@ RUN SECRET_KEY=dummy-build-time-secret-key python manage.py collectstatic --noin
 # Expose port
 EXPOSE 8000
 
-# Run Daphne (ASGI server - support WebSocket)
-CMD daphne -b 0.0.0.0 -p $PORT bukudigital.asgi:application
+# Run migrations, sync official pegawai, and start Daphne (ASGI server - support WebSocket)
+CMD sh -c "python manage.py migrate --noinput && (python manage.py createcachetable || true) && (python manage.py setup_admin || true) && daphne -b 0.0.0.0 -p ${PORT:-8000} bukudigital.asgi:application"

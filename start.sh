@@ -10,6 +10,9 @@ python manage.py createcachetable
 echo "==> Collecting static files..."
 python manage.py collectstatic --noinput
 
+echo "==> Syncing admin & official pegawai records..."
+python manage.py setup_admin || true
+
 if [ -n "$ADMIN_INITIAL_PASSWORD" ]; then
   echo "==> Ensuring initial admin exists..."
   python manage.py shell -c "
