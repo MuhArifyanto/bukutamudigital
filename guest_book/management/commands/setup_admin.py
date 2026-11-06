@@ -177,6 +177,13 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.WARNING(f"Peringatan saat inisialisasi kalender: {e}"))
 
+        # 6. Pastikan 17 Pegawai Resmi Diskominfosantik tersinkronisasi ke database
+        try:
+            from django.core.management import call_command
+            call_command('seed_pegawai')
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f"Peringatan saat sinkronisasi pegawai: {e}"))
+
         if has_errors:
             self.stdout.write(self.style.ERROR("================================================"))
             self.stdout.write(self.style.ERROR("SETUP SELESAI DENGAN CATATAN/ERROR."))

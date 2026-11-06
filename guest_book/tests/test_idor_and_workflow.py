@@ -15,11 +15,20 @@ class IDORAndWorkflowTestCase(BaseSecurityTestCase):
     def setUp(self):
         super().setUp()
 
+        # Pastikan tanggal awal kunjungan berada di hari kerja (bukan Sabtu/Minggu)
+        workday_a = timezone.now() + timedelta(days=1)
+        while workday_a.weekday() >= 5:
+            workday_a += timedelta(days=1)
+
+        workday_b = workday_a + timedelta(days=1)
+        while workday_b.weekday() >= 5:
+            workday_b += timedelta(days=1)
+
         # Kunjungan milik Tamu A
         self.kunjungan_a = Kunjungan.objects.create(
             tamu=self.tamu_a,
             pegawai=self.pegawai,
-            arrival_time=timezone.now() + timedelta(days=1),
+            arrival_time=workday_a,
             purpose="Konsultasi Jaringan",
             status=KunjunganStatus.MENUNGGU_ADMIN
         )
@@ -28,7 +37,7 @@ class IDORAndWorkflowTestCase(BaseSecurityTestCase):
         self.kunjungan_b = Kunjungan.objects.create(
             tamu=self.tamu_b,
             pegawai=self.pegawai,
-            arrival_time=timezone.now() + timedelta(days=2),
+            arrival_time=workday_b,
             purpose="Pengajuan subdomain",
             status=KunjunganStatus.MENUNGGU_ADMIN
         )
@@ -427,10 +436,14 @@ class IDORAndWorkflowTestCase(BaseSecurityTestCase):
             self.assertEqual(res_quota['intent'], 'jadwal_kuota')
             self.assertIn('kuota', res_quota['reply_text'].lower())
 
-            # 2. Permintaan daftar penuh saltik: "daftarin kunjunagn bsk"
+            # 2. Permintaan daftar penuh saltik di hari kerja (agar tidak ditolak aturan akhir pekan)
+            target_date = timezone.now() + timedelta(days=1)
+            while target_date.weekday() >= 5:
+                target_date += timedelta(days=1)
+            day_name = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'][target_date.weekday()]
             res_book = build_n8n_chat_response(
                 self.tamu_a.id,
-                'daftarin kunjunagn bsk',
+                f'daftarin kunjunagn hari {day_name}',
                 session_id=sess_id,
             )
             self.assertEqual(res_book['intent'], 'buat_kunjungan')
