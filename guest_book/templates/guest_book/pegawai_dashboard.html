@@ -329,9 +329,14 @@
                                 <i class="fas fa-times"></i>
                             </button>
                             {% endif %}
+                            <a href="{% url 'tamu:pegawai_kunjungan_detail' k.id %}" class="action-btn btn-view" title="Lihat Detail">
+                                <i class="fas fa-eye"></i> Detail
+                            </a>
+                            {% if k.status == 'disetujui_pegawai' or k.status == 'disetujui' or k.status == 'in_progress' or k.status == 'completed' %}
                             <a href="{% url 'tamu:pegawai_chat' %}?session=kunjungan_{{ k.id }}" class="action-btn btn-view" style="background: rgba(139,92,246,0.1); color: #8b5cf6;" title="Chat">
                                 <i class="fas fa-comments"></i>
                             </a>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -352,7 +357,18 @@
 {% block extra_js %}
 <script>
     function updateStatus(kunjunganId, status) {
-        if (!confirm('Apakah Anda yakin ingin memperbarui status kunjungan ini?')) return;
+        let rejectionReason = '';
+        if (status === 'ditolak_pegawai') {
+            const reason = prompt('Masukkan alasan penolakan kunjungan ini:');
+            if (reason === null) return;
+            rejectionReason = reason.trim();
+            if (!rejectionReason) {
+                alert('Alasan penolakan wajib diisi.');
+                return;
+            }
+        } else {
+            if (!confirm('Apakah Anda yakin ingin menyetujui kunjungan ini?')) return;
+        }
         
         fetch("{% url 'tamu:api_update_kunjungan_status' %}", {
             method: 'POST',
@@ -362,7 +378,8 @@
             },
             body: JSON.stringify({
                 kunjungan_id: kunjunganId,
-                status: status
+                status: status,
+                rejection_reason: rejectionReason
             })
         })
         .then(response => response.json())

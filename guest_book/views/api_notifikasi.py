@@ -13,11 +13,34 @@ from ..models import Notification, Kunjungan, Pegawai, Tamu
 def get_authenticated_recipient(request):
     """
     Menentukan identitas penerima valid secara hierarkis dari sesi server:
-    1. Admin: check_is_admin(request) -> ('admin', 'admin')
-    2. Pegawai: session pegawai_id valid & aktif di DB -> ('pegawai', str(pegawai.id))
-    3. Tamu: session tamu_id valid & aktif di DB (dan bukan admin) -> ('tamu', str(tamu.id))
-    4. Sesi tidak valid / anonim -> (None, None)
+    - Jika request berasal dari Portal Pegawai (/pegawai-portal/ atau ?portal=pegawai),
+      utamakan sesi pegawai_id.
+    - Jika request berasal dari Portal Tamu (?portal=tamu), utamakan sesi tamu_id.
+    - Selain itu: Admin -> Pegawai -> Tamu.
     """
+    portal_hint = (request.GET.get('portal') or '').strip().lower()
+    referer = (request.headers.get('Referer') or '').lower()
+
+    if portal_hint == 'pegawai' or '/pegawai-portal/' in referer:
+        pegawai_id = request.session.get('pegawai_id')
+        if pegawai_id:
+            try:
+                pegawai = Pegawai.objects.filter(pk=pegawai_id, account_status='active').first()
+                if pegawai:
+                    return 'pegawai', str(pegawai.id)
+            except Exception:
+                pass
+
+    if portal_hint == 'tamu':
+        tamu_id = request.session.get('tamu_id')
+        if tamu_id:
+            try:
+                tamu = Tamu.objects.filter(pk=tamu_id, account_status='active').first()
+                if tamu and not tamu.is_admin:
+                    return 'tamu', str(tamu.id)
+            except Exception:
+                pass
+
     is_admin, admin_id = check_is_admin(request)
     if is_admin:
         return 'admin', 'admin'
@@ -127,12 +150,28 @@ def api_update_kunjungan_status(request):
                 return JsonResponse({'error': 'kunjungan_id dan status wajib diisi'}, status=400)
 
             kunjungan = Kunjungan.objects.select_related('tamu', 'pegawai').get(id=kunjungan_id)
-            user_id = str(admin_id) if is_admin else str(pegawai_id)
-            user_type = 'admin' if is_admin else 'pegawai'
+            referer = (request.headers.get('Referer') or '').lower()
+            is_pegawai_action = bool(pegawai_id) and (
+                '/pegawai-portal/' in referer
+                or new_status in ('disetujui_pegawai', 'ditolak_pegawai')
+                or not is_admin
+            )
+            user_id = str(pegawai_id) if is_pegawai_action else str(admin_id)
+            user_type = 'pegawai' if is_pegawai_action else 'admin'
 
             from ..workflow_engine import WorkflowEngine
             engine = WorkflowEngine(kunjungan)
             engine.transition(new_status=new_status, user_id=user_id, user_type=user_type, notes=notes, rejection_reason=rejection_reason)
+
+            # Tandai notifikasi terkait kunjungan ini sebagai sudah dibaca
+            if is_pegawai_action:
+                Notification.objects.filter(
+                    recipient_id=str(pegawai_id),
+                    recipient_type='pegawai',
+                    related_object_id=str(kunjungan.id),
+                    status='unread'
+                ).update(status='read', read_at=timezone.now())
+
             return JsonResponse({'success': True})
 
         except Kunjungan.DoesNotExist:

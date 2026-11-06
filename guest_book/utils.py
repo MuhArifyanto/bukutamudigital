@@ -47,7 +47,11 @@ def send_notification(recipient_id, recipient_type, notification_type, title, me
                 'play_chime': True,
             }
             try:
-                payload['unread_count'] = Notification.objects.filter(recipient_id=str(recipient_id), status='unread').count()
+                payload['unread_count'] = Notification.objects.filter(
+                    recipient_id=str(recipient_id),
+                    recipient_type=recipient_type,
+                    status='unread'
+                ).count()
             except Exception:
                 pass
 

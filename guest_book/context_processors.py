@@ -1,4 +1,4 @@
-from .models import Notification, Tamu
+from .models import Notification, Tamu, Kunjungan, ChatMessage
 
 def notifications_context(request):
     """
@@ -51,16 +51,40 @@ def notifications_context(request):
 
 def pegawai_notifications_context(request):
     """
-    Context processor untuk badge notifikasi di navbar Portal Pegawai.
+    Context processor untuk badge notifikasi & counter sidebar di Portal Pegawai.
     """
     pegawai = getattr(request, '_pegawai', None)
     if not pegawai:
         return {}
-        
+
+    pegawai_id_str = str(pegawai.id)
+
     unread_count = Notification.objects.filter(
-        recipient_id=str(pegawai.id),
+        recipient_id=pegawai_id_str,
         recipient_type='pegawai',
         status='unread'
     ).count()
-    
-    return {'pegawai_unread_count': unread_count}
+
+    pending_kunjungan_count = Kunjungan.objects.filter(
+        pegawai=pegawai,
+        status='menunggu_pegawai'
+    ).count()
+
+    # Hitung pesan chat belum dibaca untuk pegawai ini (dari Admin maupun Tamu)
+    kunjungan_ids = list(
+        Kunjungan.objects.filter(
+            pegawai=pegawai,
+            status__in=['disetujui_pegawai', 'disetujui', 'in_progress', 'completed']
+        ).values_list('id', flat=True)
+    )
+    chat_sessions = [f'pegawai_admin_{pegawai_id_str}'] + [f'kunjungan_{kid}' for kid in kunjungan_ids]
+    unread_chat_count = ChatMessage.objects.filter(
+        session_id__in=chat_sessions,
+        is_read=False
+    ).exclude(sender_type='pegawai').count()
+
+    return {
+        'pegawai_unread_count': unread_count,
+        'pegawai_pending_kunjungan_count': pending_kunjungan_count,
+        'pegawai_unread_chat_count': unread_chat_count,
+    }

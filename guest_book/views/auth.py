@@ -388,8 +388,11 @@ def _establish_tamu_session(request, tamu):
     Buat sesi Tamu yang bersih: rotasi session key (anti session fixation),
     hapus kunci peran lain, lalu isi tamu_id.
     """
+    from django.contrib.auth import logout as django_logout
+    if getattr(request, 'user', None) and request.user.is_authenticated:
+        django_logout(request)
     request.session.cycle_key()
-    for stale_key in ('pegawai_id', 'pegawai_name', 'pegawai_role', 'is_admin', 'is_staff', 'role'):
+    for stale_key in ('pegawai_id', 'pegawai_name', 'pegawai_role', 'is_admin', 'admin_id', 'is_staff', 'role', '_auth_user_id', '_auth_user_backend', '_auth_user_hash'):
         request.session.pop(stale_key, None)
     request.session['tamu_id'] = str(tamu.pk)
     request.session.set_expiry(86400)  # Sesi aktif 1 hari
@@ -1032,8 +1035,12 @@ def pegawai_login_view(request):
 
 
         # Simpan session pegawai dengan rotasi key untuk mencegah session fixation
+        from django.contrib.auth import logout as django_logout
+        if getattr(request, 'user', None) and request.user.is_authenticated:
+            django_logout(request)
         request.session.cycle_key()
-        request.session.pop('tamu_id', None)
+        for stale_key in ('tamu_id', 'is_admin', 'admin_id', 'is_staff', 'role', '_auth_user_id', '_auth_user_backend', '_auth_user_hash'):
+            request.session.pop(stale_key, None)
         request.session['pegawai_id']   = str(pegawai.pk)
         request.session['pegawai_name'] = pegawai.name
         request.session['pegawai_role'] = pegawai.role

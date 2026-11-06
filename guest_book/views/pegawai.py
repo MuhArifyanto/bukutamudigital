@@ -75,6 +75,9 @@ def pegawai_dashboard_view(request, pegawai=None):
         arrival_time__gte=now
     ).select_related('tamu').order_by('arrival_time')[:5]
 
+    # Daftar kunjungan terbaru milik pegawai untuk ditampilkan di tabel Dashboard
+    kunjungan_list = base_qs.select_related('tamu', 'pegawai').order_by('-created_at')[:10]
+
     return render(request, 'guest_book/pegawai_dashboard.html', {
         'pegawai': pegawai,
         'active_page': 'dashboard',
@@ -82,6 +85,7 @@ def pegawai_dashboard_view(request, pegawai=None):
         'pending_approvals': pending_approvals,
         'department_requests': department_requests,
         'upcoming_visits': upcoming_visits,
+        'kunjungan_list': kunjungan_list,
     })
 
 
@@ -113,6 +117,16 @@ def pegawai_kunjungan_detail_view(request, pk, pegawai=None):
     if not can_view:
         messages.error(request, 'Anda tidak memiliki akses ke kunjungan ini.')
         return redirect('tamu:pegawai_kunjungan_list')
+
+    # Otomatis tandai notifikasi terkait kunjungan ini sebagai sudah dibaca saat detail dibuka
+    from django.utils import timezone as tz_now
+    from ..models import Notification
+    Notification.objects.filter(
+        recipient_id=str(pegawai.id),
+        recipient_type='pegawai',
+        related_object_id=str(kunjungan.id),
+        status='unread'
+    ).update(status='read', read_at=tz_now.now())
 
     # Cek apakah pegawai dapat respond
     can_respond = PermissionManager.can_approve_reject(pegawai, kunjungan) and kunjungan.status == 'menunggu_pegawai'
@@ -431,6 +445,18 @@ def pegawai_chat_view(request, pegawai=None):
             session_id=active_conversation['session_id'],
             is_read=False
         ).exclude(sender_type='pegawai').update(is_read=True)
+
+        # Tandai juga notifikasi chat di lonceng sebagai terbaca
+        from django.utils import timezone as tz_now
+        from ..models import Notification
+        Notification.objects.filter(
+            recipient_id=str(pegawai.id),
+            recipient_type='pegawai',
+            status='unread'
+        ).filter(
+            Q(related_object_id=active_conversation['session_id']) |
+            Q(notification_type__in=['message_received', 'message_replied'])
+        ).update(status='read', read_at=tz_now.now())
         
     return render(request, 'guest_book/pegawai_chat.html', {
         'pegawai': pegawai,

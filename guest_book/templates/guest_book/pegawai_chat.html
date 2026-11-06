@@ -676,7 +676,7 @@
     let pegawaiId = "{{ pegawai.id }}";
     let chatSocket;
     let editingMessageId = null;
-    let lastMsgId = "{% if active_conversation %}{% with last=active_conversation.messages|last %}{{ last.id }}{% endwith %}{% endif %}";
+    let lastMsgId = "{% if messages_list %}{% with last=messages_list|last %}{{ last.id }}{% endwith %}{% endif %}";
     
     (function() {
         "use strict";

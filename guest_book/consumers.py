@@ -593,6 +593,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             await self.close(code=4003)
             return
 
+        self._seen_notif_ids = set()
         for grp in self.groups:
             await self.channel_layer.group_add(grp, self.channel_name)
         await self.accept()
@@ -610,10 +611,22 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         except Exception:
             pass
 
+    async def _send_deduped(self, payload):
+        if not hasattr(self, '_seen_notif_ids'):
+            self._seen_notif_ids = set()
+        notif_id = payload.get('id') if isinstance(payload, dict) else None
+        if notif_id:
+            if notif_id in self._seen_notif_ids:
+                return
+            self._seen_notif_ids.add(notif_id)
+            if len(self._seen_notif_ids) > 200:
+                self._seen_notif_ids.clear()
+        await self.send(text_data=json.dumps(payload))
+
     async def send_notification(self, event):
         payload = event.get('data') or event.get('notification') or event
-        await self.send(text_data=json.dumps(payload))
+        await self._send_deduped(payload)
 
     async def notification_message(self, event):
         payload = event.get('notification') or event.get('data') or event
-        await self.send(text_data=json.dumps(payload))
+        await self._send_deduped(payload)

@@ -403,10 +403,16 @@
             <a href="{% url 'tamu:pegawai_kunjungan_list' %}" class="nav-link-custom {% if active_page == 'kunjungan' %}active{% endif %}">
                 <i class="fas fa-list-alt"></i>
                 <span>Kunjungan</span>
+                {% if pegawai_pending_kunjungan_count > 0 %}
+                <span class="badge rounded-pill ms-auto" id="sidebarKunjunganBadge" style="background: #f59e0b; color: #fff; font-size: 0.68rem; font-weight: 700;">{{ pegawai_pending_kunjungan_count }}</span>
+                {% endif %}
             </a>
             <a href="{% url 'tamu:pegawai_chat' %}" class="nav-link-custom {% if active_page == 'chat' %}active{% endif %}">
                 <i class="fas fa-comments"></i>
                 <span>Chat & Pesan</span>
+                {% if pegawai_unread_chat_count > 0 %}
+                <span class="badge rounded-pill ms-auto" id="sidebarChatBadge" style="background: #ef4444; color: #fff; font-size: 0.68rem; font-weight: 700;">{{ pegawai_unread_chat_count }}</span>
+                {% endif %}
             </a>
         </nav>
 
@@ -432,23 +438,23 @@
                 <div class="dropdown" style="position: relative;">
                     <button class="icon-btn" id="notifDropdownBtn" aria-label="Notifikasi" data-bs-toggle="dropdown" aria-expanded="false" style="background: none; border: none; cursor: pointer; position: relative; color: var(--text-primary); font-size: 1.25rem; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; transition: var(--transition);">
                         <i class="fas fa-bell"></i>
-                        {% if pegawai_unread_count > 0 %}
-                        <span class="notif-badge" style="position: absolute; top: 0px; right: 0px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 99px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">{{ pegawai_unread_count }}</span>
-                        {% endif %}
+                        <span id="pegawaiNotifBadge" class="notif-badge badge-notification" style="position: absolute; top: 0px; right: 0px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 99px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); {% if pegawai_unread_count > 0 %}display: inline-flex;{% else %}display: none;{% endif %} align-items: center; justify-content: center;">{{ pegawai_unread_count|default:0 }}</span>
                     </button>
-                    <div class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="width: 320px; border-radius: 16px; padding: 0; overflow: hidden; margin-top: 0.5rem;" aria-labelledby="notifDropdownBtn">
-                        <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                            <h6 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #0f172a;">Notifikasi</h6>
+                    <div class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="width: 340px; border-radius: 16px; padding: 0; overflow: hidden; margin-top: 0.5rem;" aria-labelledby="notifDropdownBtn">
+                        <div style="padding: 0.85rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <h6 style="margin: 0; font-size: 0.92rem; font-weight: 800; color: #0f172a;">Notifikasi</h6>
+                            <button type="button" id="btnMarkAllPegawaiNotifRead" class="btn btn-link p-0 text-decoration-none fw-bold" style="font-size: 0.72rem; color: #059669;">
+                                Tandai Semua Dibaca
+                            </button>
                         </div>
-                        <div style="max-height: 300px; overflow-y: auto;" id="pegawaiNotifList">
-                            <!-- Placeholder untuk notifikasi, bisa dihubungkan ke halaman notifikasi atau diload via htmx -->
+                        <div style="max-height: 320px; overflow-y: auto;" id="pegawaiNotifList">
                             <div style="padding: 1.5rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
                                 {% if pegawai_unread_count == 0 %}
                                     <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; color: #10b981;"></i>
                                     <div>Tidak ada notifikasi baru</div>
                                 {% else %}
-                                    <i class="fas fa-bell" style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary);"></i>
-                                    <div>Anda memiliki {{ pegawai_unread_count }} notifikasi baru. Silakan cek menu kunjungan.</div>
+                                    <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #10b981;"></i>
+                                    <div>Memuat {{ pegawai_unread_count }} notifikasi...</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -565,25 +571,16 @@
                         toast.show();
                     }
                     
-                    let badge = document.querySelector('.badge-notification');
-                    if (data.unread_count > 0) {
-                        if (badge) {
-                            badge.innerText = data.unread_count;
-                            badge.style.display = 'flex';
+                    const badge = document.getElementById('pegawaiNotifBadge');
+                    const newCount = typeof data.unread_count === 'number' ? data.unread_count : ((parseInt(badge ? badge.innerText : '0', 10) || 0) + 1);
+                    if (badge) {
+                        if (newCount > 0) {
+                            badge.innerText = newCount;
+                            badge.style.display = 'inline-flex';
                         } else {
-                            const btn = document.querySelector('[data-bs-toggle="dropdown"] .fa-bell').parentElement;
-                            if (btn) {
-                                badge = document.createElement('span');
-                                badge.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger badge-notification';
-                                badge.style.fontSize = '0.65rem';
-                                badge.style.padding = '0.35em 0.5em';
-                                badge.innerText = data.unread_count;
-                                btn.style.position = 'relative';
-                                btn.appendChild(badge);
-                            }
+                            badge.innerText = '0';
+                            badge.style.display = 'none';
                         }
-                    } else if (badge) {
-                        badge.style.display = 'none';
                     }
                 } catch (err) {
                     console.warn('Error handling notification:', err);
@@ -591,14 +588,43 @@
             };
             
             window.pegawaiNotifSocket.onclose = function(e) {
-                console.error('Notification socket closed unexpectedly');
+                console.warn('Notification socket closed');
             };
+
+            function markAllPegawaiNotifRead() {
+                const badge = document.getElementById('pegawaiNotifBadge');
+                if (badge) {
+                    badge.innerText = '0';
+                    badge.style.display = 'none';
+                }
+                return fetch("{% url 'tamu:api_mark_all_notifications_read' %}?portal=pegawai", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                }).catch(err => console.warn('Mark read error:', err));
+            }
+
+            const btnMarkAll = document.getElementById('btnMarkAllPegawaiNotifRead');
+            if (btnMarkAll) {
+                btnMarkAll.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    markAllPegawaiNotifRead();
+                    document.querySelectorAll('#pegawaiNotifList .pegawai-notif-item').forEach(el => {
+                        el.style.background = '#ffffff';
+                    });
+                });
+            }
 
             // Fetch dropdown notifications
             const notifDropdownBtn = document.getElementById('notifDropdownBtn');
             if (notifDropdownBtn) {
                 notifDropdownBtn.addEventListener('click', () => {
-                    fetch("{% url 'tamu:api_get_recent_notifications' %}")
+                    // Langsung sembunyikan badge angka saat lonceng diklik dan tandai terbaca di server
+                    markAllPegawaiNotifRead();
+
+                    fetch("{% url 'tamu:api_get_recent_notifications' %}?portal=pegawai&page_size=10")
                         .then(res => res.json())
                         .then(data => {
                             const notifList = document.getElementById('pegawaiNotifList');
@@ -606,41 +632,35 @@
                                 notifList.innerHTML = data.notifications.map(n => {
                                     let url = "#";
                                     let onclickAttr = "";
-                                    
-                                    if (n.notification_type === 'message_replied') {
-                                        url = "{% url 'tamu:pegawai_chat' %}";
+                                    const relId = n.related_object_id || "";
+                                    const isChatNotif = (
+                                        n.notification_type === 'message_replied' ||
+                                        n.notification_type === 'message_received' ||
+                                        relId.startsWith('kunjungan_') ||
+                                        relId.startsWith('pegawai_admin_')
+                                    );
+
+                                    if (isChatNotif) {
+                                        url = "{% url 'tamu:pegawai_chat' %}" + (relId ? ("?session=" + encodeURIComponent(relId)) : "");
                                         onclickAttr = `onclick="window.location.href='${url}'"`;
-                                    } else if (n.related_object_id) {
-                                        url = "/pegawai-portal/kunjungan/" + n.related_object_id + "/";
+                                    } else if (relId) {
+                                        url = "/pegawai-portal/kunjungan/" + encodeURIComponent(relId) + "/";
                                         onclickAttr = `onclick="window.location.href='${url}'"`;
                                     }
                                     
                                     return `
-                                        <div style="padding: 1rem; border-bottom: 1px solid #f1f5f9; display: flex; gap: 0.75rem; cursor: pointer; ${n.status === 'unread' ? 'background: #f8fafc;' : ''}" ${onclickAttr}>
-                                            <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: ${n.notification_type === 'message_replied' ? '#eff6ff; color: #3b82f6;' : '#f0fdf4; color: #10b981;'}">
-                                                <i class="fas ${n.notification_type === 'message_replied' ? 'fa-comment-dots' : 'fa-bell'}"></i>
+                                        <div class="pegawai-notif-item" style="padding: 0.9rem 1rem; border-bottom: 1px solid #f1f5f9; display: flex; gap: 0.75rem; cursor: pointer; ${n.status === 'unread' ? 'background: #f0fdf4;' : 'background: #ffffff;'}" ${onclickAttr}>
+                                            <div style="width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: ${isChatNotif ? '#eff6ff; color: #3b82f6;' : '#dcfce7; color: #10b981;'}">
+                                                <i class="fas ${isChatNotif ? 'fa-comment-dots' : 'fa-bell'}"></i>
                                             </div>
-                                            <div style="flex: 1;">
-                                                <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin-bottom: 0.2rem;">${n.title}</div>
-                                                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">${n.message}</div>
-                                                <div style="font-size: 0.65rem; color: #94a3b8;"><i class="far fa-clock"></i> ${n.created_at}</div>
+                                            <div style="flex: 1; min-width: 0;">
+                                                <div style="font-size: 0.84rem; font-weight: 700; color: #0f172a; margin-bottom: 0.15rem;">${n.title}</div>
+                                                <div style="font-size: 0.75rem; color: #475569; margin-bottom: 0.25rem; line-height: 1.4;">${n.message}</div>
+                                                <div style="font-size: 0.65rem; color: #94a3b8;"><i class="far fa-clock me-1"></i>${n.created_at}</div>
                                             </div>
                                         </div>
                                     `;
                                 }).join('');
-                                
-                                // Mark as read API
-                                fetch("{% url 'tamu:api_mark_all_notifications_read' %}", {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-CSRFToken': '{{ csrf_token }}'
-                                    }
-                                });
-                                // Remove badge
-                                const badge = document.querySelector('.notif-badge');
-                                if (badge) badge.remove();
-                                previousUnreadCount = 0;
                             } else {
                                 notifList.innerHTML = `
                                     <div style="padding: 2rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
@@ -649,7 +669,8 @@
                                     </div>
                                 `;
                             }
-                        });
+                        })
+                        .catch(err => console.warn('Fetch notifications error:', err));
                 });
             }
         }

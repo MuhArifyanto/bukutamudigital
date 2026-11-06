@@ -222,11 +222,11 @@
             </tr>
             <tr>
                 <th>NIP / Jabatan</th>
-                <td>: {{ pegawai.position|default:"-" }}</td>
+                <td>: {{ pegawai.nip|default:"-" }} / {{ pegawai.jabatan|default:"-" }}</td>
             </tr>
             <tr>
                 <th>Bidang/Bagian</th>
-                <td>: {{ pegawai.department_rel.nama|default:"-" }}</td>
+                <td>: {{ pegawai.department_rel.nama|default:pegawai.department|default:"-" }}</td>
             </tr>
         </table>
     </div>
@@ -296,10 +296,10 @@
         <div class="signature-box">
             <p>Bekasi, {% now "d F Y" %}</p>
             <p>Mengetahui,</p>
-            <p><strong>Administrator Sistem</strong></p>
+            <p><strong>{{ pegawai.jabatan|default:"Pegawai" }}</strong></p>
             <div class="signature-space"></div>
-            <p class="signature-name">{{ admin_name|default:"Administrator" }}</p>
-            <p style="font-size: 10px;">NIP. {{ admin_nip|default:"_________________________" }}</p>
+            <p class="signature-name">{{ pegawai.name }}</p>
+            <p style="font-size: 10px;">NIP. {{ pegawai.nip|default:"_________________________" }}</p>
         </div>
     </div>
 </body>
