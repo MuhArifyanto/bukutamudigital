@@ -2,58 +2,265 @@
 
 {% block title %}Scan Tiket QR — Pos Resepsionis & Satpam{% endblock %}
 {% block page_title %}Pos Resepsionis & Keamanan{% endblock %}
+{% block page_subtitle %}Verifikasi Kehadiran Tamu via QR Code Kamera atau Kode Tiket{% endblock %}
 {% block active_page %}scan_tiket{% endblock %}
 
+{% block extra_css %}
+<style>
+    .card-premium {
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+    }
+
+    /* Viewport Kamera Scanner */
+    .scanner-viewport-wrap {
+        position: relative;
+        width: 100%;
+        min-height: 320px;
+        background: #0f172a;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 2px solid #1e293b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #reader {
+        width: 100% !important;
+        border: none !important;
+        background: #0f172a;
+    }
+
+    #reader video {
+        width: 100% !important;
+        height: auto !important;
+        min-height: 300px;
+        max-height: 400px;
+        object-fit: cover !important;
+        display: block !important;
+        border-radius: 12px;
+    }
+
+    /* Sembunyikan elemen bawaan html5-qrcode yang tidak diperlukan */
+    #reader__dashboard_section_csr,
+    #reader__header_message {
+        display: none !important;
+    }
+    #reader__scan_region {
+        width: 100% !important;
+        min-height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #reader__scan_region img {
+        display: none !important;
+    }
+
+    /* Placeholder saat kamera belum menyala */
+    .scanner-idle-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2.25rem 1.5rem;
+        color: #94a3b8;
+        width: 100%;
+        z-index: 2;
+    }
+    .scanner-idle-icon {
+        width: 68px;
+        height: 68px;
+        border-radius: 18px;
+        background: rgba(56, 189, 248, 0.1);
+        border: 1.5px dashed rgba(56, 189, 248, 0.45);
+        color: #38bdf8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Overlay Bingkai Scan (Tanpa konflik Bootstrap .d-flex !important) */
+    .scanner-overlay-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 5;
+    }
+    .scanner-overlay-layer.active {
+        display: flex;
+    }
+    .scanner-frame-box {
+        position: relative;
+        width: 200px;
+        height: 200px;
+        border: 2px dashed rgba(56, 189, 248, 0.85);
+        border-radius: 16px;
+        box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.45);
+        animation: pulseFrame 2s infinite ease-in-out;
+        overflow: hidden;
+    }
+    .scanner-laser-line {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #38bdf8, #22d3ee, #38bdf8, transparent);
+        box-shadow: 0 0 8px #38bdf8;
+        animation: laserScan 2.2s infinite ease-in-out;
+    }
+
+    @keyframes pulseFrame {
+        0%, 100% { transform: scale(0.99); opacity: 0.85; }
+        50% { transform: scale(1.01); opacity: 1; }
+    }
+    @keyframes laserScan {
+        0% { top: 10%; opacity: 0.6; }
+        50% { top: 88%; opacity: 1; }
+        100% { top: 10%; opacity: 0.6; }
+    }
+
+    .badge-status-checkin {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 0.9rem;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #86efac;
+    }
+    .badge-status-checkin.already {
+        background: #e0f2fe;
+        color: #0369a1;
+        border-color: #7dd3fc;
+    }
+
+    @media (max-width: 767.98px) {
+        .card-premium {
+            padding: 1.15rem;
+            border-radius: 14px;
+        }
+        .scanner-viewport-wrap {
+            min-height: 270px;
+        }
+        .scanner-frame-box {
+            width: 175px;
+            height: 175px;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row g-3">
+<div class="row g-4">
     <!-- Kolom Kiri: Kamera Scanner & Input Manual -->
     <div class="col-lg-6">
-        <div class="card-premium mb-3">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <div style="width: 38px; height: 38px; border-radius: 8px; background: #eff6ff; color: #1e3a8a; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
-                        <i class="fas fa-qrcode"></i>
+        <div class="card-premium h-100 d-flex flex-column justify-content-between">
+            <div>
+                <!-- Header Card Scanner -->
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div style="width: 42px; height: 42px; border-radius: 10px; background: #eff6ff; color: #1e3a8a; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0;">
+                            <i class="fas fa-qrcode"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.98rem;">Scanner Kamera QR Code</h6>
+                            <small class="text-muted" style="font-size: 0.76rem;">Arahkan kamera ke QR Code ponsel atau kartu tiket tamu</small>
+                        </div>
                     </div>
-                    <div>
-                        <h6 class="fw-bold mb-0 text-dark">Scanner Kamera QR Code</h6>
-                        <small class="text-muted" style="font-size: 0.75rem;">Arahkan kamera ke QR Code ponsel atau kartu tamu</small>
+                    <span class="badge bg-light text-secondary border px-2.5 py-1.5 rounded-pill fw-semibold" id="scannerStatusBadge" style="font-size: 0.75rem;">
+                        <i class="fas fa-video me-1"></i> Kamera Siap
+                    </span>
+                </div>
+
+                <!-- Viewport Kamera Scanner -->
+                <div class="scanner-viewport-wrap mb-3" id="scannerViewport">
+                    <!-- Placeholder ketika kamera mati / belum mulai -->
+                    <div id="scannerIdlePlaceholder" class="scanner-idle-placeholder">
+                        <div class="scanner-idle-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <h6 class="text-white fw-bold mb-1" id="idleTitle" style="font-size: 0.92rem;">Kamera Scanner Siap Digunakan</h6>
+                        <p class="small mb-0 px-2" id="idleSubtitle" style="color: #94a3b8; font-size: 0.78rem; max-width: 340px;">
+                            Klik tombol <strong class="text-white">Mulai Kamera</strong> di bawah untuk memindai QR Code dari laptop atau ponsel, atau gunakan <strong class="text-white">Scan File QR</strong>.
+                        </p>
+                    </div>
+
+                    <!-- Elemen Target HTML5-QRCode -->
+                    <div id="reader" style="display: none;"></div>
+
+                    <!-- Overlay Bingkai Pemindaian -->
+                    <div id="scannerOverlay" class="scanner-overlay-layer">
+                        <div class="scanner-frame-box">
+                            <div class="scanner-laser-line"></div>
+                        </div>
+                        <span class="badge bg-dark bg-opacity-75 text-white mt-2 px-3 py-1 rounded-pill" style="font-size: 0.72rem; border: 1px solid rgba(255,255,255,0.15);">
+                            Posisikan QR Code di dalam kotak
+                        </span>
                     </div>
                 </div>
-                <span class="badge bg-light text-secondary border px-2 py-1" id="scannerStatusBadge" style="font-size: 0.75rem;">
-                    <i class="fas fa-video me-1"></i> Kamera Siap
-                </span>
-            </div>
 
-            <!-- Viewport Kamera Scanner -->
-            <div class="position-relative overflow-hidden mb-3" style="background: #0f172a; min-height: 300px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                <div id="reader" style="width: 100%; border: none;"></div>
-                <div id="scannerOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white" style="pointer-events: none; display: none;">
-                    <div style="width: 180px; height: 180px; border: 2px dashed #38bdf8; border-radius: 12px; box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.45); animation: pulseFrame 2s infinite ease-in-out;"></div>
+                <!-- Pilihan Kamera (Muncul otomatis jika terdeteksi > 1 kamera) -->
+                <div id="cameraSelectWrap" class="mb-2" style="display: none;">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light text-secondary border-end-0" style="font-size: 0.76rem;">
+                            <i class="fas fa-video me-1"></i> Pilih Kamera
+                        </span>
+                        <select id="cameraSelect" class="form-select form-select-sm text-dark fw-medium" style="font-size: 0.78rem;">
+                        </select>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Kontrol Kamera -->
-            <div class="d-flex flex-wrap gap-2 mb-3">
-                <button type="button" class="btn btn-dark btn-sm px-3" id="btnToggleCamera" style="border-radius: 6px; font-weight: 600; font-size: 0.8rem;">
-                    <i class="fas fa-camera me-1"></i> <span id="btnCameraText">Mulai Kamera</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm px-3" id="btnSwitchCamera" style="border-radius: 6px; font-size: 0.8rem; display: none;">
-                    <i class="fas fa-sync-alt me-1"></i> Ganti Kamera
-                </button>
-                <button type="button" class="btn btn-light btn-sm px-3 border ms-auto text-secondary" style="border-radius: 6px; font-size: 0.8rem;" onclick="testBeepSound()">
-                    <i class="fas fa-volume-up me-1"></i> Tes Beep
-                </button>
+                <!-- Kontrol Kamera & Fallback Upload Gambar QR -->
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <button type="button" class="btn btn-dark btn-sm px-3 py-2 d-inline-flex align-items-center gap-1" id="btnToggleCamera" style="border-radius: 8px; font-weight: 600; font-size: 0.8rem;">
+                        <i class="fas fa-camera" id="btnCameraIcon"></i>
+                        <span id="btnCameraText">Mulai Kamera</span>
+                    </button>
+
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 py-2 d-inline-flex align-items-center gap-1" id="btnSwitchCamera" style="border-radius: 8px; font-weight: 600; font-size: 0.8rem; display: none;">
+                        <i class="fas fa-sync-alt"></i> Ganti Kamera
+                    </button>
+
+                    <!-- Fallback: Scan dari Foto / Galeri / Ambil Gambar Kamera HP -->
+                    <label for="qrFileInput" class="btn btn-outline-primary btn-sm px-3 py-2 mb-0 d-inline-flex align-items-center gap-1" style="border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer;" title="Unggah gambar QR atau ambil foto langsung dari HP">
+                        <i class="fas fa-image"></i> Scan File / Foto QR
+                    </label>
+                    <input type="file" id="qrFileInput" accept="image/*" class="d-none">
+
+                    <button type="button" class="btn btn-light btn-sm px-2.5 py-2 border ms-auto text-secondary d-inline-flex align-items-center gap-1" style="border-radius: 8px; font-size: 0.78rem;" onclick="testBeepSound()" title="Tes Suara Beep">
+                        <i class="fas fa-volume-up"></i> Tes Beep
+                    </button>
+                </div>
             </div>
 
             <!-- Divider Input Manual -->
-            <div class="border-top pt-3">
-                <label class="form-label text-muted fw-bold mb-1" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">
-                    <i class="fas fa-keyboard me-1"></i> Atau Masukkan Kode Tiket Manual (8 Karakter / Barcode Reader)
+            <div class="border-top pt-3 mt-1">
+                <label for="manualTicketInput" class="form-label text-muted fw-bold mb-1.5" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                    <i class="fas fa-keyboard me-1"></i> Atau Masukkan Kode Tiket Manual (8 Karakter / Barcode Gun)
                 </label>
                 <form id="manualCheckinForm" class="d-flex gap-2">
-                    <input type="text" id="manualTicketInput" class="form-control text-uppercase fw-bold font-monospace" placeholder="Contoh: 7F2A1C3B" maxlength="36" autocomplete="off" style="border-radius: 6px; font-size: 0.85rem;">
-                    <button type="submit" class="btn btn-primary px-3 fw-bold flex-shrink-0" id="btnManualSubmit" style="border-radius: 6px; font-size: 0.82rem; background: #0f172a; border-color: #0f172a;">
-                        <i class="fas fa-check-circle me-1"></i> Hadir
+                    <input type="text" id="manualTicketInput" class="form-control text-uppercase fw-bold font-monospace" placeholder="CONTOH: 7F2A1C3B" maxlength="64" autocomplete="off" style="border-radius: 8px; font-size: 0.88rem; padding: 0.55rem 0.85rem;">
+                    <button type="submit" class="btn btn-dark px-3 fw-bold flex-shrink-0 d-inline-flex align-items-center gap-1" id="btnManualSubmit" style="border-radius: 8px; font-size: 0.84rem; background: #0f172a; border-color: #0f172a;">
+                        <i class="fas fa-check-circle"></i> Hadir
                     </button>
                 </form>
             </div>
@@ -62,27 +269,27 @@
 
     <!-- Kolom Kanan: Hasil Verifikasi & Profil Tamu -->
     <div class="col-lg-6">
-        <div class="card-premium h-100" id="resultCard">
+        <div class="card-premium h-100 d-flex flex-column justify-content-center" id="resultCard">
             <!-- State Default / Kosong -->
-            <div id="stateEmpty" class="text-center py-5">
-                <div style="width: 80px; height: 80px; border-radius: 50%; background: #f8fafc; border: 2px dashed #cbd5e1; display: inline-flex; align-items: center; justify-content: center; font-size: 2.2rem; color: #94a3b8; margin-bottom: 1.25rem;">
+            <div id="stateEmpty" class="text-center py-5 my-auto">
+                <div style="width: 84px; height: 84px; border-radius: 50%; background: #f8fafc; border: 2px dashed #cbd5e1; display: inline-flex; align-items: center; justify-content: center; font-size: 2.2rem; color: #94a3b8; margin-bottom: 1.25rem;">
                     <i class="fas fa-id-card-alt"></i>
                 </div>
-                <h5 class="fw-bold text-dark mb-1">Menunggu Pemindaian Tiket</h5>
-                <p class="text-muted small mb-0 px-4">
+                <h5 class="fw-bold text-dark mb-2">Menunggu Pemindaian Tiket</h5>
+                <p class="text-muted small mb-0 px-3 mx-auto" style="max-width: 420px; line-height: 1.6;">
                     Pindai QR Code tamu via kamera atau ketik 8 karakter kode tiket di samping. Status kehadiran tamu akan otomatis berganti ke <strong>Hadir di Kantor (In Progress)</strong> dalam 1 detik.
                 </p>
             </div>
 
             <!-- State Loading -->
-            <div id="stateLoading" class="text-center py-5" style="display: none;">
+            <div id="stateLoading" class="text-center py-5 my-auto" style="display: none;">
                 <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
                 <h6 class="fw-bold text-dark">Memverifikasi Data Tiket...</h6>
                 <small class="text-muted">Mencocokkan data tamu dengan database Diskominfosantik</small>
             </div>
 
             <!-- State Sukses Verifikasi -->
-            <div id="stateSuccess" style="display: none;">
+            <div id="stateSuccess" class="my-auto" style="display: none;">
                 <div class="text-center mb-4">
                     <div class="badge-status-checkin mb-2" id="resStatusBadge">
                         <i class="fas fa-check-circle me-1"></i> <span id="resStatusText">Hadir di Kantor</span>
@@ -91,25 +298,25 @@
                     <small class="text-muted" id="resCheckinTime">Check-in: Baru saja</small>
                 </div>
 
-                <div class="bg-white rounded-3 p-3 mb-3 border">
+                <div class="bg-light rounded-3 p-3 mb-3 border">
                     <div class="d-flex align-items-center gap-3 mb-3">
                         <img id="resTamuAvatar" src="" alt="Foto Tamu" class="rounded-circle object-fit-cover shadow-sm border" style="width: 56px; height: 56px; display: none;">
-                        <div id="resTamuInitial" class="rounded-circle text-white fw-bold shadow-sm d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; font-size: 1.3rem; background: #1e3a8a;">
+                        <div id="resTamuInitial" class="rounded-circle text-white fw-bold shadow-sm d-flex align-items-center justify-content-center flex-shrink-0" style="width: 56px; height: 56px; font-size: 1.25rem; background: #1e3a8a;">
                             TM
                         </div>
-                        <div>
-                            <h6 class="fw-bold text-dark mb-0" id="resTamuName">Nama Tamu</h6>
-                            <div class="text-muted small fw-medium" id="resTamuInstansi">Instansi</div>
-                            <div class="text-muted small" id="resTamuPhone" style="font-size: 0.75rem;"><i class="fas fa-phone-alt me-1"></i> -</div>
+                        <div class="overflow-hidden">
+                            <h6 class="fw-bold text-dark mb-0 text-truncate" id="resTamuName">Nama Tamu</h6>
+                            <div class="text-muted small fw-medium text-truncate" id="resTamuInstansi">Instansi</div>
+                            <div class="text-muted small" id="resTamuPhone" style="font-size: 0.76rem;"><i class="fas fa-phone-alt me-1"></i> -</div>
                         </div>
                     </div>
 
                     <div class="row g-2 pt-2 border-top">
-                        <div class="col-6">
+                        <div class="col-sm-6">
                             <span class="text-muted small d-block" style="font-size: 0.72rem;">Pegawai Dituju:</span>
                             <span class="fw-bold text-dark small" id="resPegawaiName">-</span>
                         </div>
-                        <div class="col-6">
+                        <div class="col-sm-6">
                             <span class="text-muted small d-block" style="font-size: 0.72rem;">Bidang / Bagian:</span>
                             <span class="fw-bold text-dark small" id="resDeptName">-</span>
                         </div>
@@ -121,24 +328,24 @@
                 </div>
 
                 <!-- Action Button -->
-                <div class="d-flex gap-2">
-                    <a href="#" target="_blank" class="btn btn-outline-dark flex-grow-1 rounded-2 fw-bold" id="resBtnPrint" style="font-size: 0.82rem;">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="#" target="_blank" class="btn btn-outline-dark flex-grow-1 py-2 rounded-2 fw-bold" id="resBtnPrint" style="font-size: 0.82rem;">
                         <i class="fas fa-print me-1"></i> Cetak Kartu Tamu
                     </a>
-                    <button type="button" class="btn btn-dark flex-grow-1 rounded-2 fw-bold" onclick="resetScannerUI()" style="font-size: 0.82rem; background: #0f172a;">
+                    <button type="button" class="btn btn-dark flex-grow-1 py-2 rounded-2 fw-bold" onclick="resetScannerUI()" style="font-size: 0.82rem; background: #0f172a;">
                         <i class="fas fa-qrcode me-1"></i> Scan Tiket Lain
                     </button>
                 </div>
             </div>
 
             <!-- State Error -->
-            <div id="stateError" class="text-center py-5" style="display: none;">
-                <div style="width: 60px; height: 60px; border-radius: 50%; background: #fef2f2; color: #ef4444; display: inline-flex; align-items: center; justify-content: center; font-size: 1.6rem; margin-bottom: 1rem;">
+            <div id="stateError" class="text-center py-5 my-auto" style="display: none;">
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: #fef2f2; color: #ef4444; display: inline-flex; align-items: center; justify-content: center; font-size: 1.65rem; margin-bottom: 1rem;">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
                 <h6 class="fw-bold text-danger mb-2">Verifikasi Gagal</h6>
-                <p class="text-muted small mb-3" id="resErrorMessage">Tiket tidak ditemukan atau sudah tidak berlaku.</p>
-                <button type="button" class="btn btn-outline-secondary rounded-2 px-3 btn-sm" onclick="resetScannerUI()">
+                <p class="text-muted small mb-3 px-3" id="resErrorMessage">Tiket tidak ditemukan atau sudah tidak berlaku.</p>
+                <button type="button" class="btn btn-outline-secondary rounded-2 px-3 py-1.5 btn-sm fw-semibold" onclick="resetScannerUI()">
                     <i class="fas fa-redo me-1"></i> Coba Lagi
                 </button>
             </div>
@@ -146,38 +353,18 @@
     </div>
 </div>
 
-<style>
-@keyframes pulseFrame {
-    0% { transform: scale(0.98); opacity: 0.8; }
-    50% { transform: scale(1.02); opacity: 1; }
-    100% { transform: scale(0.98); opacity: 0.8; }
-}
-.badge-status-checkin {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.35rem 0.85rem;
-    border-radius: 6px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    background: #dcfce7;
-    color: #15803d;
-    border: 1px solid #86efac;
-}
-.badge-status-checkin.already {
-    background: #e0f2fe;
-    color: #0369a1;
-    border-color: #7dd3fc;
-}
-</style>
-
-<!-- Library HTML5-QRCode -->
+<!-- Library HTML5-QRCode (dengan CDN Fallback) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+if (typeof Html5Qrcode === 'undefined') {
+    document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');
+}
+</script>
 
 <script>
 let html5QrCode = null;
 let isScannerRunning = false;
+let isScannerStarting = false;
 let currentCameraId = null;
 let availableCameras = [];
 let audioCtx = null;
@@ -201,7 +388,7 @@ function playBeepSuccess() {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(1046.5, now); // C6 tone
+        osc.frequency.setValueAtTime(1046.5, now);
         gain.gain.setValueAtTime(0.3, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
         osc.connect(gain);
@@ -218,30 +405,41 @@ function testBeepSound() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    Html5Qrcode.getCameras().then(cameras => {
-        if (cameras && cameras.length) {
-            availableCameras = cameras;
-            currentCameraId = cameras[cameras.length - 1].id; // Prefer back/environment camera
-            if (cameras.length > 1) {
-                document.getElementById('btnSwitchCamera').style.display = 'inline-flex';
-            }
-        }
-    }).catch(err => {
-        console.log("Kamera tidak terdeteksi:", err);
-    });
+    const btnToggle = document.getElementById('btnToggleCamera');
+    const btnSwitch = document.getElementById('btnSwitchCamera');
+    const cameraSelect = document.getElementById('cameraSelect');
+    const qrFileInput = document.getElementById('qrFileInput');
+    const manualForm = document.getElementById('manualCheckinForm');
 
-    document.getElementById('btnToggleCamera').addEventListener('click', toggleCamera);
-    document.getElementById('btnSwitchCamera').addEventListener('click', switchCamera);
-    document.getElementById('manualCheckinForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const code = document.getElementById('manualTicketInput').value.trim();
-        if (code) {
-            processTicketCode(code);
-        }
-    });
+    if (btnToggle) btnToggle.addEventListener('click', toggleCamera);
+    if (btnSwitch) btnSwitch.addEventListener('click', switchCamera);
+
+    if (cameraSelect) {
+        cameraSelect.addEventListener('change', function() {
+            currentCameraId = this.value || null;
+            if (isScannerRunning) {
+                restartCameraWithSelected();
+            }
+        });
+    }
+
+    if (qrFileInput) {
+        qrFileInput.addEventListener('change', handleQrFileSelect);
+    }
+
+    if (manualForm) {
+        manualForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const code = document.getElementById('manualTicketInput').value.trim();
+            if (code) {
+                processTicketCode(code);
+            }
+        });
+    }
 });
 
 function toggleCamera() {
+    if (isScannerStarting) return;
     if (isScannerRunning) {
         stopCamera();
     } else {
@@ -249,42 +447,250 @@ function toggleCamera() {
     }
 }
 
-function startCamera() {
+function getScannerConfig() {
+    return {
+        fps: 15,
+        aspectRatio: 1.333334,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const minEdge = Math.min(viewfinderWidth || 260, viewfinderHeight || 260);
+            const size = Math.floor(minEdge * 0.68);
+            const clamped = Math.max(140, Math.min(size, 230));
+            return { width: clamped, height: clamped };
+        }
+    };
+}
+
+function setUIStarting() {
+    isScannerStarting = true;
+    const btn = document.getElementById('btnToggleCamera');
+    const text = document.getElementById('btnCameraText');
+    const icon = document.getElementById('btnCameraIcon');
+    const badge = document.getElementById('scannerStatusBadge');
+
+    if (btn) btn.disabled = true;
+    if (text) text.innerText = 'Membuka Kamera...';
+    if (icon) icon.className = 'fas fa-spinner fa-spin';
+    if (badge) {
+        badge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-2.5 py-1.5 rounded-pill fw-semibold';
+        badge.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Mengakses Kamera...';
+    }
+}
+
+function setUIRunning() {
+    isScannerStarting = false;
+    isScannerRunning = true;
+
+    const btn = document.getElementById('btnToggleCamera');
+    const text = document.getElementById('btnCameraText');
+    const icon = document.getElementById('btnCameraIcon');
+    const overlay = document.getElementById('scannerOverlay');
+    const idle = document.getElementById('scannerIdlePlaceholder');
+    const readerEl = document.getElementById('reader');
+    const badge = document.getElementById('scannerStatusBadge');
+
+    if (idle) idle.style.display = 'none';
+    if (readerEl) readerEl.style.display = 'block';
+    if (overlay) overlay.classList.add('active');
+
+    if (btn) {
+        btn.disabled = false;
+        btn.classList.remove('btn-dark', 'btn-primary');
+        btn.classList.add('btn-danger');
+    }
+    if (text) text.innerText = 'Hentikan Kamera';
+    if (icon) icon.className = 'fas fa-stop-circle';
+
+    if (badge) {
+        badge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1.5 rounded-pill fw-semibold';
+        badge.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i> Memindai QR...';
+    }
+}
+
+function setUIStopped(errorMessage) {
+    isScannerStarting = false;
+    isScannerRunning = false;
+
+    const btn = document.getElementById('btnToggleCamera');
+    const text = document.getElementById('btnCameraText');
+    const icon = document.getElementById('btnCameraIcon');
+    const overlay = document.getElementById('scannerOverlay');
+    const idle = document.getElementById('scannerIdlePlaceholder');
+    const readerEl = document.getElementById('reader');
+    const badge = document.getElementById('scannerStatusBadge');
+    const idleTitle = document.getElementById('idleTitle');
+    const idleSubtitle = document.getElementById('idleSubtitle');
+
+    if (overlay) overlay.classList.remove('active');
+    if (readerEl) readerEl.style.display = 'none';
+    if (idle) idle.style.display = 'flex';
+
+    if (btn) {
+        btn.disabled = false;
+        btn.classList.remove('btn-danger', 'btn-primary');
+        btn.classList.add('btn-dark');
+    }
+    if (text) text.innerText = 'Mulai Kamera';
+    if (icon) icon.className = 'fas fa-camera';
+
+    if (errorMessage) {
+        if (badge) {
+            badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1.5 rounded-pill fw-semibold';
+            badge.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i> Kamera Diblokir / Gagal';
+        }
+        if (idleTitle) idleTitle.innerText = 'Tidak Dapat Mengakses Kamera';
+        if (idleSubtitle) {
+            idleSubtitle.innerHTML = '<span class="text-warning d-block mb-1">' + errorMessage + '</span>' +
+                'Pastikan izin kamera (Allow Camera) telah diaktifkan di browser Anda, atau gunakan tombol <strong class="text-white">Scan File / Foto QR</strong> di bawah.';
+        }
+    } else {
+        if (badge) {
+            badge.className = 'badge bg-light text-secondary border px-2.5 py-1.5 rounded-pill fw-semibold';
+            badge.innerHTML = '<i class="fas fa-video me-1"></i> Kamera Siap';
+        }
+        if (idleTitle) idleTitle.innerText = 'Kamera Scanner Siap Digunakan';
+        if (idleSubtitle) {
+            idleSubtitle.innerHTML = 'Klik tombol <strong class="text-white">Mulai Kamera</strong> di bawah untuk memindai QR Code dari laptop atau ponsel, atau gunakan <strong class="text-white">Scan File / Foto QR</strong>.';
+        }
+    }
+}
+
+async function populateCamerasAfterPermission() {
+    try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras && cameras.length > 0) {
+            availableCameras = cameras;
+            const selectEl = document.getElementById('cameraSelect');
+            const selectWrap = document.getElementById('cameraSelectWrap');
+            const btnSwitch = document.getElementById('btnSwitchCamera');
+
+            if (selectEl) {
+                selectEl.innerHTML = '';
+                cameras.forEach((cam, index) => {
+                    const opt = document.createElement('option');
+                    opt.value = cam.id;
+                    opt.textContent = cam.label || ('Kamera ' + (index + 1));
+                    if (currentCameraId && cam.id === currentCameraId) {
+                        opt.selected = true;
+                    }
+                    selectEl.appendChild(opt);
+                });
+            }
+
+            if (cameras.length > 1) {
+                if (selectWrap) selectWrap.style.display = 'block';
+                if (btnSwitch) btnSwitch.style.display = 'inline-flex';
+            }
+        }
+    } catch (e) {
+        console.warn("Tidak dapat memuat daftar kamera:", e);
+    }
+}
+
+async function startCamera() {
+    if (typeof Html5Qrcode === 'undefined') {
+        setUIStopped('Library QR Scanner gagal dimuat. Periksa koneksi internet Anda.');
+        return;
+    }
+
+    if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        setUIStopped('Akses kamera membutuhkan koneksi aman (HTTPS).');
+        return;
+    }
+
+    setUIStarting();
+
+    const idle = document.getElementById('scannerIdlePlaceholder');
+    const readerEl = document.getElementById('reader');
+    if (idle) idle.style.display = 'none';
+    if (readerEl) readerEl.style.display = 'block';
+
     if (!html5QrCode) {
         html5QrCode = new Html5Qrcode("reader");
     }
 
-    const config = { fps: 15, qrbox: { width: 220, height: 220 } };
-    const cameraIdOrConfig = currentCameraId ? currentCameraId : { facingMode: "environment" };
+    const config = getScannerConfig();
 
-    html5QrCode.start(
-        cameraIdOrConfig,
-        config,
-        onScanSuccess,
-        onScanFailure
-    ).then(() => {
-        isScannerRunning = true;
-        document.getElementById('btnCameraText').innerText = 'Hentikan Kamera';
-        document.getElementById('btnToggleCamera').classList.replace('btn-primary', 'btn-danger');
-        document.getElementById('scannerOverlay').style.display = 'flex';
-        document.getElementById('scannerStatusBadge').className = 'badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-bold';
-        document.getElementById('scannerStatusBadge').innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Memindai...';
-    }).catch(err => {
-        alert("Gagal membuka kamera: " + err);
-    });
+    // Susun urutan kandidat kamera agar kompatibel di Mobile (kamera belakang) maupun Laptop (webcam depan)
+    const candidates = [];
+    if (currentCameraId) {
+        candidates.push(currentCameraId);
+    }
+    candidates.push({ facingMode: "environment" });
+    candidates.push({ facingMode: "user" });
+
+    try {
+        const cams = await Html5Qrcode.getCameras();
+        if (cams && cams.length > 0) {
+            availableCameras = cams;
+            // Utamakan kamera non-IR (hindari Windows Hello Infrared camera di laptop)
+            const sortedCams = [...cams].sort((a, b) => {
+                const labelA = (a.label || '').toLowerCase();
+                const labelB = (b.label || '').toLowerCase();
+                const isIrA = labelA.includes('ir ') || labelA.includes('infrared') || labelA.includes('windows hello');
+                const isIrB = labelB.includes('ir ') || labelB.includes('infrared') || labelB.includes('windows hello');
+                if (isIrA !== isIrB) return isIrA ? 1 : -1;
+                const isBackA = labelA.includes('back') || labelA.includes('rear') || labelA.includes('environment') || labelA.includes('belakang');
+                const isBackB = labelB.includes('back') || labelB.includes('rear') || labelB.includes('environment') || labelB.includes('belakang');
+                if (isBackA !== isBackB) return isBackA ? -1 : 1;
+                return 0;
+            });
+            sortedCams.forEach(c => {
+                if (c.id && !candidates.includes(c.id)) {
+                    candidates.push(c.id);
+                }
+            });
+        }
+    } catch (camErr) {
+        // Izin belum diberikan atau getCameras belum tersedia sebelum stream pertama dibuka
+    }
+
+    let lastErr = null;
+    for (const candidate of candidates) {
+        try {
+            await html5QrCode.start(candidate, config, onScanSuccess, onScanFailure);
+            if (typeof candidate === 'string') {
+                currentCameraId = candidate;
+            }
+            setUIRunning();
+            populateCamerasAfterPermission();
+            return;
+        } catch (err) {
+            lastErr = err;
+            console.warn("Kandidat kamera gagal:", candidate, err);
+        }
+    }
+
+    const errStr = String(lastErr || '');
+    let friendlyErr = 'Kamera tidak ditemukan atau sedang digunakan aplikasi lain.';
+    if (errStr.toLowerCase().includes('permission') || errStr.toLowerCase().includes('notallowed')) {
+        friendlyErr = 'Izin kamera ditolak oleh browser. Klik ikon gembok/kamera di sebelah alamat URL browser lalu pilih "Allow / Izinkan".';
+    } else if (errStr.toLowerCase().includes('notfound') || errStr.toLowerCase().includes('device')) {
+        friendlyErr = 'Perangkat kamera tidak terdeteksi pada perangkat ini.';
+    }
+    setUIStopped(friendlyErr);
 }
 
-function stopCamera() {
+async function stopCamera() {
     if (html5QrCode && isScannerRunning) {
-        html5QrCode.stop().then(() => {
-            isScannerRunning = false;
-            document.getElementById('btnCameraText').innerText = 'Mulai Kamera';
-            document.getElementById('btnToggleCamera').classList.replace('btn-danger', 'btn-primary');
-            document.getElementById('scannerOverlay').style.display = 'none';
-            document.getElementById('scannerStatusBadge').className = 'badge bg-success-subtle text-success px-3 py-2 rounded-pill fw-bold';
-            document.getElementById('scannerStatusBadge').innerHTML = '<i class="fas fa-video me-1"></i> Kamera Siap';
-        }).catch(err => console.log("Stop error:", err));
+        try {
+            await html5QrCode.stop();
+        } catch (err) {
+            console.warn("Stop camera warning:", err);
+        }
     }
+    setUIStopped();
+}
+
+async function restartCameraWithSelected() {
+    if (html5QrCode && isScannerRunning) {
+        try {
+            await html5QrCode.stop();
+            isScannerRunning = false;
+        } catch (e) {
+            console.warn("Restart stop warning:", e);
+        }
+    }
+    startCamera();
 }
 
 function switchCamera() {
@@ -292,10 +698,41 @@ function switchCamera() {
         const currentIdx = availableCameras.findIndex(c => c.id === currentCameraId);
         const nextIdx = (currentIdx + 1) % availableCameras.length;
         currentCameraId = availableCameras[nextIdx].id;
+        const selectEl = document.getElementById('cameraSelect');
+        if (selectEl) selectEl.value = currentCameraId;
         if (isScannerRunning) {
-            stopCamera();
-            setTimeout(startCamera, 400);
+            restartCameraWithSelected();
+        } else {
+            startCamera();
         }
+    } else {
+        startCamera();
+    }
+}
+
+async function handleQrFileSelect(e) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const imageFile = files[0];
+
+    showState('loading');
+
+    try {
+        if (isScannerRunning && html5QrCode) {
+            await html5QrCode.stop();
+            setUIStopped();
+        }
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("reader");
+        }
+        const decodedText = await html5QrCode.scanFile(imageFile, false);
+        playBeepSuccess();
+        processTicketCode(decodedText);
+    } catch (err) {
+        document.getElementById('resErrorMessage').innerText = 'QR Code tidak terbaca pada gambar yang dipilih. Pastikan gambar QR Code terlihat jelas dan tidak buram.';
+        showState('error');
+    } finally {
+        e.target.value = '';
     }
 }
 
@@ -315,7 +752,7 @@ function onScanSuccess(decodedText, decodedResult) {
 }
 
 function onScanFailure(error) {
-    // Abaikan frame scan kosong
+    // Abaikan frame kosong
 }
 
 function showState(stateName) {
@@ -393,4 +830,3 @@ function resetScannerUI() {
 }
 </script>
 {% endblock %}
-
