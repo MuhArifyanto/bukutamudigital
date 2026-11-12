@@ -152,7 +152,8 @@
         }
         .commitment-card::after {
             content: '\f3ed';
-            font-family: 'FontAwesome';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
             position: absolute;
             right: -10px;
             top: 20px;
@@ -404,31 +405,107 @@
             color: rgba(255,255,255,0.4);
         }
 
-        @media (max-width: 991px) {
-            .data-grid { grid-template-columns: 1fr; }
-            .content-area { padding-left: 0; margin-top: 2rem; }
+        .navbar-toggler {
+            border: 1.5px solid rgba(255,255,255,0.35);
+            padding: 0.4rem 0.65rem;
+            border-radius: 8px;
+        }
+        .navbar-toggler:focus {
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.2);
+        }
+
+        @media (max-width: 991.98px) {
+            .navbar-collapse {
+                background: rgba(8, 29, 69, 0.98);
+                margin-top: 0.75rem;
+                padding: 1rem;
+                border-radius: 12px;
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+            .navbar-nav {
+                margin-bottom: 0.75rem;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                padding-bottom: 0.5rem;
+            }
+            .nav-link {
+                padding: 0.6rem 0.75rem !important;
+                border-radius: 8px;
+            }
+            .nav-auth-actions {
+                display: flex;
+                gap: 0.75rem;
+                width: 100%;
+            }
+            .btn-nav-masuk, .btn-nav-daftar {
+                flex: 1;
+                text-align: center;
+                justify-content: center;
+                padding: 0.55rem 1rem !important;
+            }
+
+            .main-container { padding: 2rem 0 3.5rem; }
+            .data-grid { grid-template-columns: 1fr; gap: 1rem; }
+            .content-area { padding-left: 0; margin-top: 0; margin-bottom: 2.5rem; }
             .sidebar { position: relative; top: 0; }
+            .page-title { font-size: 2.1rem; }
+            .page-intro { font-size: 0.98rem; margin-bottom: 2rem; }
+            .data-box { padding: 1.5rem; margin-bottom: 2rem; }
+            .security-box { padding: 1.5rem; margin-bottom: 2rem; }
+            .hak-list { margin-bottom: 2.5rem; }
 
             /* Footer Centering di HP */
-            .footer { text-align: center; }
+            .footer { text-align: center; padding: 3rem 0 1.75rem; }
             .footer-brand { text-align: center; }
             .footer-desc { margin-left: auto; margin-right: auto; text-align: center; margin-bottom: 2rem; }
             .footer-links-col { text-align: center; margin-bottom: 1.5rem; }
             .footer-links { text-align: center; padding-left: 0; }
             .footer-links li { text-align: center; }
+            .footer-bottom { margin-top: 2rem; padding-top: 1.5rem; }
+        }
+
+        @media (max-width: 575.98px) {
+            .main-container { padding: 1.5rem 0.25rem 3rem; }
+            .page-title { font-size: 1.75rem; }
+            .page-intro { font-size: 0.92rem; line-height: 1.6; margin-bottom: 1.75rem; }
+            .content-text { font-size: 0.9rem; line-height: 1.7; margin-bottom: 1.75rem; }
+            .data-box { padding: 1.25rem; border-radius: 14px; }
+            .data-card { padding: 1.15rem; }
+            .security-box { padding: 1.25rem; border-radius: 14px; }
+            .security-desc { font-size: 0.88rem; }
+            .security-tags { gap: 0.5rem; }
+            .security-tag { font-size: 0.72rem; padding: 0.35rem 0.75rem; }
+            .hak-item { padding-left: 1rem; }
+            .doc-card { padding: 1.35rem; }
+            .commitment-card { padding: 1.5rem 1.35rem; }
+            .bottom-actions {
+                flex-direction: column-reverse;
+                gap: 0.85rem;
+                align-items: stretch;
+            }
+            .btn-understand, .btn-print {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+            }
+            .btn-print {
+                padding: 0.65rem 1rem;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                background: #fff;
+            }
         }
     </style>
 </head>
 <body>
 
 <!-- NAVBAR -->
-<nav class="navbar navbar-expand-lg">
+<nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container">
         <a class="navbar-brand" href="{% url 'tamu:landing' %}">
             <div class="brand-icon"><i class="fas fa-book-open"></i></div>
             Buku Tamu Digital
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navMain">
@@ -437,7 +514,7 @@
                 <li class="nav-item"><a class="nav-link" href="{% url 'tamu:tentang_kami' %}">Tentang Kami</a></li>
                 <li class="nav-item"><a class="nav-link active" href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan Privasi</a></li>
             </ul>
-            <div class="d-flex gap-2 mt-2 mt-lg-0">
+            <div class="nav-auth-actions d-flex gap-2 mt-2 mt-lg-0">
                 <a href="{% url 'tamu:login' %}" class="nav-link btn-nav-masuk">Masuk</a>
                 <a href="{% url 'tamu:register' %}" class="nav-link btn-nav-daftar">Daftar</a>
             </div>
@@ -448,7 +525,7 @@
 <div class="container main-container">
     <div class="row">
         <!-- SIDEBAR -->
-        <div class="col-lg-3">
+        <div class="col-lg-3 order-2 order-lg-1">
             <div class="sidebar">
                 <div class="doc-card">
                     <div class="doc-card-title">
@@ -473,7 +550,7 @@
         </div>
 
         <!-- CONTENT -->
-        <div class="col-lg-8 offset-lg-1 content-area">
+        <div class="col-lg-8 offset-lg-1 content-area order-1 order-lg-2">
             <h1 class="page-title">Kebijakan Privasi</h1>
             <p class="page-intro">
                 Diskominfosatik berkomitmen untuk melindungi informasi pribadi Anda dan memastikan transparansi dalam setiap pemrosesan data pengunjung.
@@ -603,8 +680,8 @@
             <div class="col-lg-3 col-6 footer-links-col">
                 <h6>Dukungan</h6>
                 <ul class="footer-links">
-                    <li><a href="#">Aksesibilitas</a></li>
-                    <li><a href="#">Hubungi Dukungan</a></li>
+                    <li><a href="{% url 'tamu:landing' %}">Beranda</a></li>
+                    <li><a href="{% url 'tamu:login' %}">Portal Tamu</a></li>
                 </ul>
             </div>
         </div>

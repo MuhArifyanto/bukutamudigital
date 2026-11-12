@@ -289,30 +289,91 @@
             text-align: center;
         }
 
-        @media (max-width: 991px) {
-            .experience-card { position: static; margin-top: 2rem; }
-            .section-title { font-size: 2rem; }
+        .navbar-toggler {
+            border: 1.5px solid rgba(255,255,255,0.35);
+            padding: 0.4rem 0.65rem;
+            border-radius: 8px;
+        }
+        .navbar-toggler:focus {
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.2);
+        }
+
+        @media (max-width: 991.98px) {
+            .navbar-collapse {
+                background: rgba(8, 29, 69, 0.98);
+                margin-top: 0.75rem;
+                padding: 1rem;
+                border-radius: 12px;
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+            .navbar-nav {
+                margin-bottom: 0.75rem;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                padding-bottom: 0.5rem;
+            }
+            .nav-link {
+                margin: 0 !important;
+                padding: 0.6rem 0.75rem !important;
+                border-radius: 8px;
+            }
+            .nav-auth-actions {
+                display: flex;
+                gap: 0.75rem;
+                width: 100%;
+            }
+            .btn-nav-masuk, .btn-nav-daftar {
+                flex: 1;
+                text-align: center;
+                justify-content: center;
+                margin-right: 0 !important;
+                padding: 0.55rem 1rem !important;
+                text-decoration: none;
+            }
+
+            .about-hero { padding: 4.5rem 0 3.5rem; }
+            .section-padding { padding: 4rem 0; }
+            .profil-image-wrap { padding-right: 0; padding-bottom: 0; }
+            .img-accent-box { display: none; }
+            .experience-card { position: static; margin-top: 1.25rem; padding: 1.5rem; }
+            .section-title { font-size: 1.85rem; }
+            .vm-card { padding: 2rem 1.5rem; }
 
             /* Footer Centering di HP */
-            .footer { text-align: center; }
+            .footer { text-align: center; padding: 3.5rem 0 1.75rem; }
             .footer-logo { text-align: center; }
-            .footer p, .section-desc { text-align: center; margin-left: auto; margin-right: auto; }
-            .footer-links { text-align: center !important; margin-top: 1.5rem; }
+            .footer p { text-align: center; margin-left: auto; margin-right: auto; }
+            .footer-links { text-align: center !important; margin-top: 1.25rem; }
             .footer-links a { margin: 0.35rem 0.75rem; display: inline-block; }
-            .copyright { text-align: center; }
+            .copyright { text-align: center; margin-top: 2.5rem; padding-top: 1.5rem; }
+        }
+
+        @media (max-width: 575.98px) {
+            .about-hero { padding: 3.25rem 0.5rem 2.75rem; }
+            .about-hero h1 { font-size: 1.85rem; }
+            .about-hero p { font-size: 0.95rem; }
+            .section-padding { padding: 2.75rem 0; }
+            .section-title { font-size: 1.55rem; margin-bottom: 1rem; }
+            .section-desc { font-size: 0.95rem; line-height: 1.7; }
+            .main-img { border-radius: 20px; }
+            .experience-card { border-radius: 18px; padding: 1.25rem; }
+            .exp-num { font-size: 2rem; }
+            .vm-card { padding: 1.5rem 1.25rem; border-radius: 18px; }
+            .vm-icon { width: 50px; height: 50px; font-size: 1.25rem; margin-bottom: 1.25rem; }
+            .value-card { padding: 1.5rem 1.25rem; border-radius: 18px; }
+            .value-icon { font-size: 2rem; margin-bottom: 1rem; }
         }
     </style>
 </head>
 <body>
 
 <!-- NAVBAR -->
-<nav class="navbar navbar-expand-lg">
+<nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container">
         <a class="navbar-brand" href="{% url 'tamu:landing' %}">
-            <div class="brand-icon-box"><i class="fas fa-university"></i></div>
+            <div class="brand-icon-box"><i class="fas fa-book-open"></i></div>
             Buku Tamu Digital
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navMain">
@@ -321,9 +382,9 @@
                 <li class="nav-item"><a class="nav-link active" href="{% url 'tamu:tentang_kami' %}">Tentang Kami</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan Privasi</a></li>
             </ul>
-            <div class="d-flex align-items-center">
-                <a href="{% url 'tamu:login' %}" class="btn-nav-masuk">Masuk</a>
-                <a href="{% url 'tamu:register' %}" class="btn-nav-daftar">Daftar</a>
+            <div class="nav-auth-actions d-flex align-items-center gap-2 mt-2 mt-lg-0">
+                <a href="{% url 'tamu:login' %}" class="nav-link btn-nav-masuk">Masuk</a>
+                <a href="{% url 'tamu:register' %}" class="nav-link btn-nav-daftar">Daftar</a>
             </div>
         </div>
     </div>
@@ -446,7 +507,7 @@
                 <a href="{% url 'tamu:landing' %}">Beranda</a>
                 <a href="{% url 'tamu:tentang_kami' %}">Tentang</a>
                 <a href="{% url 'tamu:kebijakan_privasi' %}">Kebijakan</a>
-                <a href="#">Bantuan</a>
+                <a href="{% url 'tamu:login' %}">Masuk</a>
             </div>
         </div>
         <div class="copyright">
