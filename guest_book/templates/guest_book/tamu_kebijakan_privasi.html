@@ -443,9 +443,15 @@
                 padding: 0.55rem 1rem !important;
             }
 
-            .main-container { padding: 2rem 0 3.5rem; }
+            .main-container {
+                padding: 2rem 0 3.5rem;
+            }
             .data-grid { grid-template-columns: 1fr; gap: 1rem; }
-            .content-area { padding-left: 0; margin-top: 0; margin-bottom: 2.5rem; }
+            .content-area {
+                padding-left: 0;
+                margin-top: 0;
+                margin-bottom: 2.5rem;
+            }
             .sidebar { position: relative; top: 0; }
             .page-title { font-size: 2.1rem; }
             .page-intro { font-size: 0.98rem; margin-bottom: 2rem; }
@@ -454,7 +460,7 @@
             .hak-list { margin-bottom: 2.5rem; }
 
             /* Footer Centering di HP */
-            .footer { text-align: center; padding: 3rem 0 1.75rem; }
+            .footer { text-align: center; padding: 3rem 1rem 1.75rem; }
             .footer-brand { text-align: center; }
             .footer-desc { margin-left: auto; margin-right: auto; text-align: center; margin-bottom: 2rem; }
             .footer-links-col { text-align: center; margin-bottom: 1.5rem; }
@@ -464,7 +470,13 @@
         }
 
         @media (max-width: 575.98px) {
-            .main-container { padding: 1.5rem 0.25rem 3rem; }
+            .container {
+                padding-left: 1.35rem !important;
+                padding-right: 1.35rem !important;
+            }
+            .main-container {
+                padding: 1.5rem 0 3rem;
+            }
             .page-title { font-size: 1.75rem; }
             .page-intro { font-size: 0.92rem; line-height: 1.6; margin-bottom: 1.75rem; }
             .content-text { font-size: 0.9rem; line-height: 1.7; margin-bottom: 1.75rem; }
@@ -500,7 +512,7 @@
 
 <!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-dark">
-    <div class="container">
+    <div class="container px-3">
         <a class="navbar-brand" href="{% url 'tamu:landing' %}">
             <div class="brand-icon"><i class="fas fa-book-open"></i></div>
             Buku Tamu Digital
@@ -522,7 +534,8 @@
     </div>
 </nav>
 
-<div class="container main-container">
+<main class="main-container">
+<div class="container px-4 px-lg-3">
     <div class="row">
         <!-- SIDEBAR -->
         <div class="col-lg-3 order-2 order-lg-1">
@@ -550,7 +563,8 @@
         </div>
 
         <!-- CONTENT -->
-        <div class="col-lg-8 offset-lg-1 content-area order-1 order-lg-2">
+        <div class="col-lg-8 offset-lg-1 order-1 order-lg-2">
+            <div class="content-area">
             <h1 class="page-title">Kebijakan Privasi</h1>
             <p class="page-intro">
                 Diskominfosatik berkomitmen untuk melindungi informasi pribadi Anda dan memastikan transparansi dalam setiap pemrosesan data pengunjung.
@@ -658,9 +672,11 @@
                     Saya Mengerti
                 </a>
             </div>
+            </div>
         </div>
     </div>
 </div>
+</main>
 
 <!-- FOOTER -->
 <footer class="footer">
