@@ -116,7 +116,7 @@ Petugas resepsionis lobi dan pengelola sistem yang memiliki akses ke **Admin Por
 | **Nama Akun** | Administrator |
 | **Username** | `admin` |
 | **Email** | `admin@diskominfosantik.bekasikab.go.id` |
-| **Password** | `AdminBekasi2026!` |
+| **Password** | *Kredensial rahasia instansi (dikelola aman via Environment Variable)* |
 
 ---
 
@@ -128,30 +128,30 @@ Seluruh pegawai resmi **Diskominfosantik Kabupaten Bekasi** (17 pegawai yang ter
 |---|---|
 | **URL Login Pegawai** | `/pegawai-portal/login/` ([https://bukutamudigital.onrender.com/pegawai-portal/login/](https://bukutamudigital.onrender.com/pegawai-portal/login/)) *(juga mendukung login melalui `/admin-portal/login/`)* |
 | **URL Dashboard Pegawai** | `/pegawai-portal/` |
-| **Username / Identifier** | Dapat menggunakan **Username** atau **Email** masing-masing pegawai di bawah ini |
-| **Password Default (Semua Pegawai)** | `Diskominfo@2025` |
+| **Username / Identifier** | Menggunakan **Username** atau **Email** masing-masing pegawai resmi |
+| **Password** | *Didistribusikan secara internal dan wajib diganti secara berkala oleh pegawai* |
 
 #### Tabel 17 Akun Pegawai Resmi Diskominfosantik Kabupaten Bekasi
 
-| No | Nama Pegawai | Jabatan | Bidang / Unit Kerja | Username | Email | Password |
-|:---:|---|---|---|---|---|---|
-| 1 | **Drs. Ahmad Fauzi, M.Kom** | Kepala Bidang E-Government | Bidang E-Government | `ahmad.fauzi` | `ahmad.fauzi@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 2 | **Siti Rahayu, S.Kom** | Analis Sistem Informasi | Bidang E-Government | `siti.rahayu` | `siti.rahayu@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 3 | **Budi Santoso, S.T** | Pengembang Perangkat Lunak | Bidang E-Government | `budi.santoso` | `budi.santoso@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 4 | **Ir. Dewi Kartika, M.Si** | Kepala Bidang Informasi dan Komunikasi Publik | Bidang Informasi dan Komunikasi Publik | `dewi.kartika` | `dewi.kartika@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 5 | **Rudi Hermawan, S.Sos** | Pengelola Informasi Publik | Bidang Informasi dan Komunikasi Publik | `rudi.hermawan` | `rudi.hermawan@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 6 | **Fitri Handayani, S.I.Kom** | Penyusun Konten Media | Bidang Informasi dan Komunikasi Publik | `fitri.handayani` | `fitri.handayani@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 7 | **Kolonel (Purn) Hendra Wijaya, M.T** | Kepala Bidang Persandian | Bidang Persandian | `hendra.wijaya` | `hendra.wijaya@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 8 | **Maya Kurniawati, S.Kom** | Analis Keamanan Siber | Bidang Persandian | `maya.kurniawati` | `maya.kurniawati@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 9 | **Dr. Agus Priyono, M.Stat** | Kepala Bidang Statistik | Bidang Statistik | `agus.priyono` | `agus.priyono@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 10 | **Rina Susanti, S.Stat** | Statistisi Ahli Pertama | Bidang Statistik | `rina.susanti` | `rina.susanti@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 11 | **Doni Prasetyo, S.Si** | Pengolah Data Statistik | Bidang Statistik | `doni.prasetyo` | `doni.prasetyo@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 12 | **Ir. Yusuf Efendi, M.T** | Kepala Bidang Teknologi Informasi dan Komunikasi | Bidang Teknologi Informasi dan Komunikasi | `yusuf.efendi` | `yusuf.efendi@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 13 | **Novita Sari, S.T** | Administrator Jaringan | Bidang Teknologi Informasi dan Komunikasi | `novita.sari` | `novita.sari@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 14 | **Guntur Wibowo, S.Kom** | Teknisi Infrastruktur TIK | Bidang Teknologi Informasi dan Komunikasi | `guntur.wibowo` | `guntur.wibowo@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 15 | **Dra. Lestari Wulandari, M.AP** | Sekretaris | Sekretariat | `lestari.wulandari` | `lestari.wulandari@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 16 | **Bagas Nugroho, S.AP** | Pengelola Kepegawaian | Sekretariat | `bagas.nugroho` | `bagas.nugroho@diskominfosantik.go.id` | `Diskominfo@2025` |
-| 17 | **Anisa Putri, A.Md** | Pengadministrasi Umum | Sekretariat | `anisa.putri` | `anisa.putri@diskominfosantik.go.id` | `Diskominfo@2025` |
+| No | Nama Pegawai | Jabatan | Bidang / Unit Kerja | Username | Email |
+|:---:|---|---|---|---|---|
+| 1 | **Drs. Ahmad Fauzi, M.Kom** | Kepala Bidang E-Government | Bidang E-Government | `ahmad.fauzi` | `ahmad.fauzi@diskominfosantik.go.id` |
+| 2 | **Siti Rahayu, S.Kom** | Analis Sistem Informasi | Bidang E-Government | `siti.rahayu` | `siti.rahayu@diskominfosantik.go.id` |
+| 3 | **Budi Santoso, S.T** | Pengembang Perangkat Lunak | Bidang E-Government | `budi.santoso` | `budi.santoso@diskominfosantik.go.id` |
+| 4 | **Ir. Dewi Kartika, M.Si** | Kepala Bidang Informasi dan Komunikasi Publik | Bidang Informasi dan Komunikasi Publik | `dewi.kartika` | `dewi.kartika@diskominfosantik.go.id` |
+| 5 | **Rudi Hermawan, S.Sos** | Pengelola Informasi Publik | Bidang Informasi dan Komunikasi Publik | `rudi.hermawan` | `rudi.hermawan@diskominfosantik.go.id` |
+| 6 | **Fitri Handayani, S.I.Kom** | Penyusun Konten Media | Bidang Informasi dan Komunikasi Publik | `fitri.handayani` | `fitri.handayani@diskominfosantik.go.id` |
+| 7 | **Kolonel (Purn) Hendra Wijaya, M.T** | Kepala Bidang Persandian | Bidang Persandian | `hendra.wijaya` | `hendra.wijaya@diskominfosantik.go.id` |
+| 8 | **Maya Kurniawati, S.Kom** | Analis Keamanan Siber | Bidang Persandian | `maya.kurniawati` | `maya.kurniawati@diskominfosantik.go.id` |
+| 9 | **Dr. Agus Priyono, M.Stat** | Kepala Bidang Statistik | Bidang Statistik | `agus.priyono` | `agus.priyono@diskominfosantik.go.id` |
+| 10 | **Rina Susanti, S.Stat** | Statistisi Ahli Pertama | Bidang Statistik | `rina.susanti` | `rina.susanti@diskominfosantik.go.id` |
+| 11 | **Doni Prasetyo, S.Si** | Pengolah Data Statistik | Bidang Statistik | `doni.prasetyo` | `doni.prasetyo@diskominfosantik.go.id` |
+| 12 | **Ir. Yusuf Efendi, M.T** | Kepala Bidang Teknologi Informasi dan Komunikasi | Bidang Teknologi Informasi dan Komunikasi | `yusuf.efendi` | `yusuf.efendi@diskominfosantik.go.id` |
+| 13 | **Novita Sari, S.T** | Administrator Jaringan | Bidang Teknologi Informasi dan Komunikasi | `novita.sari` | `novita.sari@diskominfosantik.go.id` |
+| 14 | **Guntur Wibowo, S.Kom** | Teknisi Infrastruktur TIK | Bidang Teknologi Informasi dan Komunikasi | `guntur.wibowo` | `guntur.wibowo@diskominfosantik.go.id` |
+| 15 | **Dra. Lestari Wulandari, M.AP** | Sekretaris | Sekretariat | `lestari.wulandari` | `lestari.wulandari@diskominfosantik.go.id` |
+| 16 | **Bagas Nugroho, S.AP** | Pengelola Kepegawaian | Sekretariat | `bagas.nugroho` | `bagas.nugroho@diskominfosantik.go.id` |
+| 17 | **Anisa Putri, A.Md** | Pengadministrasi Umum | Sekretariat | `anisa.putri` | `anisa.putri@diskominfosantik.go.id` |
 
 ---
 
@@ -329,15 +329,15 @@ DB_PORT=3306
 # Kredensial Default Admin (Opsional - digunakan oleh setup_admin)
 ADMIN_USERNAME=admin
 ADMIN_EMAIL=admin@diskominfosantik.bekasikab.go.id
-ADMIN_PASSWORD=AdminBekasi2026!
+ADMIN_PASSWORD=ganti_dengan_password_admin_yang_sangat_kuat
 
 # Email SMTP (Gmail App Password untuk Reset Password & Notifikasi)
 EMAIL_HOST_USER=email_anda@gmail.com
 EMAIL_HOST_PASSWORD=16_karakter_app_password_gmail
 
 # Integrasi Firebase (Google SSO)
-FIREBASE_PROJECT_ID=bukutamudigital-43ae7
-FIREBASE_WEBHOOK_SECRET=rahasia-webhook-firebase
+FIREBASE_PROJECT_ID=id_proyek_firebase_anda
+FIREBASE_WEBHOOK_SECRET=rahasia_webhook_firebase_acak_dan_panjang
 
 # Integrasi AI Chatbot & Auto-Routing (n8n Webhook)
 N8N_WEBHOOK_URL=https://url-n8n-anda/webhook/auto-routing
