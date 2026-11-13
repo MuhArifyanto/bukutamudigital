@@ -380,6 +380,7 @@ def pegawai_chat_view(request, pegawai=None):
         'id': admin_session_id,
         'type': 'admin',
         'name': 'Admin Diskominfosantik',
+        'subtitle': 'Resepsionis / Admin',
         'session_id': admin_session_id,
         'last_message': admin_last_msg,
         'unread_count': admin_unread,
@@ -405,6 +406,7 @@ def pegawai_chat_view(request, pegawai=None):
                 'id': str(k.id),
                 'type': 'tamu',
                 'name': k.tamu.name,
+                'subtitle': k.tamu.instansi or 'Tamu',
                 'session_id': session_id,
                 'last_message': last_msg,
                 'unread_count': unread,
@@ -445,6 +447,7 @@ def pegawai_chat_view(request, pegawai=None):
             session_id=active_conversation['session_id'],
             is_read=False
         ).exclude(sender_type='pegawai').update(is_read=True)
+        active_conversation['unread_count'] = 0
 
         # Tandai juga notifikasi chat di lonceng sebagai terbaca
         from django.utils import timezone as tz_now

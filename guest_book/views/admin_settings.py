@@ -272,6 +272,8 @@ def admin_chat_view(request):
         ChatMessage.objects.filter(
             session_id=active_session_id, is_read=False
         ).exclude(sender_type='admin').update(is_read=True)
+    if active_conversation:
+        active_conversation['unread_count'] = 0
 
     context = get_admin_context(request)
     context.update({'conversations': conversations, 'active_page': 'chat'})

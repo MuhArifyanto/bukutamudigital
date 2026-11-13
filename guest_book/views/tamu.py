@@ -547,6 +547,7 @@ def user_chat_view(request, tamu):
     ChatMessage.objects.filter(
         session_id=active_conv['session_id'], is_read=False
     ).exclude(sender_type='tamu').update(is_read=True)
+    active_conv['unread_count'] = 0
 
     # Load messages for active conversation
     messages_qs = ChatMessage.objects.filter(
