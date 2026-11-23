@@ -2,12 +2,16 @@
 API Views — Notifikasi & Status Kunjungan
 """
 import json
+import logging
 from django.http import JsonResponse
 from django.utils import timezone
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 
-from .base import admin_login_required, check_is_admin
+from .base import admin_login_required, check_is_admin, clamp_page_size
 from ..models import Notification, Kunjungan, Pegawai, Tamu
+
+logger = logging.getLogger(__name__)
 
 
 def get_authenticated_recipient(request):
@@ -106,8 +110,11 @@ def api_mark_notification_read(request):
         notif.read_at = timezone.now()
         notif.save(update_fields=['status', 'read_at'])
         return JsonResponse({'success': True})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return JsonResponse({'success': False, 'error': 'Format permintaan tidak valid.'}, status=400)
+    except Exception:
+        logger.exception("Gagal menandai notifikasi %s sebagai dibaca", notif_id if 'notif_id' in locals() else '-')
+        return JsonResponse({'success': False, 'error': 'Gagal memperbarui status notifikasi.'}, status=500)
 
 
 def api_mark_all_notifications_read(request):
@@ -126,14 +133,21 @@ def api_mark_all_notifications_read(request):
             status='unread'
         ).update(status='read', read_at=timezone.now())
         return JsonResponse({'success': True, 'updated': updated})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        logger.exception("Gagal menandai semua notifikasi sebagai dibaca")
+        return JsonResponse({'success': False, 'error': 'Gagal memperbarui notifikasi.'}, status=500)
 
 
 def api_update_kunjungan_status(request):
     """API untuk update status kunjungan oleh Admin atau Pegawai (via WorkflowEngine)"""
     is_admin, admin_id = check_is_admin(request)
-    pegawai_id = request.session.get('pegawai_id')
+    raw_pegawai_id = request.session.get('pegawai_id')
+    pegawai = (
+        Pegawai.objects.filter(pk=raw_pegawai_id, account_status='active').first()
+        if raw_pegawai_id
+        else None
+    )
+    pegawai_id = str(pegawai.id) if pegawai else None
 
     if not (is_admin or pegawai_id):
         return JsonResponse({'error': 'Unauthorized'}, status=403)
@@ -176,8 +190,16 @@ def api_update_kunjungan_status(request):
 
         except Kunjungan.DoesNotExist:
             return JsonResponse({'error': 'Kunjungan tidak ditemukan'}, status=404)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+        except PermissionDenied as exc:
+            return JsonResponse({'error': str(exc) or 'Anda tidak memiliki izin mengubah status kunjungan.'}, status=403)
+        except ValidationError as exc:
+            msg = '; '.join(exc.messages) if hasattr(exc, 'messages') else 'Perubahan status kunjungan tidak valid.'
+            return JsonResponse({'error': msg}, status=400)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            return JsonResponse({'error': 'Format permintaan tidak valid.'}, status=400)
+        except Exception:
+            logger.exception("Gagal memperbarui status kunjungan")
+            return JsonResponse({'error': 'Terjadi kesalahan saat memperbarui status kunjungan.'}, status=500)
 
     return JsonResponse({'error': 'Invalid method'}, status=405)
 
@@ -212,7 +234,7 @@ def api_get_recent_notifications(request):
         })
 
     page = request.GET.get('page', 1)
-    page_size = request.GET.get('page_size', 5)
+    page_size = clamp_page_size(request.GET.get('page_size'), default=5, max_size=50)
 
     qs = Notification.objects.filter(
         recipient_id=recipient_id,

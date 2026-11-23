@@ -11,8 +11,122 @@ from django.utils import timezone
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate, TruncMonth
 
-from .base import admin_login_required, get_admin_context
+from .base import admin_login_required, check_is_super_admin, get_admin_context
 from ..models import Kunjungan, Tamu, Instansi, Departemen, CalendarSettings
+
+
+def _group_kunjungan_by_local_date(period_start, period_end):
+    """Hitung kunjungan per tanggal lokal; otomatis fallback bila tabel TZ MySQL belum terpasang."""
+    rows = list(
+        Kunjungan.objects.filter(arrival_time__range=(period_start, period_end))
+        .annotate(day=TruncDate('arrival_time'))
+        .values('day')
+        .annotate(total=Count('id'))
+    )
+    if rows and any(r['day'] is None for r in rows):
+        counts = {}
+        for dt in Kunjungan.objects.filter(arrival_time__range=(period_start, period_end)).values_list('arrival_time', flat=True):
+            if dt is not None:
+                d = timezone.localtime(dt).date()
+                counts[d] = counts.get(d, 0) + 1
+        return counts
+    return {row['day']: row['total'] for row in rows if row['day'] is not None}
+
+
+def _group_kunjungan_by_local_month(period_start, period_end):
+    """Hitung kunjungan per (tahun, bulan) lokal; fallback aman untuk MySQL tanpa tabel TZ."""
+    rows = list(
+        Kunjungan.objects.filter(arrival_time__range=(period_start, period_end))
+        .annotate(month=TruncMonth('arrival_time'))
+        .values('month')
+        .annotate(total=Count('id'))
+    )
+    if rows and any(r['month'] is None for r in rows):
+        counts = {}
+        for dt in Kunjungan.objects.filter(arrival_time__range=(period_start, period_end)).values_list('arrival_time', flat=True):
+            if dt is not None:
+                local_dt = timezone.localtime(dt)
+                key = (local_dt.year, local_dt.month)
+                counts[key] = counts.get(key, 0) + 1
+        return counts
+    return {(row['month'].year, row['month'].month): row['total'] for row in rows if row['month'] is not None}
+
+
+def _build_visit_chart_series(today, chart_range, *, visitor_offset=5):
+    """Susun seri grafik tren kunjungan harian/bulanan untuk dashboard & statistik."""
+    labels, values, prev_values, visitor_values = [], [], [], []
+
+    if chart_range == '30':
+        num_days = 30
+        period_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days - 1), time.min))
+        period_end = timezone.make_aware(datetime.combine(today, time.max))
+        prev_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days * 2 - 1), time.min))
+        prev_end = timezone.make_aware(datetime.combine(today - timedelta(days=num_days), time.max))
+
+        current_map = _group_kunjungan_by_local_date(period_start, period_end)
+        prev_map = _group_kunjungan_by_local_date(prev_start, prev_end)
+
+        for i in range(num_days - 1, -1, -1):
+            day_date = today - timedelta(days=i)
+            prev_day_date = day_date - timedelta(days=num_days)
+            labels.append(day_date.strftime('%d %b') if i % 5 == 0 else '')
+            count = current_map.get(day_date, 0)
+            values.append(count)
+            visitor_values.append(count * 3 + visitor_offset)
+            prev_values.append(prev_map.get(prev_day_date, 0))
+        chart_title = "Tren Kunjungan 30 Hari Terakhir"
+
+    elif chart_range == '365':
+        month_list = []
+        for i in range(11, -1, -1):
+            m = today.month - i
+            y = today.year
+            while m <= 0:
+                m += 12
+                y -= 1
+            month_list.append((y, m))
+
+        first_year, first_month = month_list[0]
+        last_year, last_month = month_list[-1]
+        _, last_day_of_last = _cal.monthrange(last_year, last_month)
+
+        period_start = timezone.make_aware(datetime(first_year, first_month, 1, 0, 0, 0))
+        period_end = timezone.make_aware(datetime(last_year, last_month, last_day_of_last, 23, 59, 59))
+        prev_period_start = timezone.make_aware(datetime(first_year - 1, first_month, 1, 0, 0, 0))
+        prev_period_end = timezone.make_aware(datetime(last_year - 1, last_month, last_day_of_last, 23, 59, 59))
+
+        current_map = _group_kunjungan_by_local_month(period_start, period_end)
+        prev_map = _group_kunjungan_by_local_month(prev_period_start, prev_period_end)
+
+        for y, m in month_list:
+            labels.append(_cal.month_abbr[m])
+            count = current_map.get((y, m), 0)
+            values.append(count)
+            visitor_values.append(count * 3 + 20)
+            prev_values.append(prev_map.get((y - 1, m), 0))
+        chart_title = "Tren Kunjungan 12 Bulan Terakhir"
+
+    else:
+        num_days = 7
+        period_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days - 1), time.min))
+        period_end = timezone.make_aware(datetime.combine(today, time.max))
+        prev_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days * 2 - 1), time.min))
+        prev_end = timezone.make_aware(datetime.combine(today - timedelta(days=num_days), time.max))
+
+        current_map = _group_kunjungan_by_local_date(period_start, period_end)
+        prev_map = _group_kunjungan_by_local_date(prev_start, prev_end)
+
+        for i in range(num_days - 1, -1, -1):
+            day_date = today - timedelta(days=i)
+            prev_day_date = day_date - timedelta(days=num_days)
+            labels.append(day_date.strftime('%a'))
+            count = current_map.get(day_date, 0)
+            values.append(count)
+            visitor_values.append(count * 3 + visitor_offset)
+            prev_values.append(prev_map.get(prev_day_date, 0))
+        chart_title = "Tren Kunjungan 7 Hari Terakhir"
+
+    return labels, values, prev_values, visitor_values, chart_title, period_start, period_end
 
 
 @admin_login_required
@@ -43,85 +157,24 @@ def admin_dashboard_view(request):
     if growth_pct == -100:
         growth_pct = 0
 
+    ALLOWED_KUNJUNGAN_SORT = {
+        '-arrival_time': '-arrival_time',
+        'arrival_time': 'arrival_time',
+        '-created_at': '-created_at',
+        'created_at': 'created_at',
+        'tamu__name': 'tamu__name',
+        '-tamu__name': '-tamu__name',
+    }
     k_status = request.GET.get('k_status', 'all')
-    k_sort = request.GET.get('k_sort', '-arrival_time')
+    raw_k_sort = request.GET.get('k_sort', '-arrival_time')
+    k_sort = ALLOWED_KUNJUNGAN_SORT.get(raw_k_sort, '-arrival_time')
     riwayat_query = Kunjungan.objects.select_related('tamu', 'pegawai')
     if k_status != 'all':
         riwayat_query = riwayat_query.filter(status=k_status)
     riwayat_terbaru = riwayat_query.order_by(k_sort)[:10]
 
     chart_range = request.GET.get('range', '7')
-    labels, values, prev_values, visitor_values = [], [], [], []
-
-    if chart_range == '30':
-        num_days = 30
-        period_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days - 1), time.min))
-        period_end = timezone.make_aware(datetime.combine(today, time.max))
-        prev_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days * 2 - 1), time.min))
-        prev_end = timezone.make_aware(datetime.combine(today - timedelta(days=num_days), time.max))
-
-        current_map = {row['day']: row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(period_start, period_end)).annotate(day=TruncDate('arrival_time')).values('day').annotate(total=Count('id'))}
-        prev_map = {row['day']: row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(prev_start, prev_end)).annotate(day=TruncDate('arrival_time')).values('day').annotate(total=Count('id'))}
-
-        for i in range(num_days - 1, -1, -1):
-            day_date = today - timedelta(days=i)
-            prev_day_date = day_date - timedelta(days=num_days)
-            labels.append(day_date.strftime('%d %b') if i % 5 == 0 else '')
-            count = current_map.get(day_date, 0)
-            values.append(count)
-            visitor_values.append(count * 3 + 5)
-            prev_values.append(prev_map.get(prev_day_date, 0))
-        chart_title = "Tren Kunjungan 30 Hari Terakhir"
-
-    elif chart_range == '365':
-        month_list = []
-        for i in range(11, -1, -1):
-            m = today.month - i
-            y = today.year
-            while m <= 0:
-                m += 12
-                y -= 1
-            month_list.append((y, m))
-
-        first_year, first_month = month_list[0]
-        last_year, last_month = month_list[-1]
-        _, last_day_of_last = _cal.monthrange(last_year, last_month)
-
-        period_start = timezone.make_aware(datetime(first_year, first_month, 1, 0, 0, 0))
-        period_end = timezone.make_aware(datetime(last_year, last_month, last_day_of_last, 23, 59, 59))
-        prev_period_start = timezone.make_aware(datetime(first_year - 1, first_month, 1, 0, 0, 0))
-        prev_period_end = timezone.make_aware(datetime(last_year - 1, last_month, last_day_of_last, 23, 59, 59))
-
-        current_map = {(row['month'].year, row['month'].month): row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(period_start, period_end)).annotate(month=TruncMonth('arrival_time')).values('month').annotate(total=Count('id'))}
-        prev_map = {(row['month'].year, row['month'].month): row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(prev_period_start, prev_period_end)).annotate(month=TruncMonth('arrival_time')).values('month').annotate(total=Count('id'))}
-
-        for (y, m) in month_list:
-            labels.append(_cal.month_abbr[m])
-            count = current_map.get((y, m), 0)
-            values.append(count)
-            visitor_values.append(count * 3 + 20)
-            prev_values.append(prev_map.get((y - 1, m), 0))
-        chart_title = "Tren Kunjungan 12 Bulan Terakhir"
-
-    else:
-        num_days = 7
-        period_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days - 1), time.min))
-        period_end = timezone.make_aware(datetime.combine(today, time.max))
-        prev_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days * 2 - 1), time.min))
-        prev_end = timezone.make_aware(datetime.combine(today - timedelta(days=num_days), time.max))
-
-        current_map = {row['day']: row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(period_start, period_end)).annotate(day=TruncDate('arrival_time')).values('day').annotate(total=Count('id'))}
-        prev_map = {row['day']: row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(prev_start, prev_end)).annotate(day=TruncDate('arrival_time')).values('day').annotate(total=Count('id'))}
-
-        for i in range(num_days - 1, -1, -1):
-            day_date = today - timedelta(days=i)
-            prev_day_date = day_date - timedelta(days=num_days)
-            labels.append(day_date.strftime('%a'))
-            count = current_map.get(day_date, 0)
-            values.append(count)
-            visitor_values.append(count * 3 + 5)
-            prev_values.append(prev_map.get(prev_day_date, 0))
-        chart_title = "Tren Kunjungan 7 Hari Terakhir"
+    labels, values, prev_values, visitor_values, chart_title, _, _ = _build_visit_chart_series(today, chart_range)
 
     context = get_admin_context(request)
     context.update({
@@ -157,12 +210,20 @@ def admin_statistik_view(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add_pegawai':
+            is_super, _ = check_is_super_admin(request)
+            if not is_super:
+                messages.error(request, "Akses khusus Super Admin diperlukan untuk menambahkan pegawai.")
+                return redirect('tamu:admin_statistik')
+
             from django.contrib.auth.hashers import make_password
+            from django.contrib.auth.password_validation import validate_password
+            from django.core.exceptions import ValidationError as DjangoValidationError
             from ..models import Pegawai
             name = (request.POST.get('name') or '').strip()
             email = (request.POST.get('email') or '').strip().lower()
             phone = (request.POST.get('phone') or '').strip()
             department_id = request.POST.get('department')
+            raw_password = (request.POST.get('password') or request.POST.get('initial_password') or '').strip()
 
             if not name or not email or not phone or not department_id:
                 messages.error(request, "Semua field pegawai wajib diisi.")
@@ -171,6 +232,17 @@ def admin_statistik_view(request):
             if Pegawai.objects.filter(email__iexact=email).exists():
                 messages.error(request, f"Pegawai dengan email {email} sudah terdaftar.")
                 return redirect('tamu:admin_statistik')
+
+            if raw_password:
+                try:
+                    validate_password(raw_password)
+                except DjangoValidationError as val_err:
+                    messages.error(request, f"Password awal tidak memenuhi kebijakan keamanan: {' '.join(val_err.messages)}")
+                    return redirect('tamu:admin_statistik')
+                password_hash = make_password(raw_password)
+            else:
+                # Tidak memakai password default tetap; admin atau mekanisme reset harus mengatur password eksplisit
+                password_hash = make_password(None)
 
             dept_obj = Departemen.objects.filter(pk=department_id).first()
             base_username = (email.split('@')[0] if '@' in email else name.lower().replace(' ', '.'))[:50]
@@ -186,7 +258,8 @@ def admin_statistik_view(request):
                 phone=phone,
                 department_rel=dept_obj,
                 department=dept_obj.nama if dept_obj else None,
-                password=make_password('password123'),
+                password=password_hash,
+                must_change_password=True,
                 account_status='active',
             )
             messages.success(request, f"Pegawai {name} berhasil ditambahkan.")
@@ -229,70 +302,11 @@ def admin_statistik_view(request):
     jadwal_terkini = Kunjungan.objects.select_related('tamu', 'pegawai').order_by('-arrival_time')[:10]
 
     chart_range = request.GET.get('range', '7')
-    labels, values, prev_values = [], [], []
-
+    labels, values, prev_values, _, chart_title, period_start, period_end = _build_visit_chart_series(today, chart_range)
     if chart_range == '30':
-        num_days = 30
-        period_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days - 1), time.min))
-        period_end = timezone.make_aware(datetime.combine(today, time.max))
-        prev_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days * 2 - 1), time.min))
-        prev_end = timezone.make_aware(datetime.combine(today - timedelta(days=num_days), time.max))
-
-        current_map = {row['day']: row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(period_start, period_end)).annotate(day=TruncDate('arrival_time')).values('day').annotate(total=Count('id'))}
-        prev_map = {row['day']: row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(prev_start, prev_end)).annotate(day=TruncDate('arrival_time')).values('day').annotate(total=Count('id'))}
-
-        for i in range(num_days - 1, -1, -1):
-            d = today - timedelta(days=i)
-            prev_d = d - timedelta(days=num_days)
-            labels.append(d.strftime('%d %b') if i % 5 == 0 else '')
-            values.append(current_map.get(d, 0))
-            prev_values.append(prev_map.get(prev_d, 0))
         chart_title = "Tren Kunjungan 1 Bulan Terakhir"
-
     elif chart_range == '365':
-        month_list = []
-        for i in range(11, -1, -1):
-            m, y = today.month - i, today.year
-            while m <= 0:
-                m += 12
-                y -= 1
-            month_list.append((y, m))
-
-        first_year, first_month = month_list[0]
-        last_year, last_month = month_list[-1]
-        _, last_day_of_last = _cal.monthrange(last_year, last_month)
-
-        period_start = timezone.make_aware(datetime(first_year, first_month, 1, 0, 0, 0))
-        period_end = timezone.make_aware(datetime(last_year, last_month, last_day_of_last, 23, 59, 59))
-        prev_period_start = timezone.make_aware(datetime(first_year - 1, first_month, 1, 0, 0, 0))
-        prev_period_end = timezone.make_aware(datetime(last_year - 1, last_month, last_day_of_last, 23, 59, 59))
-
-        current_map = {(row['month'].year, row['month'].month): row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(period_start, period_end)).annotate(month=TruncMonth('arrival_time')).values('month').annotate(total=Count('id'))}
-        prev_map = {(row['month'].year, row['month'].month): row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(prev_period_start, prev_period_end)).annotate(month=TruncMonth('arrival_time')).values('month').annotate(total=Count('id'))}
-
-        for (y, m) in month_list:
-            labels.append(_cal.month_abbr[m])
-            values.append(current_map.get((y, m), 0))
-            prev_values.append(prev_map.get((y - 1, m), 0))
         chart_title = "Tren Kunjungan 1 Tahun Terakhir"
-
-    else:
-        num_days = 7
-        period_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days - 1), time.min))
-        period_end = timezone.make_aware(datetime.combine(today, time.max))
-        prev_start = timezone.make_aware(datetime.combine(today - timedelta(days=num_days * 2 - 1), time.min))
-        prev_end = timezone.make_aware(datetime.combine(today - timedelta(days=num_days), time.max))
-
-        current_map = {row['day']: row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(period_start, period_end)).annotate(day=TruncDate('arrival_time')).values('day').annotate(total=Count('id'))}
-        prev_map = {row['day']: row['total'] for row in Kunjungan.objects.filter(arrival_time__range=(prev_start, prev_end)).annotate(day=TruncDate('arrival_time')).values('day').annotate(total=Count('id'))}
-
-        for i in range(num_days - 1, -1, -1):
-            d = today - timedelta(days=i)
-            prev_d = d - timedelta(days=num_days)
-            labels.append(d.strftime('%a'))
-            values.append(current_map.get(d, 0))
-            prev_values.append(prev_map.get(prev_d, 0))
-        chart_title = "Tren Kunjungan 7 Hari Terakhir"
 
     hari_kerja_raw = inst.hari_kerja if inst and hasattr(inst, 'hari_kerja') else '0,1,2,3,4'
     active_days = [int(x) for x in hari_kerja_raw.split(',') if x.isdigit()]
@@ -341,9 +355,19 @@ def admin_kalender_view(request):
     from django.db.models.functions import TruncDate
     from ..utils import get_google_calendar_holidays
 
-    now = timezone.now()
-    year = int(request.GET.get('year', now.year))
-    month = int(request.GET.get('month', now.month))
+    now = timezone.localtime(timezone.now())
+    try:
+        year = int(request.GET.get('year', now.year))
+        if not (2000 <= year <= 2100):
+            year = now.year
+    except (TypeError, ValueError):
+        year = now.year
+    try:
+        month = int(request.GET.get('month', now.month))
+        if not (1 <= month <= 12):
+            month = now.month
+    except (TypeError, ValueError):
+        month = now.month
 
     first_day = datetime(year, month, 1)
     if month == 12:
@@ -523,18 +547,28 @@ def admin_ikm_view(request):
     for row in surveys.values('rating').annotate(total=Count('id')):
         star_counts[row['rating']] = row['total']
 
-    # Rekapitulasi Tren Bulanan (Tahun berjalan)
+    # Rekapitulasi Tren Bulanan (Tahun berjalan) — 1 query range lokal (kompatibel MySQL tanpa tabel TZ)
     now = timezone.localtime(timezone.now())
     current_year = now.year
     months_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
     monthly_ratings = [0.0] * 12
     monthly_counts = [0] * 12
 
-    for m in range(1, 13):
-        m_surveys = surveys.filter(created_at__year=current_year, created_at__month=m)
-        m_agg = m_surveys.aggregate(avg=Avg('rating'), cnt=Count('id'))
-        monthly_ratings[m - 1] = round((m_agg['avg'] or 0.0) * 20, 1)  # Skala 100
-        monthly_counts[m - 1] = m_agg['cnt'] or 0
+    year_start = timezone.make_aware(datetime(current_year, 1, 1, 0, 0, 0))
+    next_year_start = timezone.make_aware(datetime(current_year + 1, 1, 1, 0, 0, 0))
+    monthly_sums = [0] * 12
+    for rating_val, created_dt in surveys.filter(
+        created_at__gte=year_start,
+        created_at__lt=next_year_start,
+    ).values_list('rating', 'created_at'):
+        if created_dt is not None:
+            m_idx = timezone.localtime(created_dt).month - 1
+            monthly_sums[m_idx] += rating_val
+            monthly_counts[m_idx] += 1
+
+    for m_idx in range(12):
+        if monthly_counts[m_idx]:
+            monthly_ratings[m_idx] = round((monthly_sums[m_idx] / monthly_counts[m_idx]) * 20, 1)  # Skala 100
 
     recent_feedbacks = surveys.filter(ulasan__isnull=False).exclude(ulasan='').order_by('-created_at')[:20]
 

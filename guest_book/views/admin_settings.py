@@ -3,20 +3,27 @@ Views Admin — Modul Pengaturan & Profil
 Berisi: profil admin, instansi, pengguna, pegawai, audit log, chat, notifikasi
 """
 import json
-import os
+import logging
+import uuid
 
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.http import JsonResponse
 from django.db.models import Count, Q, Max
 from django.core.paginator import Paginator
 
-from .base import admin_login_required, get_admin_context, get_admin_name
+from .base import (
+    admin_login_required, check_is_super_admin, clamp_page_size,
+    get_admin_context, get_admin_name, resolve_admin_record,
+)
 from ..models import (
-    Tamu, Pegawai, Instansi, Departemen,
+    Admin, Tamu, Pegawai, Instansi, Departemen,
     Notification, AuditLog, LoginAttempt, Kunjungan
 )
+
+logger = logging.getLogger(__name__)
 
 
 @admin_login_required
@@ -37,17 +44,15 @@ def admin_profil_view(request):
         total_attempts = LoginAttempt.objects.filter(email=admin_user.email).count()
         context['uptime'] = round((total_login / total_attempts) * 100) if total_attempts > 0 else 100
 
-        pref_path = os.path.join(os.path.dirname(__file__), '../admin_preferences.json')
-        prefs = {}
-        if os.path.exists(pref_path):
-            try:
-                with open(pref_path, 'r') as f:
-                    prefs = json.load(f)
-            except Exception:
-                prefs = {}
+    admin_record = resolve_admin_record(getattr(request, 'user', None))
+    if admin_record is None and admin_user and getattr(admin_user, 'email', None):
+        admin_record = Admin.objects.filter(
+            email__iexact=admin_user.email, account_status='active'
+        ).first()
 
-        context['email_notif_enabled'] = prefs.get('email_notif_enabled', True)
-        context['push_notif_enabled'] = prefs.get('push_notif_enabled', False)
+    context['email_notif_enabled'] = bool(admin_record.email_notif_enabled) if admin_record else True
+    context['push_notif_enabled'] = bool(admin_record.push_notif_enabled) if admin_record else False
+    context['admin_2fa_enabled'] = bool(admin_record and admin_record.two_fa_enabled and admin_record.two_fa_secret)
 
     return render(request, 'guest_book/admin_profil.html', context)
 
@@ -59,6 +64,11 @@ def admin_instansi_view(request):
     departemen_all = Departemen.objects.all().order_by('nama')
 
     if request.method == 'POST':
+        is_super, _ = check_is_super_admin(request)
+        if not is_super:
+            messages.error(request, "Akses khusus Super Admin diperlukan untuk mengubah pengaturan instansi atau bidang.")
+            return redirect('tamu:admin_instansi')
+
         action = request.POST.get('action')
         if action == 'update_instansi':
             if not instansi:
@@ -87,22 +97,86 @@ def admin_instansi_view(request):
                 ip_address=request.META.get('REMOTE_ADDR')
             )
             messages.success(request, "Data instansi berhasil diperbarui.")
-            return redirect(request.META.get('HTTP_REFERER', 'tamu:admin_instansi'))
+            referer = request.META.get('HTTP_REFERER')
+            if referer and url_has_allowed_host_and_scheme(
+                referer,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                return redirect(referer)
+            return redirect('tamu:admin_instansi')
 
         elif action == 'add_departemen':
-            nama = request.POST.get('nama')
-            kode = request.POST.get('kode')
-            dep = Departemen.objects.create(nama=nama, kode=kode)
+            nama = (request.POST.get('nama') or '').strip()
+            kode = (request.POST.get('kode') or '').strip()
+            if not nama:
+                messages.error(request, "Nama bidang/departemen wajib diisi.")
+                return redirect('tamu:admin_instansi')
+
+            dep = Departemen.objects.create(nama=nama, kode=kode or None)
 
             from .base import record_audit_log
-            admin_id = request.session.get('tamu_id', 'admin')
+            from .auth import get_client_ip
+            admin_actor = (
+                str(request.user.pk)
+                if getattr(request, 'user', None) and request.user.is_authenticated
+                else str(request.session.get('tamu_id', 'admin'))
+            )
             record_audit_log(
-                user_id=str(admin_id), user_type='admin', action='create',
+                user_id=admin_actor, user_type='admin', action='create',
                 table_name='departemen', record_id=str(dep.id),
                 new_value=f"Menambahkan bidang baru: {nama}",
-                ip_address=request.META.get('REMOTE_ADDR')
+                ip_address=get_client_ip(request)
             )
             messages.success(request, f"Departemen {nama} berhasil ditambahkan.")
+            return redirect('tamu:admin_instansi')
+
+        elif action == 'delete_departemen':
+            import uuid
+            from .base import record_audit_log
+            from .auth import get_client_ip
+
+            dept_id = (request.POST.get('dept_id') or '').strip()
+            try:
+                dept_uuid = uuid.UUID(dept_id)
+            except (ValueError, TypeError):
+                messages.error(request, "ID bidang/departemen tidak valid.")
+                return redirect('tamu:admin_instansi')
+
+            dep = Departemen.objects.filter(pk=dept_uuid).first()
+            if not dep:
+                messages.error(request, "Bidang/departemen tidak ditemukan.")
+                return redirect('tamu:admin_instansi')
+
+            active_pegawai_count = dep.pegawai_list.filter(account_status='active').count()
+            if active_pegawai_count > 0:
+                messages.error(
+                    request,
+                    f"Bidang {dep.nama} tidak dapat dihapus karena masih memiliki {active_pegawai_count} pegawai aktif. "
+                    "Pindahkan atau nonaktifkan pegawai terlebih dahulu."
+                )
+                return redirect('tamu:admin_instansi')
+
+            dep_id_str = str(dep.id)
+            dep_nama = dep.nama
+            dep_kode = dep.kode
+            dep.delete()
+
+            admin_actor = (
+                str(request.user.pk)
+                if getattr(request, 'user', None) and request.user.is_authenticated
+                else str(request.session.get('tamu_id', 'admin'))
+            )
+            record_audit_log(
+                user_id=admin_actor,
+                user_type='admin',
+                action='delete',
+                table_name='departemen',
+                record_id=dep_id_str,
+                old_value={'nama': dep_nama, 'kode': dep_kode},
+                ip_address=get_client_ip(request),
+            )
+            messages.success(request, f"Bidang {dep_nama} berhasil dihapus.")
             return redirect('tamu:admin_instansi')
 
     context = get_admin_context(request)
@@ -126,56 +200,36 @@ def admin_notifications_view(request):
 @admin_login_required
 def admin_chat_view(request):
     """Manajemen Chat Admin — menampilkan percakapan dari Tamu dan Pegawai."""
-    from ..models import ChatMessage, Pegawai
-    from django.db.models import Subquery, OuterRef
+    from ..models import ChatMessage, ChatRoom, Pegawai
 
     # 1. Ambil list session_id beserta waktu pesan terakhirnya
     sessions = list(ChatMessage.objects.values('session_id').annotate(last_msg=Max('created_at')).order_by('-last_msg'))
     active_session_id = request.GET.get('session') or request.GET.get('guest')
 
-    # 2. Kumpulkan semua ID Tamu dan Pegawai dari session_id
+    # 2. Kumpulkan semua ID Tamu dan Pegawai dari session_id memakai parser terstruktur
     tamu_ids = []
     pegawai_ids = []
     session_ids = []
+    parsed_sessions = {}
 
-    import uuid as _uuid
     for s in sessions:
         sid = s['session_id']
         session_ids.append(sid)
-        if sid.startswith('pegawai_admin_'):
-            pegawai_ids.append(sid.replace('pegawai_admin_', ''))
-        else:
-            t_id = sid.replace('tamu_', '') if sid.startswith('tamu_') else sid
-            try:
-                _uuid.UUID(str(t_id))
-                tamu_ids.append(t_id)
-            except (ValueError, AttributeError):
-                pass  # Skip jika bukan UUID (e.g. kunjungan_*)
+        parsed = ChatRoom.parse_session_id(sid)
+        parsed_sessions[sid] = parsed
+        if parsed['entity_uuid'] is not None:
+            if parsed['room_type'] == ChatRoom.RoomType.PEGAWAI_ADMIN:
+                pegawai_ids.append(parsed['entity_uuid'])
+            elif parsed['room_type'] == ChatRoom.RoomType.TAMU_ADMIN:
+                tamu_ids.append(parsed['entity_uuid'])
 
     # 3. Batch query (Single DB hit) untuk data Tamu, Pegawai, Unread, dan Last Message
     tamu_dict = {str(t.id): t for t in Tamu.objects.filter(id__in=tamu_ids)}
     pegawai_dict = {str(p.id): p for p in Pegawai.objects.select_related('department_rel').filter(id__in=pegawai_ids)}
-    
-    # Ambil jumlah unread per session (hanya dari tamu/pegawai ke admin)
-    unread_counts = dict(
-        ChatMessage.objects.filter(session_id__in=session_ids, is_read=False)
-        .exclude(sender_type='admin')
-        .values('session_id')
-        .annotate(count=Count('id'))
-        .values_list('session_id', 'count')
-    )
 
-    # Ambil pesan terakhir untuk tiap session (MySQL Compatible)
-    latest_timestamps = [s['last_msg'] for s in sessions]
-    latest_msgs_qs = ChatMessage.objects.filter(
-        session_id__in=session_ids, 
-        created_at__in=latest_timestamps
-    ).order_by('-created_at')
-    
-    latest_msg_dict = {}
-    for msg in latest_msgs_qs:
-        if msg.session_id not in latest_msg_dict:
-            latest_msg_dict[msg.session_id] = msg
+    # Ambil jumlah unread & pesan terakhir secara batch (memakai index komposit)
+    unread_counts = ChatMessage.unread_counts_by_session(session_ids, exclude_sender_type='admin')
+    latest_msg_dict = ChatMessage.latest_by_session(session_ids)
 
     conversations = []
     active_conversation = None
@@ -183,11 +237,11 @@ def admin_chat_view(request):
     # 4. Susun data percakapan
     for s in sessions:
         sid = s['session_id']
+        parsed = parsed_sessions[sid]
         conv_data = None
 
-        if sid.startswith('pegawai_admin_'):
-            pid = sid.replace('pegawai_admin_', '')
-            pegawai = pegawai_dict.get(pid)
+        if parsed['room_type'] == ChatRoom.RoomType.PEGAWAI_ADMIN and parsed['entity_uuid']:
+            pegawai = pegawai_dict.get(str(parsed['entity_uuid']))
             if not pegawai:
                 continue
 
@@ -199,9 +253,8 @@ def admin_chat_view(request):
                 'name': pegawai.name,
                 'subtitle': pegawai.department_rel.nama if pegawai.department_rel else 'Pegawai',
             }
-        else:
-            t_id = sid.replace('tamu_', '') if sid.startswith('tamu_') else sid
-            guest = tamu_dict.get(t_id)
+        elif parsed['room_type'] == ChatRoom.RoomType.TAMU_ADMIN and parsed['entity_uuid']:
+            guest = tamu_dict.get(str(parsed['entity_uuid']))
             if not guest:
                 continue
 
@@ -213,6 +266,8 @@ def admin_chat_view(request):
                 'name': guest.name,
                 'subtitle': guest.instansi or 'Tamu',
             }
+        else:
+            continue
 
         # Lengkapi conv_data
         conv_data['last_message'] = latest_msg_dict.get(sid)
@@ -239,30 +294,27 @@ def admin_chat_view(request):
 
     # 5. Tangani fallback jika session aktif baru dibuat / kosong
     if active_session_id and not active_conversation:
-        if active_session_id.startswith('pegawai_admin_'):
-            pid = active_session_id.replace('pegawai_admin_', '')
-            try:
-                pegawai = Pegawai.objects.select_related('department_rel').get(id=pid)
+        parsed_active = ChatRoom.parse_session_id(active_session_id)
+        if parsed_active['room_type'] == ChatRoom.RoomType.PEGAWAI_ADMIN and parsed_active['entity_uuid']:
+            pegawai = Pegawai.objects.select_related('department_rel').filter(id=parsed_active['entity_uuid']).first()
+            if pegawai:
+                ChatRoom.resolve_or_create_for_session(active_session_id)
                 active_conversation = {
                     'session_id': active_session_id, 'participant_type': 'pegawai',
                     'guest': None, 'pegawai': pegawai, 'name': pegawai.name,
                     'subtitle': pegawai.department_rel.nama if pegawai.department_rel else 'Pegawai',
                     'last_message': None, 'unread_count': 0, 'messages': [],
                 }
-            except Pegawai.DoesNotExist:
-                pass
-        else:
-            t_id = active_session_id.replace('tamu_', '') if active_session_id.startswith('tamu_') else active_session_id
-            try:
-                guest = Tamu.objects.get(id=t_id)
+        elif parsed_active['room_type'] == ChatRoom.RoomType.TAMU_ADMIN and parsed_active['entity_uuid']:
+            guest = Tamu.objects.filter(id=parsed_active['entity_uuid']).first()
+            if guest:
+                ChatRoom.resolve_or_create_for_session(active_session_id)
                 active_conversation = {
                     'session_id': active_session_id, 'participant_type': 'tamu',
                     'guest': guest, 'pegawai': None, 'name': guest.name,
                     'subtitle': guest.instansi or 'Tamu',
                     'last_message': None, 'unread_count': 0, 'messages': [],
                 }
-            except (Tamu.DoesNotExist, ValueError):
-                pass
 
     if active_conversation:
         conversations.insert(0, active_conversation)
@@ -283,7 +335,7 @@ def admin_chat_view(request):
 @admin_login_required
 def admin_audit_log_view(request):
     """View untuk Laporan Aktivitas (Audit Log)"""
-    q_action = request.GET.get('action', '')
+    q_action = request.GET.get('action', '').strip()
     logs_query = AuditLog.objects.all().order_by('-timestamp')
     if q_action:
         logs_query = logs_query.filter(action=q_action)
@@ -291,8 +343,7 @@ def admin_audit_log_view(request):
     paginator = Paginator(logs_query, 20)
     page_obj = paginator.get_page(request.GET.get('page'))
 
-    for log in page_obj:
-        log.user_name = _resolve_user_name(log)
+    _attach_audit_log_user_names(page_obj.object_list)
 
     ctx = get_admin_context(request)
     ctx.update({'active_page': 'audit_log', 'page_obj': page_obj, 'q_action': q_action})
@@ -301,33 +352,119 @@ def admin_audit_log_view(request):
 
 @admin_login_required
 def admin_audit_log_cetak_pdf(request):
-    """View untuk mencetak PDF Laporan Aktivitas"""
-    logs_all = AuditLog.objects.all().order_by('-timestamp')
-    for log in logs_all:
-        log.user_name = _resolve_user_name(log)
+    """View untuk mencetak PDF Laporan Aktivitas (terbatas & bebas N+1)."""
+    q_action = request.GET.get('action', '').strip()
+    limit = clamp_page_size(request.GET.get('limit'), default=500, min_size=1, max_size=1000)
 
-    instansi = Instansi.objects.first()
+    logs_qs = AuditLog.objects.all().order_by('-timestamp')
+    if q_action:
+        logs_qs = logs_qs.filter(action=q_action)
+
+    logs_all = _attach_audit_log_user_names(logs_qs[:limit])
+
     context = get_admin_context(request)
-    context.update({'logs_all': logs_all, 'instansi': instansi})
+    context.update({'logs_all': logs_all, 'q_action': q_action, 'print_limit': limit})
     return render(request, 'guest_book/admin_audit_log_cetak_pdf.html', context)
 
 
-def _resolve_user_name(log):
-    """Helper: resolve user_name dari AuditLog entry."""
-    if log.user_type == 'admin':
-        if log.user_id == 'admin':
-            return "Administrator"
+def _normalize_uuid_str(value):
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError, AttributeError):
+        return None
 
-        try:
-            return Tamu.objects.get(id=log.user_id, is_admin=True).name
-        except Exception:
-            return log.user_id
-    elif log.user_type == 'tamu':
-        try:
-            return Tamu.objects.get(id=log.user_id).name
-        except Exception:
-            return f"Tamu ({log.user_id[:8]})"
-    return log.user_id
+
+def _attach_audit_log_user_names(logs):
+    """Batch-resolve user_name untuk koleksi AuditLog tanpa N+1 query."""
+    from django.contrib.auth.models import User
+
+    logs_list = list(logs)
+    if not logs_list:
+        return logs_list
+
+    tamu_uuids = set()
+    admin_uuids = set()
+    admin_int_ids = set()
+    pegawai_uuids = set()
+    normalized_ids = {}
+
+    for log in logs_list:
+        uid = (log.user_id or '').strip()
+        if not uid or (log.user_type == 'admin' and uid == 'admin'):
+            continue
+
+        if log.user_type == 'admin':
+            if uid.isdigit():
+                admin_int_ids.add(int(uid))
+            else:
+                norm_id = _normalize_uuid_str(uid)
+                if norm_id:
+                    normalized_ids[uid] = norm_id
+                    parsed_uuid = uuid.UUID(norm_id)
+                    tamu_uuids.add(parsed_uuid)
+                    admin_uuids.add(parsed_uuid)
+        elif log.user_type == 'tamu':
+            norm_id = _normalize_uuid_str(uid)
+            if norm_id:
+                normalized_ids[uid] = norm_id
+                tamu_uuids.add(uuid.UUID(norm_id))
+        elif log.user_type == 'pegawai':
+            norm_id = _normalize_uuid_str(uid)
+            if norm_id:
+                normalized_ids[uid] = norm_id
+                pegawai_uuids.add(uuid.UUID(norm_id))
+
+    tamu_map = {}
+    tamu_admin_map = {}
+    if tamu_uuids:
+        for tid, name, is_admin in Tamu.objects.filter(id__in=tamu_uuids).values_list('id', 'name', 'is_admin'):
+            key = str(tid)
+            tamu_map[key] = name
+            if is_admin:
+                tamu_admin_map[key] = name
+
+    admin_model_map = {}
+    if admin_uuids:
+        for aid, name in Admin.objects.filter(id__in=admin_uuids).values_list('id', 'name'):
+            admin_model_map[str(aid)] = name
+
+    auth_user_map = {}
+    if admin_int_ids:
+        for u in User.objects.filter(pk__in=admin_int_ids).only('id', 'username', 'first_name', 'last_name'):
+            auth_user_map[str(u.pk)] = (u.get_full_name() or '').strip() or u.username
+
+    pegawai_map = {}
+    if pegawai_uuids:
+        for pid, name in Pegawai.objects.filter(id__in=pegawai_uuids).values_list('id', 'name'):
+            pegawai_map[str(pid)] = name
+
+    for log in logs_list:
+        uid = (log.user_id or '').strip()
+        norm_uid = normalized_ids.get(uid, uid)
+        if log.user_type == 'admin':
+            if uid == 'admin':
+                log.user_name = "Administrator"
+            elif norm_uid in tamu_admin_map:
+                log.user_name = tamu_admin_map[norm_uid]
+            elif norm_uid in admin_model_map:
+                log.user_name = admin_model_map[norm_uid]
+            elif uid in auth_user_map:
+                log.user_name = auth_user_map[uid]
+            else:
+                log.user_name = log.user_id
+        elif log.user_type == 'tamu':
+            log.user_name = tamu_map.get(norm_uid) or f"Tamu ({uid[:8]})"
+        elif log.user_type == 'pegawai':
+            log.user_name = pegawai_map.get(norm_uid) or log.user_id
+        else:
+            log.user_name = log.user_id
+
+    return logs_list
+
+
+def _resolve_user_name(log):
+    """Helper kompatibilitas: resolve user_name untuk satu AuditLog entry."""
+    return _attach_audit_log_user_names([log])[0].user_name
 
 
 @admin_login_required
@@ -360,17 +497,8 @@ def admin_pengguna_view(request):
 @admin_login_required
 def admin_pegawai_view(request):
     """Manajemen Pegawai dengan Role Management"""
-    # Pastikan data pegawai dummy lama otomatis dibersihkan dan 17 pegawai resmi tersedia
-    try:
-        has_dummy = Pegawai.objects.filter(
-            Q(email__icontains='@gmail.com') |
-            Q(name__in=['Lutpiah', 'Hasbi Ardiansyah', 'Dimas', 'Suherman', 'Agus Susanto', 'firmansyah', 'Dimas Anugrah', 'Bayu Aji'])
-        ).exists()
-        if has_dummy or Pegawai.objects.filter(email__icontains='@diskominfosantik.go.id').count() < 17:
-            from django.core.management import call_command
-            call_command('seed_pegawai')
-    except Exception:
-        pass
+    # Sinkronisasi data awal pegawai hanya dijalankan melalui command CLI (`manage.py seed_pegawai`),
+    # bukan saat HTTP GET request agar perubahan status/role admin tidak tertimpa.
 
     query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
@@ -424,6 +552,10 @@ def admin_pegawai_update_role(request, pegawai_id):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Method not allowed'}, status=405)
 
+    is_super, _ = check_is_super_admin(request)
+    if not is_super:
+        return JsonResponse({'success': False, 'message': 'Akses khusus Super Admin diperlukan untuk mengubah role pegawai.'}, status=403)
+
     try:
         pegawai = Pegawai.objects.get(pk=pegawai_id)
         data = json.loads(request.body)
@@ -447,8 +579,11 @@ def admin_pegawai_update_role(request, pegawai_id):
 
     except Pegawai.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Pegawai tidak ditemukan'}, status=404)
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=400)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return JsonResponse({'success': False, 'message': 'Format permintaan tidak valid.'}, status=400)
+    except Exception:
+        logger.exception("Gagal memperbarui role pegawai %s", pegawai_id)
+        return JsonResponse({'success': False, 'message': 'Terjadi kesalahan saat memperbarui role pegawai.'}, status=500)
 
 
 @admin_login_required
@@ -456,6 +591,10 @@ def admin_pegawai_update_status(request, pegawai_id):
     """Update status pegawai (AJAX endpoint)"""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Method not allowed'}, status=405)
+
+    is_super, _ = check_is_super_admin(request)
+    if not is_super:
+        return JsonResponse({'success': False, 'message': 'Akses khusus Super Admin diperlukan untuk mengubah status pegawai.'}, status=403)
 
     try:
         pegawai = Pegawai.objects.get(pk=pegawai_id)
@@ -469,6 +608,10 @@ def admin_pegawai_update_status(request, pegawai_id):
         pegawai.account_status = new_status
         pegawai.save(update_fields=['account_status'])
 
+        if new_status != 'active':
+            from ..security_utils import revoke_user_sessions
+            revoke_user_sessions('pegawai', str(pegawai.id))
+
         AuditLog.objects.create(
             user_id=get_admin_name(request), user_type='admin', action='update',
             table_name='pegawai', record_id=str(pegawai.id),
@@ -480,6 +623,9 @@ def admin_pegawai_update_status(request, pegawai_id):
 
     except Pegawai.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Pegawai tidak ditemukan'}, status=404)
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=400)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return JsonResponse({'success': False, 'message': 'Format permintaan tidak valid.'}, status=400)
+    except Exception:
+        logger.exception("Gagal memperbarui status pegawai %s", pegawai_id)
+        return JsonResponse({'success': False, 'message': 'Terjadi kesalahan saat memperbarui status pegawai.'}, status=500)
 

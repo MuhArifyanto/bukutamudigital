@@ -315,12 +315,12 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     function goToTarget(type, id) {
         if (type === 'message_replied') {
             window.location.href = "{% url 'tamu:user_chat' %}";
         } else if (type === 'system_alert' && id) {
-            window.location.href = "/kunjungan/" + id + "/";
+            window.location.href = "/kunjungan/" + encodeURIComponent(String(id)) + "/";
         }
     }
 

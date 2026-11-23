@@ -338,9 +338,9 @@
             </div>
             
             <div class="pagination-dots">
-                <div class="dot active" onclick="setSlide(0)"></div>
-                <div class="dot" onclick="setSlide(1)"></div>
-                <div class="dot" onclick="setSlide(2)"></div>
+                <div class="dot active" data-slide="0"></div>
+                <div class="dot" data-slide="1"></div>
+                <div class="dot" data-slide="2"></div>
             </div>
         </div>
 
@@ -433,7 +433,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     let currentSlide = 0;
     const slides = document.querySelectorAll('.slide');
     const dots = document.querySelectorAll('.dot');
@@ -445,6 +445,10 @@
         slides[currentSlide].classList.add('active');
         dots[currentSlide].classList.add('active');
     }
+
+    dots.forEach((dot, idx) => {
+        dot.addEventListener('click', () => setSlide(Number(dot.dataset.slide ?? idx)));
+    });
 
     function nextSlide() {
         let next = (currentSlide + 1) % slides.length;
@@ -466,7 +470,7 @@
         this.classList.toggle('fa-eye');
     });
 </script>
-<script type="module">
+<script type="module" nonce="{{ csp_nonce }}">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
@@ -543,6 +547,7 @@
                             'Content-Type': 'application/json',
                             'X-CSRFToken': '{{ csrf_token }}'
                         },
+                        credentials: 'same-origin',
                         body: JSON.stringify({ id_token: idToken })
                     })
                     .then(response => response.json())

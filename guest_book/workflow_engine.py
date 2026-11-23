@@ -259,7 +259,8 @@ class WorkflowEngine:
         lines.extend(["", detail_desc])
         chat_text = "\n".join(lines)
 
-        session_id = str(self.kunjungan.tamu.id)
+        from .models import ChatRoom
+        session_id = ChatRoom.session_id_for_tamu(self.kunjungan.tamu.id)
         chat_msg = ChatMessage.objects.create(
             session_id=session_id,
             sender_id='admin',

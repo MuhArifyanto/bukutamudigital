@@ -1,0 +1,34 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Version control & CI/CD
+.git
+.github
+.gitignore
+
+# Local virtualenvs & IDE tooling
+.venv
+.venv*
+.vscode
+.kiro
+
+# Python caches & test artifacts
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.coverage
+htmlcov
+
+# Local databases, uploads, logs & temporary/utility files
+*.sqlite3
+*.db
+*.log
+media/
+staticfiles/
+scratch/
+scripts/
+test.html
+*.md

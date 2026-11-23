@@ -356,11 +356,11 @@
                     style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
                 <input type="text" name="q" value="{{ request.GET.q|default:'' }}"
                     placeholder="Cari berdasarkan keperluan atau petugas..."
-                    oninput="debounceSubmit(this.form)"
+                    class="js-riwayat-debounce-input"
                     style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.5rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; outline: none; background: #f8fafc;">
             </div>
 
-            <select name="status" onchange="debounceSubmit(this.form)"
+            <select name="status" class="js-riwayat-debounce-change"
                 style="padding: 0.6rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #475569; background: #f8fafc; outline: none;">
                 <option value="">Semua Status</option>
                 <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Menunggu</option>
@@ -372,7 +372,7 @@
             </select>
 
             <input type="date" name="date" value="{{ request.GET.date|default:'' }}"
-                onchange="debounceSubmit(this.form)"
+                class="js-riwayat-debounce-change"
                 style="padding: 0.6rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; color: #475569; background: #f8fafc; outline: none;">
 
             <button type="submit" class="btn btn-primary"
@@ -513,7 +513,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     var searchTimeout;
     function debounceSubmit(form) {
         clearTimeout(searchTimeout);
@@ -553,5 +553,16 @@
             });
         }, 400); // 400ms delay before fetching
     }
+
+    document.querySelectorAll('.js-riwayat-debounce-input').forEach(inp => {
+        inp.addEventListener('input', function() {
+            debounceSubmit(this.form);
+        });
+    });
+    document.querySelectorAll('.js-riwayat-debounce-change').forEach(el => {
+        el.addEventListener('change', function() {
+            debounceSubmit(this.form);
+        });
+    });
 </script>
 {% endblock %}

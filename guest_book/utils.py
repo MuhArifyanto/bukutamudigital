@@ -70,6 +70,178 @@ def send_notification(recipient_id, recipient_type, notification_type, title, me
     return notif
 
 
+def _format_sidebar_preview(message, message_type='text'):
+    """Format cuplikan pesan ringkas untuk tampilan sidebar chat."""
+    if message_type == 'image':
+        return '📷 Mengirim gambar'
+    if message_type == 'file':
+        return '📎 Mengirim berkas'
+    if message_type == 'deleted':
+        return 'Pesan ini telah dihapus'
+    clean = ' '.join(str(message or '').split())
+    if len(clean) > 60:
+        return clean[:57].rstrip() + '...'
+    return clean
+
+
+def send_chat_sidebar_update(
+    session_id,
+    sender_id,
+    sender_type,
+    message,
+    *,
+    message_type='text',
+    message_id=None,
+    created_at_dt=None,
+):
+    """
+    Siarkan event `chat_sidebar_update` ke kanal global '/ws/notifications/'
+    partisipan room terkait agar urutan kontak, preview, dan badge unread
+    sidebar terbarui real-time tanpa reload halaman.
+    """
+    import uuid as _uuid
+    from channels.layers import get_channel_layer
+    from asgiref.sync import async_to_sync
+    from .models import ChatRoom, Tamu, Pegawai, Kunjungan
+
+    sid = str(session_id or '').strip()
+    if not sid:
+        return
+
+    dt = created_at_dt or timezone.now()
+    time_str = timezone.localtime(dt).strftime('%H:%M')
+    epoch = dt.timestamp()
+    preview = _format_sidebar_preview(message, message_type=message_type)
+    msg_token = str(message_id or _uuid.uuid4())
+    parsed = ChatRoom.parse_session_id(sid)
+    room_type = parsed['room_type']
+    entity_uuid = parsed['entity_uuid']
+
+    # Susun target: daftar tuple (role_tag, group_list, participant_type, room_name, room_subtitle)
+    targets = []
+
+    if room_type == ChatRoom.RoomType.PEGAWAI_ADMIN:
+        pid = str(entity_uuid) if entity_uuid else sid.replace('pegawai_admin_', '', 1)
+        pegawai = None
+        if entity_uuid is not None:
+            try:
+                pegawai = Pegawai.objects.select_related('department_rel').filter(id=entity_uuid).first()
+            except Exception:
+                pegawai = None
+        peg_name = pegawai.name if pegawai else 'Pegawai'
+        peg_sub = pegawai.department_rel.nama if (pegawai and pegawai.department_rel) else 'Pegawai'
+
+        targets.append((
+            'admin',
+            ['notif_admin', 'admin_notifications'],
+            'pegawai',
+            peg_name,
+            peg_sub,
+        ))
+        targets.append((
+            f'pegawai_{pid}',
+            [f'notif_pegawai_{pid}', f'notifications_pegawai_{pid}'],
+            'admin',
+            'Admin Diskominfosantik',
+            'Resepsionis / Admin',
+        ))
+    elif room_type == ChatRoom.RoomType.KUNJUNGAN:
+        kunjungan = None
+        if entity_uuid is not None:
+            try:
+                kunjungan = Kunjungan.objects.select_related(
+                    'tamu', 'pegawai', 'pegawai__department_rel'
+                ).filter(id=entity_uuid).first()
+            except Exception:
+                kunjungan = None
+
+        if kunjungan:
+            if kunjungan.pegawai:
+                pid = str(kunjungan.pegawai.id)
+                tamu_name = kunjungan.tamu.name if kunjungan.tamu else 'Tamu'
+                tamu_sub = (kunjungan.tamu.instansi if kunjungan.tamu else None) or 'Tamu'
+                targets.append((
+                    f'pegawai_{pid}',
+                    [f'notif_pegawai_{pid}', f'notifications_pegawai_{pid}'],
+                    'tamu',
+                    tamu_name,
+                    tamu_sub,
+                ))
+            if kunjungan.tamu:
+                tid = str(kunjungan.tamu.id)
+                peg_name = kunjungan.pegawai.name if kunjungan.pegawai else 'Pegawai'
+                peg_sub = 'Pegawai'
+                if kunjungan.pegawai:
+                    peg_sub = kunjungan.pegawai.department or (
+                        kunjungan.pegawai.department_rel.nama if kunjungan.pegawai.department_rel else 'Pegawai'
+                    )
+                targets.append((
+                    f'tamu_{tid}',
+                    [f'notif_tamu_{tid}', f'notifications_tamu_{tid}'],
+                    'pegawai',
+                    peg_name,
+                    peg_sub,
+                ))
+    else:
+        tid = str(entity_uuid) if entity_uuid else (sid.replace('tamu_', '', 1) if sid.startswith('tamu_') else sid)
+        guest = None
+        if entity_uuid is not None:
+            guest = Tamu.objects.filter(id=entity_uuid).first()
+
+        guest_name = guest.name if guest else 'Tamu'
+        guest_sub = (guest.instansi if guest else None) or 'Tamu'
+
+        targets.append((
+            'admin',
+            ['notif_admin', 'admin_notifications'],
+            'tamu',
+            guest_name,
+            guest_sub,
+        ))
+        targets.append((
+            f'tamu_{tid}',
+            [f'notif_tamu_{tid}', f'notifications_tamu_{tid}'],
+            'admin',
+            'Admin Diskominfosantik',
+            'Layanan Umum & Asisten AI',
+        ))
+
+    if not targets:
+        return
+
+    try:
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+        for role_tag, groups, p_type, room_name, room_subtitle in targets:
+            payload = {
+                'id': f'sidebar:{role_tag}:{msg_token}',
+                'event_type': 'chat_sidebar_update',
+                'suppress_toast': True,
+                'session_id': sid,
+                'sender_id': str(sender_id),
+                'sender_type': sender_type,
+                'message_type': message_type,
+                'preview': preview,
+                'created_at': time_str,
+                'timestamp': epoch,
+                'participant_type': p_type,
+                'room_name': room_name,
+                'room_subtitle': room_subtitle,
+            }
+            for grp in groups:
+                async_to_sync(channel_layer.group_send)(
+                    grp,
+                    {
+                        'type': 'notification_message',
+                        'data': payload,
+                        'notification': payload,
+                    },
+                )
+    except Exception as exc:
+        logger.warning("Gagal menyiarkan pembaruan sidebar chat: %s", exc)
+
+
 def record_audit_log(user_id, user_type, action, table_name, record_id, old_value=None, new_value=None, ip_address=None):
     """Mencatat aktivitas ke AuditLog."""
     try:
@@ -88,9 +260,79 @@ def record_audit_log(user_id, user_type, action, table_name, record_id, old_valu
         logger.error(f"Gagal mencatat audit log: {e}")
 
 
+_OFFICE_OLE2_MAGIC = b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
+_OOXML_MAX_UNCOMPRESSED_BYTES = 25 * 1024 * 1024
+_OOXML_MAX_ENTRIES = 5000
+
+
+def _validate_image_magic_bytes(file_obj, ext):
+    """Validasi header magic bytes file gambar agar sesuai ekstensi."""
+    try:
+        header = file_obj.read(16)
+        if ext in ('jpg', 'jpeg') and not header.startswith(b'\xff\xd8\xff'):
+            return False, "File signature mismatch: File bukan format JPEG/JPG yang valid."
+        if ext == 'png' and not header.startswith(b'\x89PNG\r\n\x1a\n'):
+            return False, "File signature mismatch: File bukan format PNG yang valid."
+        if ext == 'webp' and not (header.startswith(b'RIFF') and len(header) >= 12 and header[8:12] == b'WEBP'):
+            return False, "File signature mismatch: File bukan format WEBP yang valid."
+        return True, ""
+    except Exception:
+        return False, "File signature mismatch: Gagal membaca file yang diunggah."
+    finally:
+        try:
+            file_obj.seek(0)
+        except Exception:
+            pass
+
+
+def _validate_document_magic_bytes(file_obj, ext):
+    """Validasi magic bytes & struktur internal untuk PDF dan dokumen Office."""
+    import zipfile
+
+    try:
+        header = file_obj.read(16)
+        if ext == 'pdf':
+            if not header.startswith(b'%PDF-'):
+                return False, "File signature mismatch: File bukan dokumen PDF yang valid."
+            return True, ""
+
+        if ext in ('doc', 'xls'):
+            if not header.startswith(_OFFICE_OLE2_MAGIC):
+                return False, f"File signature mismatch: File bukan dokumen .{ext.upper()} yang valid."
+            return True, ""
+
+        if ext in ('docx', 'xlsx'):
+            if not header.startswith(b'PK\x03\x04'):
+                return False, f"File signature mismatch: File bukan arsip OOXML (.{ext}) yang valid."
+            file_obj.seek(0)
+            try:
+                with zipfile.ZipFile(file_obj, 'r') as zf:
+                    infos = zf.infolist()
+                    if len(infos) > _OOXML_MAX_ENTRIES:
+                        return False, "Dokumen Office ditolak karena melebihi batas jumlah entri arsip."
+                    if sum(i.file_size for i in infos) > _OOXML_MAX_UNCOMPRESSED_BYTES:
+                        return False, "Dokumen Office ditolak karena ukuran dekompresi melebihi batas aman."
+                    names = [i.filename for i in infos]
+                    required_dir = 'word/' if ext == 'docx' else 'xl/'
+                    if '[Content_Types].xml' not in names or not any(n.startswith(required_dir) for n in names):
+                        return False, f"File signature mismatch: Struktur dokumen .{ext.upper()} tidak valid."
+            except (zipfile.BadZipFile, RuntimeError, ValueError):
+                return False, f"File signature mismatch: Dokumen .{ext.upper()} rusak atau terenkripsi."
+            return True, ""
+
+        return True, ""
+    except Exception:
+        return False, "File signature mismatch: Gagal memverifikasi isi dokumen."
+    finally:
+        try:
+            file_obj.seek(0)
+        except Exception:
+            pass
+
+
 def validate_uploaded_file(file_obj, max_size_bytes=5 * 1024 * 1024, allowed_extensions=None):
     """
-    Validasi file upload: ukuran dan ekstensi.
+    Validasi file upload: ukuran, ekstensi, dan magic bytes/struktur berkas.
     Mengembalikan (is_valid: bool, error_message: str, safe_filename: str)
     """
     import uuid
@@ -112,23 +354,14 @@ def validate_uploaded_file(file_obj, max_size_bytes=5 * 1024 * 1024, allowed_ext
         if ext not in allowed:
             return False, f"Ekstensi file .{ext} tidak diizinkan. Hanya: {', '.join(allowed)}.", ""
 
-    # Validasi magic bytes / signature untuk file gambar (keamanan upload)
-    if ext in ['jpg', 'jpeg', 'png', 'webp']:
-        try:
-            header = file_obj.read(16)
-            file_obj.seek(0)
-            if ext in ['jpg', 'jpeg']:
-                if not header.startswith(b'\xff\xd8\xff'):
-                    return False, "File signature mismatch: File bukan format JPEG/JPG yang valid.", ""
-            elif ext == 'png':
-                if not header.startswith(b'\x89PNG\r\n\x1a\n'):
-                    return False, "File signature mismatch: File bukan format PNG yang valid.", ""
-            elif ext == 'webp':
-                if not (header.startswith(b'RIFF') and len(header) >= 12 and header[8:12] == b'WEBP'):
-                    return False, "File signature mismatch: File bukan format WEBP yang valid.", ""
-        except Exception:
-            file_obj.seek(0)
-            return False, "File signature mismatch: Gagal membaca file yang diunggah.", ""
+    if ext in ('jpg', 'jpeg', 'png', 'webp'):
+        ok, err = _validate_image_magic_bytes(file_obj, ext)
+        if not ok:
+            return False, err, ""
+    elif ext in ('pdf', 'doc', 'docx', 'xls', 'xlsx'):
+        ok, err = _validate_document_magic_bytes(file_obj, ext)
+        if not ok:
+            return False, err, ""
 
     # Generate nama aman
     safe_name = f"{uuid.uuid4().hex}.{ext}" if ext else uuid.uuid4().hex
@@ -245,6 +478,33 @@ def _fallback_holidays(year):
     return base_holidays
 
 
+def _get_n8n_webhook_secret():
+    """Ambil secret autentikasi webhook n8n dari settings atau environment."""
+    from django.conf import settings as dj_settings
+    return (getattr(dj_settings, 'N8N_WEBHOOK_SECRET', '') or os.getenv('N8N_WEBHOOK_SECRET', '') or '').strip()
+
+
+def _is_valid_webhook_url(url: str) -> bool:
+    """Pastikan URL webhook menggunakan skema HTTP/HTTPS yang valid (anti file:// / SSRF skema non-HTTP)."""
+    from urllib.parse import urlparse
+    if not url or not isinstance(url, str):
+        return False
+    parsed = urlparse(url.strip())
+    return parsed.scheme in ('http', 'https') and bool(parsed.netloc)
+
+
+def _build_n8n_headers(user_agent: str) -> dict:
+    """Bangun header standar panggilan webhook n8n termasuk X-Webhook-Secret bila dikonfigurasi."""
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': user_agent,
+    }
+    secret = _get_n8n_webhook_secret()
+    if secret:
+        headers['X-Webhook-Secret'] = secret
+    return headers
+
+
 def call_n8n_routing(kunjungan_id, purpose, department=None, arrival_time=None, *args, **kwargs):
     """
     Memanggil Webhook N8N untuk Auto-Routing / Auto-Approval kunjungan.
@@ -260,9 +520,12 @@ def call_n8n_routing(kunjungan_id, purpose, department=None, arrival_time=None, 
     Returns:
         dict | None: Response dari n8n webhook jika berhasil, None jika gagal / dinonaktifkan
     """
-    webhook_url = os.getenv('N8N_WEBHOOK_URL')
+    webhook_url = (os.getenv('N8N_WEBHOOK_URL') or '').strip()
     if not webhook_url:
         logger.debug("N8N_WEBHOOK_URL tidak dikonfigurasi. Auto-routing dilewati.")
+        return None
+    if not _is_valid_webhook_url(webhook_url):
+        logger.warning("N8N_WEBHOOK_URL ditolak karena skema URL tidak valid.")
         return None
 
     timeout_seconds = int(os.getenv('N8N_WEBHOOK_TIMEOUT', '5'))
@@ -275,8 +538,8 @@ def call_n8n_routing(kunjungan_id, purpose, department=None, arrival_time=None, 
 
     payload = {
         'kunjungan_id': str(kunjungan_id or ''),
-        'purpose': str(purpose or ''),
-        'department': str(department or ''),
+        'purpose': str(purpose or '')[:500],
+        'department': str(department or '')[:255],
         'arrival_time': arrival_str,
         'timestamp': timezone.now().isoformat(),
         'source': 'bukudigital_django'
@@ -290,10 +553,7 @@ def call_n8n_routing(kunjungan_id, purpose, department=None, arrival_time=None, 
         req = urllib.request.Request(
             webhook_url,
             data=data,
-            headers={
-                'Content-Type': 'application/json',
-                'User-Agent': 'BukuDigital-AutoRouting/1.0',
-            },
+            headers=_build_n8n_headers('BukuDigital-AutoRouting/1.0'),
             method='POST'
         )
 
@@ -2829,32 +3089,51 @@ def build_n8n_chat_response(tamu_id, message_text, session_id=None):
             'strike_count': AI_MAX_STRIKES,
         }
 
+    # 1b. Rate limit pemanggilan Chatbot AI per sesi (mencegah penyalahgunaan kuota LLM/n8n)
+    from django.conf import settings as dj_settings
+    from .views.auth import check_rate_limit, record_rate_limit_attempt
+
+    ai_rl_max = int(getattr(dj_settings, 'AI_CHAT_RATE_LIMIT_MAX', 20) or 20)
+    ai_rl_window = int(getattr(dj_settings, 'AI_CHAT_RATE_LIMIT_WINDOW', 300) or 300)
+    ai_rl_key = f"rl_ai_chat_{sess_key}"
+    if check_rate_limit(ai_rl_key, max_attempts=ai_rl_max, fail_closed=False):
+        return {
+            'intent': 'rate_limited',
+            'reply_text': (
+                "🤖 Asisten AI Diskominfosantik:\n"
+                "Anda mengirim terlalu banyak pesan dalam waktu singkat. "
+                "Mohon tunggu beberapa menit sebelum bertanya kembali atau hubungi Admin secara langsung."
+            ),
+            'handoff': False,
+            'strike_count': get_session_strike_count(sess_key),
+        }
+    record_rate_limit_attempt(ai_rl_key, timeout_seconds=ai_rl_window)
+
+    safe_message_text = str(message_text or '')[:2000]
+
     # 2. Panggil N8N Webhook AI Assistant
     n8n_res = None
     try:
-        mock_check = call_n8n_routing(None, message_text, None, None)
+        mock_check = call_n8n_routing(None, safe_message_text, None, None)
         if isinstance(mock_check, dict) and ('intent' in mock_check or 'reply' in mock_check or 'replay' in mock_check):
             n8n_res = mock_check
     except Exception:
         pass
 
-    n8n_chat_url = os.getenv('N8N_CHAT_WEBHOOK_URL')
-    if not n8n_res and n8n_chat_url:
+    n8n_chat_url = (os.getenv('N8N_CHAT_WEBHOOK_URL') or '').strip()
+    if not n8n_res and n8n_chat_url and _is_valid_webhook_url(n8n_chat_url):
         try:
             import urllib.request
             payload = json.dumps({
                 'tamu_id': str(tamu_id),
                 'session_id': str(sess_key),
-                'message': message_text,
+                'message': safe_message_text,
                 'timestamp': timezone.now().isoformat(),
             }).encode('utf-8')
             req = urllib.request.Request(
                 n8n_chat_url,
                 data=payload,
-                headers={
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'BukuDigital-ChatAI/1.0',
-                },
+                headers=_build_n8n_headers('BukuDigital-ChatAI/1.0'),
                 method='POST'
             )
             timeout = int(os.getenv('N8N_WEBHOOK_TIMEOUT', '5'))
@@ -3443,5 +3722,14 @@ def process_n8n_chat_assistant(session_id, tamu_id, message_text, room_group_nam
                     'handoff_active': bool(res.get('handoff')),
                 }
             )
+        send_chat_sidebar_update(
+            session_id=session_id,
+            sender_id='admin',
+            sender_type='admin',
+            message=reply_text,
+            message_type='text',
+            message_id=chat_msg.id,
+            created_at_dt=chat_msg.created_at,
+        )
     except Exception as e:
         logger.exception("Error saat memproses N8N Chat Assistant: %s", e)

@@ -582,9 +582,9 @@
 
             <!-- Pagination Dots -->
             <div class="pagination-dots">
-                <div class="dot active" onclick="goToSlide(0)" id="dot-0"></div>
-                <div class="dot" onclick="goToSlide(1)" id="dot-1"></div>
-                <div class="dot" onclick="goToSlide(2)" id="dot-2"></div>
+                <div class="dot active" data-slide="0" id="dot-0"></div>
+                <div class="dot" data-slide="1" id="dot-1"></div>
+                <div class="dot" data-slide="2" id="dot-2"></div>
             </div>
         </div>
 
@@ -702,7 +702,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     // ── Slider Logic ──────────────────────────────
     let currentSlide = 0;
     const slides = document.querySelectorAll('.slide');
@@ -715,6 +715,10 @@
         slides[currentSlide].classList.add('active');
         dots[currentSlide].classList.add('active');
     }
+
+    dots.forEach((dot, idx) => {
+        dot.addEventListener('click', () => goToSlide(Number(dot.dataset.slide ?? idx)));
+    });
 
     function nextSlide() {
         goToSlide((currentSlide + 1) % slides.length);

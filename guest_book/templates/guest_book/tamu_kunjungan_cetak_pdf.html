@@ -304,7 +304,7 @@
             </div>
         </div>
         <div style="display: flex; gap: 10px;">
-            <button onclick="window.print()" style="padding: 8px 16px; background: #0f172a; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s;">
+            <button data-action="print" style="padding: 8px 16px; background: #0f172a; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s;">
                 <i class="fas fa-print"></i> Cetak / Simpan PDF
             </button>
             <a href="{% url 'tamu:riwayat' %}" style="padding: 8px 16px; background: #fff; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: 0.2s;">
@@ -316,7 +316,7 @@
     <!-- KOP SURAT -->
     <div class="kop-surat">
         <div class="logo-kiri">
-            <img src="{% static 'images/logo-bekasi.jpg' %}" alt="Logo Kab Bekasi" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png'">
+            <img src="{% static 'images/logo-bekasi.jpg' %}" alt="Logo Kab Bekasi" data-fallback-src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png">
         </div>
         
         <div class="kop-text">
@@ -423,7 +423,8 @@
         </div>
     </div>
 
-    <script>
+    <script src="{% static 'js/security_utils.js' %}"></script>
+    <script nonce="{{ csp_nonce }}">
         document.addEventListener("DOMContentLoaded", function() {
 
             // Simpan title dokumen asli

@@ -134,8 +134,8 @@ class ChatSearchSecurityTests(TestCase):
     def test_query_under_two_chars_returns_empty_instantly(self):
         """Query kurang dari 2 karakter langsung mengembalikan [] tanpa query tabel tamu/pegawai."""
         self._login_admin()
-        # 2 query berasal dari SessionMiddleware & AuthenticationMiddleware Django, 0 query bisnis (tamu/pegawai)
-        with self.assertNumQueries(2):
+        # 2 kueri middleware (session + auth) + 1 kueri verifikasi 2FA Admin (K-1), 0 kueri bisnis (tamu/pegawai)
+        with self.assertNumQueries(3):
             resp = self.client.get(f"{SEARCH_URL}?q=a")
             self.assertEqual(resp.status_code, 200)
             self.assertEqual(resp.json()['users'], [])
@@ -200,8 +200,8 @@ class ChatSearchSecurityTests(TestCase):
     def test_admin_search_queries_are_optimized_no_n_plus_one(self):
         """Pencarian pegawai menggunakan select_related('department_rel') sehingga tidak ada N+1 query."""
         self._login_admin()
-        # 2 kueri middleware (session + auth) + 1 kueri tamu + 1 kueri pegawai (JOIN departemen) = 4 kueri (TIDAK ADA N+1!)
-        with self.assertNumQueries(4):
+        # 2 kueri middleware (session + auth) + 1 kueri verifikasi 2FA Admin (K-1) + 1 kueri tamu + 1 kueri pegawai (JOIN departemen) = 5 kueri (TIDAK ADA N+1!)
+        with self.assertNumQueries(5):
             resp = self.client.get(f"{SEARCH_URL}?q=Pegawai")
             self.assertEqual(resp.status_code, 200)
             self.assertTrue(len(resp.json()['users']) > 0)

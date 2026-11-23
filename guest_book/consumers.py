@@ -1,11 +1,85 @@
 import json
 import logging
+import re
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.utils import timezone
 from .models import ChatMessage, Kunjungan
 
 logger = logging.getLogger(__name__)
+
+_SAFE_CHAT_ATTACHMENT_PATH_RE = re.compile(r'^chat_attachments/[A-Za-z0-9._-]+$')
+_IMAGE_CHAT_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+_DOC_CHAT_EXTENSIONS = {'doc', 'docx', 'xls', 'xlsx', 'pdf'}
+_ALL_CHAT_EXTENSIONS = _IMAGE_CHAT_EXTENSIONS | _DOC_CHAT_EXTENSIONS
+
+
+def _resolve_ws_identity(user, session):
+    """
+    Menentukan identitas WebSocket murni dari database & sesi aktif sisi server.
+    Fail closed (return None) bila sesi palsu, akun nonaktif/dihapus, atau 2FA belum lolos.
+    """
+    session = session or {}
+
+    # 1. Django Staff / Admin Auth (dengan verifikasi active & 2FA)
+    if (
+        user
+        and getattr(user, 'is_authenticated', False)
+        and getattr(user, 'is_staff', False)
+        and getattr(user, 'is_active', False)
+    ):
+        from .views.base import ADMIN_2FA_VERIFIED_SESSION_KEY, resolve_admin_record
+        from .security_utils import decrypt_secret
+
+        admin_record = resolve_admin_record(user)
+        if admin_record and admin_record.two_fa_enabled and admin_record.two_fa_secret:
+            if decrypt_secret(admin_record.two_fa_secret):
+                if session.get(ADMIN_2FA_VERIFIED_SESSION_KEY) != str(user.pk):
+                    return None
+        full_name = getattr(user, 'get_full_name', lambda: '')() or user.username
+        return {'type': 'admin', 'id': 'admin', 'name': full_name or 'Administrator'}
+
+    # 2. Sesi Tamu aktif di DB
+    tamu_id = session.get('tamu_id')
+    if tamu_id:
+        try:
+            from .models import Admin, Tamu
+
+            tamu = Tamu.objects.filter(id=tamu_id, account_status='active').first()
+            if not tamu:
+                return None
+            if tamu.is_admin:
+                if (
+                    tamu.email
+                    and Admin.objects.filter(
+                        email__iexact=tamu.email,
+                        account_status='active',
+                        two_fa_enabled=True,
+                    ).exists()
+                ):
+                    return None
+                return {'type': 'admin', 'id': 'admin', 'name': tamu.name}
+            return {'type': 'tamu', 'id': str(tamu.id), 'name': tamu.name}
+        except (ValueError, TypeError, ValidationError):
+            return None
+
+    # 3. Sesi Pegawai aktif di DB
+    pegawai_id = session.get('pegawai_id')
+    if pegawai_id:
+        try:
+            from .models import Pegawai
+
+            pegawai = Pegawai.objects.filter(id=pegawai_id, account_status='active').first()
+            if not pegawai:
+                return None
+            return {'type': 'pegawai', 'id': str(pegawai.id), 'name': pegawai.name}
+        except (ValueError, TypeError, ValidationError):
+            return None
+
+    return None
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -36,49 +110,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def resolve_identity(self):
         """
-        Menentukan identitas pengguna yang terhubung murni dari sisi server (scope).
+        Menentukan identitas pengguna yang terhubung murni dari sisi server & database.
         Mengembalikan dict {'type': 'admin'|'pegawai'|'tamu', 'id': str, 'name': str}
-        atau None jika anonim / tidak valid.
+        atau None jika anonim / nonaktif / tidak valid.
         """
-        user = self.scope.get('user')
-        session = self.scope.get('session', {})
-
-        # 1. Django Staff / Admin Auth
-        if user and getattr(user, 'is_authenticated', False) and getattr(user, 'is_staff', False):
-            full_name = getattr(user, 'get_full_name', lambda: '')() or user.username
-            return {'type': 'admin', 'id': 'admin', 'name': full_name or 'Administrator'}
-
-        # 2. Session Admin Flag (legacy/custom admin role)
-        if session.get('is_admin') or session.get('role') in ['admin', 'super_admin'] or session.get('admin_id'):
-            return {'type': 'admin', 'id': 'admin', 'name': 'Administrator'}
-
-        # 3. Sesi Tamu (periksa apakah tamu memiliki status is_admin)
-        tamu_id = session.get('tamu_id')
-        if tamu_id:
-            try:
-                from .models import Tamu
-                tamu = Tamu.objects.filter(id=tamu_id, account_status='active').first()
-                if tamu:
-                    if tamu.is_admin:
-                        return {'type': 'admin', 'id': 'admin', 'name': tamu.name}
-                    return {'type': 'tamu', 'id': str(tamu.id), 'name': tamu.name}
-            except Exception:
-                pass
-            return {'type': 'tamu', 'id': str(tamu_id), 'name': 'Tamu'}
-
-        # 4. Sesi Pegawai
-        pegawai_id = session.get('pegawai_id')
-        if pegawai_id:
-            try:
-                from .models import Pegawai
-                pegawai = Pegawai.objects.filter(id=pegawai_id, account_status='active').first()
-                if pegawai:
-                    return {'type': 'pegawai', 'id': str(pegawai.id), 'name': pegawai.name}
-            except Exception:
-                pass
-            return {'type': 'pegawai', 'id': str(pegawai_id), 'name': 'Pegawai'}
-
-        return None
+        return _resolve_ws_identity(self.scope.get('user'), self.scope.get('session', {}))
 
     @database_sync_to_async
     def check_chat_permission(self):
@@ -92,8 +128,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not self.identity:
             return False
 
+        from .models import ChatRoom
+        from .permissions import PermissionManager
+
         user_type = self.identity['type']
         user_id = self.identity['id']
+        parsed = ChatRoom.parse_session_id(self.session_id)
+        room_type = parsed['room_type']
+        entity_uuid = parsed['entity_uuid']
 
         # Admin memiliki hak akses universal
         if user_type == 'admin':
@@ -101,37 +143,37 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Pegawai
         if user_type == 'pegawai':
-            if self.session_id.startswith('pegawai_admin_'):
-                target_pegawai_id = self.session_id.replace('pegawai_admin_', '')
+            if room_type == ChatRoom.RoomType.PEGAWAI_ADMIN:
+                target_pegawai_id = str(entity_uuid) if entity_uuid else self.session_id.replace('pegawai_admin_', '', 1)
                 return user_id == target_pegawai_id
 
-            elif self.session_id.startswith('kunjungan_'):
-                from .permissions import PermissionManager
-                kunjungan_id = self.session_id.replace('kunjungan_', '')
+            if room_type == ChatRoom.RoomType.KUNJUNGAN and entity_uuid is not None:
                 try:
-                    kunjungan = Kunjungan.objects.select_related('pegawai', 'tamu').get(id=kunjungan_id)
+                    kunjungan = Kunjungan.objects.select_related('pegawai', 'tamu').get(id=entity_uuid)
                     if not PermissionManager.can_access_chat_pegawai_tamu(kunjungan):
                         return False
                     return str(kunjungan.pegawai_id) == user_id
-                except (Kunjungan.DoesNotExist, Exception):
+                except Kunjungan.DoesNotExist:
                     return False
             return False
 
         # Tamu
         if user_type == 'tamu':
-            if self.session_id.startswith('tamu_') or self.session_id == user_id:
-                target_tamu_id = self.session_id.replace('tamu_', '') if self.session_id.startswith('tamu_') else self.session_id
+            if room_type == ChatRoom.RoomType.TAMU_ADMIN or self.session_id == user_id:
+                target_tamu_id = (
+                    str(entity_uuid)
+                    if entity_uuid
+                    else (self.session_id.replace('tamu_', '', 1) if self.session_id.startswith('tamu_') else self.session_id)
+                )
                 return user_id == target_tamu_id
 
-            elif self.session_id.startswith('kunjungan_'):
-                from .permissions import PermissionManager
-                kunjungan_id = self.session_id.replace('kunjungan_', '')
+            if room_type == ChatRoom.RoomType.KUNJUNGAN and entity_uuid is not None:
                 try:
-                    kunjungan = Kunjungan.objects.select_related('pegawai', 'tamu').get(id=kunjungan_id)
+                    kunjungan = Kunjungan.objects.select_related('pegawai', 'tamu').get(id=entity_uuid)
                     if not PermissionManager.can_access_chat_pegawai_tamu(kunjungan):
                         return False
                     return str(kunjungan.tamu_id) == user_id
-                except (Kunjungan.DoesNotExist, Exception):
+                except Kunjungan.DoesNotExist:
                     return False
             return False
 
@@ -182,20 +224,37 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.message_timestamps.append(now_ts)
 
         # 4. Validasi aksi yang didukung
-        if action not in ['create', 'edit', 'delete']:
+        if action not in ['create', 'edit', 'delete', 'reset_ai']:
             await self.send(text_data=json.dumps({
                 'action': 'error',
                 'message': f'Aksi "{action}" tidak dikenal.'
             }))
             return
 
+        # 5. Verifikasi ulang status akun aktif di database pada setiap aksi mutasi (K-3)
+        fresh_identity = await self.resolve_identity()
+        if not fresh_identity:
+            await self.close(code=4003)
+            return
+        self.identity = fresh_identity
+
         # Identitas murni dari server (mengabaikan total field sender_id & sender_type dari klien)
         sender_id = self.identity['id']
         sender_type = self.identity['type']
 
         if action == 'reset_ai':
-            from .utils import set_session_handoff_to_admin
-            set_session_handoff_to_admin(self.session_id, active=False)
+            if self.session_id.startswith('kunjungan_') or sender_type not in ('tamu', 'admin'):
+                await self.send(text_data=json.dumps({
+                    'action': 'error',
+                    'message': 'Aksi reset AI hanya diizinkan pada percakapan layanan umum.'
+                }))
+                return
+            await self._reset_ai_session()
+            await self.send(text_data=json.dumps({
+                'action': 'reset_ai',
+                'success': True,
+                'handoff_active': False,
+            }))
             return
 
         if action == 'create':
@@ -216,19 +275,49 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 return
 
             message_type = text_data_json.get('message_type', 'text')
-            file_path = text_data_json.get('file_path')
-            file_url = text_data_json.get('file_url')
+            if message_type not in ('text', 'image', 'file'):
+                await self.send(text_data=json.dumps({
+                    'action': 'error',
+                    'message': 'Tipe pesan tidak valid.'
+                }))
+                return
 
-            # Backend file extension validation
-            if message_type in ['file', 'image'] and message:
-                allowed_extensions = ['doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'svg', 'pdf']
-                ext = message.split('.')[-1].lower() if '.' in message else ''
-                if ext not in allowed_extensions:
+            file_path = None
+            file_url = None
+            if message_type in ('file', 'image'):
+                raw_path = text_data_json.get('file_path')
+                if (
+                    not isinstance(raw_path, str)
+                    or '..' in raw_path
+                    or '\\' in raw_path
+                    or not _SAFE_CHAT_ATTACHMENT_PATH_RE.match(raw_path)
+                ):
+                    await self.send(text_data=json.dumps({
+                        'action': 'error',
+                        'message': 'Path lampiran tidak valid atau tidak diizinkan.'
+                    }))
+                    return
+
+                ext = raw_path.rsplit('.', 1)[-1].lower() if '.' in raw_path else ''
+                expected_exts = _IMAGE_CHAT_EXTENSIONS if message_type == 'image' else _DOC_CHAT_EXTENSIONS
+                if ext not in expected_exts or ext not in _ALL_CHAT_EXTENSIONS:
                     await self.send(text_data=json.dumps({
                         'action': 'error',
                         'message': 'Format file ditolak oleh server karena alasan keamanan.'
                     }))
                     return
+
+                exists_in_storage = await database_sync_to_async(default_storage.exists)(raw_path)
+                if not exists_in_storage:
+                    await self.send(text_data=json.dumps({
+                        'action': 'error',
+                        'message': 'File lampiran tidak ditemukan di penyimpanan server.'
+                    }))
+                    return
+
+                file_path = raw_path
+                # Selalu bentuk file_url murni di server (abaikan file_url kiriman klien)
+                file_url = await database_sync_to_async(default_storage.url)(file_path)
 
             # Save message to database
             msg = await self.save_message(sender_id, sender_type, message, message_type, file_path)
@@ -244,6 +333,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 from .utils import set_session_handoff_to_admin
                 set_session_handoff_to_admin(self.session_id, active=True)
                 await self._notify_recipient_from_admin(message)
+
+            await self._broadcast_sidebar_update(msg, sender_id, sender_type, message, message_type)
 
             # Broadcast message to room group
             await self.channel_layer.group_send(
@@ -342,6 +433,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         from .utils import is_session_handed_off_to_admin
         return is_session_handed_off_to_admin(self.session_id)
 
+    @database_sync_to_async
+    def _reset_ai_session(self):
+        from .utils import reset_session_ai_mode
+        reset_session_ai_mode(self.session_id)
+
     # Receive message from room group
     async def chat_message(self, event):
         # Send message to WebSocket
@@ -365,6 +461,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message': event['message'],
             'action': event['action']
         }))
+
+    @database_sync_to_async
+    def _broadcast_sidebar_update(self, msg, sender_id, sender_type, message, message_type):
+        from .utils import send_chat_sidebar_update
+        send_chat_sidebar_update(
+            session_id=self.session_id,
+            sender_id=sender_id,
+            sender_type=sender_type,
+            message=message,
+            message_type=message_type,
+            message_id=msg.id,
+            created_at_dt=msg.created_at,
+        )
 
     @database_sync_to_async
     def save_message(self, sender_id, sender_type, content, message_type='text', file_path=None):
@@ -561,32 +670,22 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         session = self.scope.get('session', {})
         user = self.scope.get('user')
 
-        is_admin = (
-            (user and getattr(user, 'is_authenticated', False) and getattr(user, 'is_staff', False))
-            or session.get('is_admin')
-            or session.get('role') in ['admin', 'super_admin']
-        )
-
-        is_tamu_admin = False
-        if session.get('tamu_id'):
-            try:
-                from .models import Tamu
-                is_tamu_admin = await database_sync_to_async(
-                    Tamu.objects.filter(id=session.get('tamu_id'), is_admin=True, account_status='active').exists
-                )()
-            except Exception:
-                pass
-
+        identity = await database_sync_to_async(_resolve_ws_identity)(user, session)
         self.groups = []
-        if is_admin or is_tamu_admin:
+        if not identity:
+            await self.close(code=4003)
+            return
+
+        self.identity = identity
+        if identity['type'] == 'admin':
             self.groups = ['notif_admin', 'admin_notifications']
             self.group_name = 'notif_admin'
-        elif session.get('pegawai_id'):
-            pid = session['pegawai_id']
+        elif identity['type'] == 'pegawai':
+            pid = identity['id']
             self.groups = [f"notif_pegawai_{pid}", f"notifications_pegawai_{pid}"]
             self.group_name = f"notif_pegawai_{pid}"
-        elif session.get('tamu_id'):
-            tid = session['tamu_id']
+        elif identity['type'] == 'tamu':
+            tid = identity['id']
             self.groups = [f"notif_tamu_{tid}", f"notifications_tamu_{tid}"]
             self.group_name = f"notif_tamu_{tid}"
         else:

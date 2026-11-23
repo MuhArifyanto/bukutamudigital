@@ -543,7 +543,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Style form controls dynamically if they don't have classes
     document.querySelectorAll('textarea, input[type="text"], input[type="datetime-local"]').forEach(el => {
         if(!el.classList.contains('form-control')) el.classList.add('form-control');

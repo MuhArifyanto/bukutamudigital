@@ -44,4 +44,7 @@ from .api_admin import (  # noqa: F401
     api_debug_calendar_settings,
     api_debug_counts,
     api_webhook_delete_user,
+    api_admin_2fa_setup,
+    api_admin_2fa_enable,
+    api_admin_2fa_disable,
 )

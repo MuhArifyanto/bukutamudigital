@@ -239,13 +239,13 @@
         <p>Kelola kuota harian, jadwal operasional, dan hari libur nasional.</p>
     </div>
     <div class="kal-header-btns">
-        <input type="file" id="excelImportInput" hidden accept=".xlsx, .xls, .csv" onchange="uploadExcelSchedule()">
+        <input type="file" id="excelImportInput" hidden accept=".xlsx, .xls, .csv">
         <div class="dropdown">
             <button class="btn-kal-white dropdown-toggle" type="button" data-bs-toggle="dropdown">
                 <i class="fas fa-file-excel"></i> Import Excel
             </button>
             <ul class="dropdown-menu dropdown-menu-end p-2 border-0 shadow-lg" style="border-radius: 12px; min-width: 220px;">
-                <li><a class="dropdown-item p-2 fw-bold" href="#" onclick="document.getElementById('excelImportInput').click()"><i class="fas fa-calendar-alt me-2 text-primary"></i> Unggah Kuota & Libur</a></li>
+                <li><a class="dropdown-item p-2 fw-bold" href="#" id="btnTriggerExcelImport"><i class="fas fa-calendar-alt me-2 text-primary"></i> Unggah Kuota & Libur</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item p-2 text-muted small" href="{% url 'tamu:admin_kalender_download_template' %}"><i class="fas fa-download me-2"></i> Unduh Template Kuota/Libur</a></li>
             </ul>
@@ -259,7 +259,7 @@
                 <li><a class="dropdown-item p-2 fw-bold" href="{% url 'tamu:admin_kunjungan_cetak_pdf' %}" target="_blank"><i class="fas fa-file-pdf me-2 text-danger"></i> Unduh PDF</a></li>
             </ul>
         </div>
-        <button class="btn-kal-blue" data-bs-toggle="modal" data-bs-target="#modalQuickCheckin" onclick="openEventBaru()"><i class="fas fa-plus"></i> Event Baru</button>
+        <button id="btnEventBaru" class="btn-kal-blue" data-bs-toggle="modal" data-bs-target="#modalQuickCheckin"><i class="fas fa-plus"></i> Event Baru</button>
     </div>
 </div>
 
@@ -271,13 +271,13 @@
                 <h3>
                     {{ current_month_str }} {{ year }}
                     <div class="cal-nav-arrows">
-                        <a href="?year={{ prev_year }}&month={{ prev_month }}" class="arrow-btn" onclick="showLoader()"><i class="fas fa-chevron-left"></i></a>
-                        <a href="?year={{ next_year }}&month={{ next_month }}" class="arrow-btn" onclick="showLoader()"><i class="fas fa-chevron-right"></i></a>
+                        <a href="?year={{ prev_year }}&month={{ prev_month }}" class="arrow-btn js-cal-nav-loader"><i class="fas fa-chevron-left"></i></a>
+                        <a href="?year={{ next_year }}&month={{ next_month }}" class="arrow-btn js-cal-nav-loader"><i class="fas fa-chevron-right"></i></a>
                     </div>
                 </h3>
                 <div class="view-toggle" id="viewToggleContainer" style="overflow-x: auto; white-space: nowrap;">
-                    <button class="vt-btn active" onclick="switchView('grid')"><i class="fas fa-calendar-alt me-1"></i> Kalender</button>
-                    <button class="vt-btn" onclick="switchView('table')"><i class="fas fa-list me-1"></i> Tabel Input</button>
+                    <button class="vt-btn active" data-view="grid"><i class="fas fa-calendar-alt me-1"></i> Kalender</button>
+                    <button class="vt-btn" data-view="table"><i class="fas fa-list me-1"></i> Tabel Input</button>
                 </div>
             </div>
 
@@ -298,8 +298,7 @@
                     {% for d in days %}
                     <div class="cal-cell {% if d.is_weekend %}is-weekend{% endif %} {% if d.is_today %}is-today{% endif %} {% if d.is_past %}is-past{% endif %} {% if d.is_holiday %}is-holiday{% endif %} {% if d.holiday_name and not d.is_holiday %}has-event{% endif %}"
                          id="calday-{{ d.date }}"
-                         data-date="{{ d.date }}" data-booked="{{ d.booked }}" data-quota="{{ d.quota }}" data-holiday="{{ d.holiday_name|default:'' }}"
-                         onclick="selectDay(this)">
+                         data-date="{{ d.date }}" data-booked="{{ d.booked }}" data-quota="{{ d.quota }}" data-holiday="{{ d.holiday_name|default:'' }}">
                         
                         {% if d.is_today %}<span class="cell-today-dot"></span>{% endif %}
                         <span class="cell-num">{{ d.day }}</span>
@@ -356,17 +355,17 @@
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         <input type="number" class="form-control form-control-sm quota-input-table" 
-                                               value="{{ d.quota }}" id="table-quota-{{ d.date }}" 
-                                               onchange="syncTableToGrid('{{ d.date }}', this.value)"
+                                               value="{{ d.quota }}" id="table-quota-{{ d.date }}"
+                                               data-date="{{ d.date }}"
                                                style="width: 70px; border-radius: 8px; font-weight: 700;">
                                         <span class="text-muted small">Slot</span>
                                     </div>
                                 </td>
                                 <td>
                                     <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="table-holiday-{{ d.date }}" 
+                                        <input class="form-check-input js-table-holiday" type="checkbox" id="table-holiday-{{ d.date }}" 
                                                {% if d.is_holiday %}checked{% endif %}
-                                               onchange="syncHolidayToGrid('{{ d.date }}', this.checked)">
+                                               data-date="{{ d.date }}">
                                         <label class="form-check-label small text-muted">{% if d.is_holiday %}Libur{% else %}Buka{% endif %}</label>
                                     </div>
                                 </td>
@@ -377,7 +376,7 @@
                                            style="border-radius: 8px; font-size: 0.75rem;">
                                 </td>
                                 <td style="text-align: right; padding-right: 1rem;">
-                                    <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="saveSingleRow('{{ d.date }}')">
+                                    <button class="btn btn-sm btn-outline-primary rounded-pill px-3 js-save-row" data-date="{{ d.date }}">
                                         <i class="fas fa-save me-1"></i> Simpan
                                     </button>
                                 </td>
@@ -414,7 +413,7 @@
             </div>
         </div>
 
-        <button class="quick-checkin-bar" data-bs-toggle="modal" data-bs-target="#modalQuickCheckin" onclick="openQuickCheckin()">
+        <button id="btnQuickCheckinBar" class="quick-checkin-bar" data-bs-toggle="modal" data-bs-target="#modalQuickCheckin">
             <i class="fas fa-plus"></i> Quick Check-in
         </button>
     </div>
@@ -452,13 +451,13 @@
             </div>
 
             <div class="d-flex flex-column gap-2">
-                <button class="btn-action-blue w-100" id="btnSaveQuota" onclick="saveQuota()">
+                <button class="btn-action-blue w-100" id="btnSaveQuota">
                     <i class="fas fa-save me-2"></i> Simpan Perubahan
                 </button>
-                <button class="btn-action-dark w-100" onclick="toggleHoliday()">
+                <button class="btn-action-dark w-100" id="btnToggleHoliday">
                     Jadikan Libur (Tutup)
                 </button>
-                <button class="btn btn-outline-success w-100 mt-1" onclick="openDateAgain()" style="border-radius:12px; font-weight:700; padding: 12px;">
+                <button class="btn btn-outline-success w-100 mt-1" id="btnOpenDateAgain" style="border-radius:12px; font-weight:700; padding: 12px;">
                     <i class="fas fa-calendar-check me-2"></i> Buka Kembali Tanggal Ini
                 </button>
             </div>
@@ -557,7 +556,7 @@
                         <label class="form-label small fw-bold text-muted">KEPERLUAN</label>
                         <textarea name="purpose" class="form-control" rows="2" placeholder="Tujuan kunjungan..." style="border-radius:12px; padding:12px;"></textarea>
                     </div>
-                    <button type="button" onclick="submitQuickCheckin()" class="btn btn-primary w-100 fw-bold py-3" style="border-radius:16px; background: linear-gradient(135deg, #1e56a0 0%, #163172 100%); border: none; box-shadow: 0 4px 15px rgba(30, 86, 160, 0.3);">
+                    <button type="button" id="btnSubmitQuickCheckin" class="btn btn-primary w-100 fw-bold py-3" style="border-radius:16px; background: linear-gradient(135deg, #1e56a0 0%, #163172 100%); border: none; box-shadow: 0 4px 15px rgba(30, 86, 160, 0.3);">
                         <i class="fas fa-check-circle me-2"></i> Daftarkan Sekarang
                     </button>
                 </form>
@@ -569,7 +568,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     let selectedDate = null;
     let selectedVisit = 0;
     let selectedMax = 50;
@@ -621,25 +620,50 @@
             
             if (data.success) {
                 badge.textContent = data.visits.length;
+                container.innerHTML = '';
                 if (data.visits.length === 0) {
                     container.innerHTML = '<div class="text-center text-muted small py-4">Tidak ada kunjungan pada tanggal ini.</div>';
                 } else {
-                    let html = '';
+                    const frag = document.createDocumentFragment();
                     data.visits.forEach(v => {
-                        html += `
-                            <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-bottom">
-                                <div>
-                                    <div class="fw-bold small">${v.tamu_name}</div>
-                                    <div class="text-muted" style="font-size: 11px;">${v.time} | ${v.instansi}</div>
-                                </div>
-                                <div>
-                                    <span class="badge bg-${v.status === 'completed' ? 'success' : (v.status === 'in_progress' ? 'warning' : 'secondary')} small">${v.status === 'completed' ? 'Selesai' : (v.status === 'in_progress' ? 'Bertamu' : (v.status === 'pending' ? 'Verifikasi' : (v.status === 'cancelled' ? 'Batal' : v.status)))}</span>
-                                    <button class="btn btn-sm btn-outline-primary ms-1" onclick="editVisit(${v.id}, '${v.tamu_name}', '${v.instansi}', '${v.time}', '${v.status}', '${v.purpose}')"><i class="fas fa-edit"></i></button>
-                                </div>
-                            </div>
-                        `;
+                        const row = document.createElement('div');
+                        row.className = 'd-flex justify-content-between align-items-center mb-2 p-2 border-bottom';
+
+                        const infoDiv = document.createElement('div');
+                        const nameDiv = document.createElement('div');
+                        nameDiv.className = 'fw-bold small';
+                        nameDiv.textContent = v.tamu_name || '';
+                        const subDiv = document.createElement('div');
+                        subDiv.className = 'text-muted';
+                        subDiv.style.fontSize = '11px';
+                        subDiv.textContent = `${v.time || ''} | ${v.instansi || ''}`;
+                        infoDiv.appendChild(nameDiv);
+                        infoDiv.appendChild(subDiv);
+
+                        const actDiv = document.createElement('div');
+                        const statusSpan = document.createElement('span');
+                        const badgeColor = v.status === 'completed' ? 'success' : (v.status === 'in_progress' ? 'warning' : 'secondary');
+                        statusSpan.className = `badge bg-${badgeColor} small`;
+                        statusSpan.textContent = v.status === 'completed'
+                            ? 'Selesai'
+                            : (v.status === 'in_progress' ? 'Bertamu' : (v.status === 'pending' ? 'Verifikasi' : (v.status === 'cancelled' ? 'Batal' : (v.status || ''))));
+
+                        const editBtn = document.createElement('button');
+                        editBtn.type = 'button';
+                        editBtn.className = 'btn btn-sm btn-outline-primary ms-1';
+                        editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+                        editBtn.addEventListener('click', () => {
+                            window.editVisit(v.id, v.tamu_name || '', v.instansi || '', v.time || '', v.status || '', v.purpose || '');
+                        });
+
+                        actDiv.appendChild(statusSpan);
+                        actDiv.appendChild(editBtn);
+
+                        row.appendChild(infoDiv);
+                        row.appendChild(actDiv);
+                        frag.appendChild(row);
                     });
-                    container.innerHTML = html;
+                    container.appendChild(frag);
                 }
             } else {
                 container.innerHTML = '<div class="text-center text-danger small py-4">Gagal memuat data.</div>';
@@ -810,7 +834,7 @@
         formData.append('file', file);
         
         // Visual feedback
-        const btn = document.querySelector('a[onclick*="excelImportInput"]') || document.querySelector('button[onclick*="excelImportInput"]');
+        const btn = document.getElementById('btnTriggerExcelImport');
         const orig = btn ? btn.innerHTML : '';
         if (btn) {
             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Mengimpor...';
@@ -944,6 +968,59 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        const excelInput = document.getElementById('excelImportInput');
+        if (excelInput) excelInput.addEventListener('change', uploadExcelSchedule);
+
+        const triggerExcelLink = document.getElementById('btnTriggerExcelImport');
+        if (triggerExcelLink && excelInput) {
+            triggerExcelLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                excelInput.click();
+            });
+        }
+
+        const btnEventBaru = document.getElementById('btnEventBaru');
+        if (btnEventBaru) btnEventBaru.addEventListener('click', () => window.openEventBaru());
+
+        document.querySelectorAll('.js-cal-nav-loader').forEach(link => {
+            link.addEventListener('click', showLoader);
+        });
+
+        document.querySelectorAll('#viewToggleContainer .vt-btn[data-view]').forEach(btn => {
+            btn.addEventListener('click', () => switchView(btn.dataset.view));
+        });
+
+        document.querySelectorAll('.cal-cell[data-date]').forEach(cell => {
+            cell.addEventListener('click', () => selectDay(cell));
+        });
+
+        document.querySelectorAll('.quota-input-table[data-date]').forEach(inp => {
+            inp.addEventListener('change', () => syncTableToGrid(inp.dataset.date, inp.value));
+        });
+
+        document.querySelectorAll('.js-table-holiday[data-date]').forEach(cb => {
+            cb.addEventListener('change', () => syncHolidayToGrid(cb.dataset.date, cb.checked));
+        });
+
+        document.querySelectorAll('.js-save-row[data-date]').forEach(btn => {
+            btn.addEventListener('click', () => saveSingleRow(btn.dataset.date));
+        });
+
+        const btnQuickCheckinBar = document.getElementById('btnQuickCheckinBar');
+        if (btnQuickCheckinBar) btnQuickCheckinBar.addEventListener('click', () => window.openQuickCheckin());
+
+        const btnSaveQuota = document.getElementById('btnSaveQuota');
+        if (btnSaveQuota) btnSaveQuota.addEventListener('click', saveQuota);
+
+        const btnToggleHoliday = document.getElementById('btnToggleHoliday');
+        if (btnToggleHoliday) btnToggleHoliday.addEventListener('click', toggleHoliday);
+
+        const btnOpenDateAgain = document.getElementById('btnOpenDateAgain');
+        if (btnOpenDateAgain) btnOpenDateAgain.addEventListener('click', openDateAgain);
+
+        const btnSubmitQuickCheckin = document.getElementById('btnSubmitQuickCheckin');
+        if (btnSubmitQuickCheckin) btnSubmitQuickCheckin.addEventListener('click', submitQuickCheckin);
+
         const today = new Date();
         const yy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -977,7 +1054,7 @@
         
         const modal = document.getElementById('modalQuickCheckin');
         modal.querySelector('h5.fw-bold').innerHTML = '<i class="fas fa-edit me-2 text-primary"></i>Edit Jadwal Kunjungan';
-        modal.querySelector('button[onclick="submitQuickCheckin()"]').innerHTML = '<i class="fas fa-save me-2"></i>Simpan Perubahan';
+        document.getElementById('btnSubmitQuickCheckin').innerHTML = '<i class="fas fa-save me-2"></i>Simpan Perubahan';
         
         new bootstrap.Modal(modal).show();
     };
@@ -988,8 +1065,7 @@
         const visitIdInput = form.querySelector('input[name="visit_id"]');
         if (visitIdInput) visitIdInput.value = '';
         
-        const modal = document.getElementById('modalQuickCheckin');
-        modal.querySelector('button[onclick="submitQuickCheckin()"]').innerHTML = '<i class="fas fa-check-circle me-2"></i>Daftarkan Sekarang';
+        document.getElementById('btnSubmitQuickCheckin').innerHTML = '<i class="fas fa-check-circle me-2"></i>Daftarkan Sekarang';
     };
 
     window.openEventBaru = function() {

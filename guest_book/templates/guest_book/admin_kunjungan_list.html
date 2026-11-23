@@ -184,7 +184,7 @@
         
         <div class="filter-group">
             <label>Rentang Tanggal</label>
-            <select name="range" class="select-prem" onchange="this.form.submit()">
+            <select name="range" class="select-prem" data-auto-submit="1">
                 <option value="all" {% if range_filter == 'all' %}selected{% endif %}>Semua Waktu</option>
                 <option value="today" {% if range_filter == 'today' %}selected{% endif %}>Hari Ini</option>
                 <option value="week" {% if range_filter == 'week' %}selected{% endif %}>Minggu Ini</option>
@@ -194,7 +194,7 @@
 
         <div class="filter-group">
             <label>Status</label>
-            <select name="status" class="select-prem" onchange="this.form.submit()">
+            <select name="status" class="select-prem" data-auto-submit="1">
                 <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Semua Status</option>
                 <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Menunggu</option>
                 <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>Bertamu</option>
@@ -205,7 +205,7 @@
 
         <div class="filter-group">
             <label>Bidang / Bagian</label>
-            <select name="dept" class="select-prem" onchange="this.form.submit()">
+            <select name="dept" class="select-prem" data-auto-submit="1">
                 <option value="all">Semua Bidang</option>
                 {% for d in departemen_list %}
                 <option value="{{ d.id }}" {% if dept_filter == d.id|stringformat:"s" %}selected{% endif %}>{{ d.nama }}</option>
@@ -237,7 +237,7 @@
                 <td>
                     <div class="visitor-info">
                         {% if k.tamu.profile_picture %}
-                            <img src="{{ k.tamu.profile_picture.url }}" class="v-avatar" style="object-fit: cover;" alt="{{ k.tamu.name }}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ k.tamu.name|urlencode }}&background=3b82f6&color=fff';">
+                            <img src="{{ k.tamu.profile_picture.url }}" class="v-avatar" style="object-fit: cover;" alt="{{ k.tamu.name }}" data-fallback-src="https://ui-avatars.com/api/?name={{ k.tamu.name|urlencode }}&background=3b82f6&color=fff">
                         {% else %}
                             <div class="v-avatar initials-avatar" data-name="{{ k.tamu.name }}">
                                 {{ k.tamu.name|slice:":2"|upper }}
@@ -297,17 +297,17 @@
                             <li><hr class="dropdown-divider"></li>
                             
                             {% if k.status == 'pending' or k.status == 'menunggu_admin' %}
-                            <li><a class="dropdown-item py-2 px-3 text-info" href="#" onclick="updateStatus('{{ k.id }}', 'menunggu_pegawai')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-user-clock me-2"></i> Teruskan ke Pegawai</a></li>
-                            <li><a class="dropdown-item py-2 px-3 text-success" href="#" onclick="updateStatus('{{ k.id }}', 'disetujui')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-check me-2"></i> ACC Kunjungan</a></li>
-                            <li><a class="dropdown-item py-2 px-3 text-danger" href="#" onclick="updateStatus('{{ k.id }}', 'cancelled')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Tolak</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-info js-list-update-status" href="#" data-visit-id="{{ k.id }}" data-status="menunggu_pegawai" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-user-clock me-2"></i> Teruskan ke Pegawai</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-success js-list-update-status" href="#" data-visit-id="{{ k.id }}" data-status="disetujui" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-check me-2"></i> ACC Kunjungan</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-danger js-list-update-status" href="#" data-visit-id="{{ k.id }}" data-status="cancelled" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Tolak</a></li>
                             {% elif k.status == 'menunggu_pegawai' %}
-                            <li><a class="dropdown-item py-2 px-3 text-success" href="#" onclick="updateStatus('{{ k.id }}', 'disetujui')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-check me-2"></i> ACC Kunjungan</a></li>
-                            <li><a class="dropdown-item py-2 px-3 text-danger" href="#" onclick="updateStatus('{{ k.id }}', 'cancelled')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Tolak</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-success js-list-update-status" href="#" data-visit-id="{{ k.id }}" data-status="disetujui" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-check me-2"></i> ACC Kunjungan</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-danger js-list-update-status" href="#" data-visit-id="{{ k.id }}" data-status="cancelled" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Tolak</a></li>
                             {% elif k.status == 'disetujui' or k.status == 'disetujui_pegawai' %}
-                            <li><a class="dropdown-item py-2 px-3 text-primary" href="#" onclick="updateStatus('{{ k.id }}', 'in_progress')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-play me-2"></i> Mulai Bertamu</a></li>
-                            <li><a class="dropdown-item py-2 px-3 text-danger" href="#" onclick="updateStatus('{{ k.id }}', 'cancelled')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Batalkan</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-primary js-list-update-status" href="#" data-visit-id="{{ k.id }}" data-status="in_progress" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-play me-2"></i> Mulai Bertamu</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-danger js-list-update-status" href="#" data-visit-id="{{ k.id }}" data-status="cancelled" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-times me-2"></i> Batalkan</a></li>
                             {% elif k.status == 'in_progress' %}
-                            <li><a class="dropdown-item py-2 px-3 text-success" href="#" onclick="updateStatus('{{ k.id }}', 'completed')" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-sign-out-alt me-2"></i> Selesai</a></li>
+                            <li><a class="dropdown-item py-2 px-3 text-success js-list-update-status" href="#" data-visit-id="{{ k.id }}" data-status="completed" style="border-radius:8px; font-size:0.85rem;"><i class="fas fa-sign-out-alt me-2"></i> Selesai</a></li>
                             {% endif %}
                         </ul>
                     </div>
@@ -404,7 +404,7 @@
             <!-- Data Kunjungan -->
             <div class="col-md-6">
               <label class="form-label" style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Bidang / Unit Tujuan</label>
-              <select name="departemen" class="form-select" required style="border-radius: 10px; padding: 0.75rem;" onchange="filterPegawai(this.value)">
+              <select name="departemen" id="modal_departemen" class="form-select" required style="border-radius: 10px; padding: 0.75rem;">
                 <option value="">-- Pilih Bidang --</option>
                 {% for d in departemen_list %}
                 <option value="{{ d.id }}">{{ d.nama }}</option>
@@ -438,7 +438,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     (function() {
         "use strict";
         // Avatar Colors
@@ -470,7 +470,7 @@
         };
 
         // Global Update Status Function
-        window.updateStatus = function(id, status) {
+        window.updateStatus = function(id, status, triggerBtn) {
             const statusLabels = {
                 'pending': 'Menunggu',
                 'in_progress': 'Bertamu',
@@ -480,10 +480,12 @@
             const label = statusLabels[status] || status;
             if (!confirm(`Apakah Anda yakin ingin mengubah status kunjungan ini menjadi ${label}?`)) return;
             
-            const btn = event.currentTarget;
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
+            const btn = triggerBtn || null;
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                btn.disabled = true;
+            }
 
             fetch('{% url "tamu:api_update_kunjungan_status" %}', {
                 method: 'POST',
@@ -499,17 +501,38 @@
                     window.location.reload(); 
                 } else {
                     alert('Gagal memperbarui status: ' + (data.error || 'Terjadi kesalahan'));
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
+                    if (btn) {
+                        btn.innerHTML = originalHtml;
+                        btn.disabled = false;
+                    }
                 }
             })
             .catch(err => {
                 console.error(err);
                 alert('Terjadi kesalahan koneksi.');
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
             });
         };
+
+        const modalDeptSelect = document.getElementById('modal_departemen');
+        if (modalDeptSelect) {
+            modalDeptSelect.addEventListener('change', function() {
+                window.filterPegawai(this.value);
+            });
+        }
+
+        const tableContainer = document.querySelector('.table-container');
+        if (tableContainer) {
+            tableContainer.addEventListener('click', function(e) {
+                const link = e.target.closest('.js-list-update-status');
+                if (!link) return;
+                e.preventDefault();
+                window.updateStatus(link.dataset.visitId, link.dataset.status, link);
+            });
+        }
 
         // Auto-refresh (Live Update) setiap 25 detik hanya saat tab aktif
         setInterval(() => {

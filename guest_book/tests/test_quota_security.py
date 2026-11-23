@@ -116,7 +116,12 @@ class QuotaCentralizedSecurityTests(TestCase):
 
     def test_quota_exhaustion_prevents_new_booking(self):
         """Ketika kuota penuh, validate_kunjungan_schedule dan form wajib melempar error."""
-        test_date = date(2026, 11, 12)
+        from django.utils import timezone
+        test_date = timezone.localtime(timezone.now(), JAKARTA_TZ).date() + timedelta(days=7)
+        CalendarSettings.objects.update_or_create(
+            date=test_date,
+            defaults={'daily_quota': 5, 'is_holiday': False, 'holiday_name': ''},
+        )
         start_day, _ = get_day_range_aware(test_date)
         arr_time = start_day.replace(hour=9, minute=0)
 

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path
 from django.views.generic.base import RedirectView, TemplateView
 from . import views
@@ -31,6 +32,7 @@ urlpatterns = [
     # Dashboard
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('admin-portal/login/', views.admin_login_view, name='admin_login'),
+    path('admin-portal/login/verify-2fa/', views.admin_verify_2fa_view, name='admin_verify_2fa'),
     path('admin-portal/', views.admin_dashboard_view, name='admin_dashboard'),
     path('admin-portal/statistik/', views.admin_statistik_view, name='admin_statistik'),
     path('admin-portal/ikm/', views.admin_ikm_view, name='admin_ikm'),
@@ -56,10 +58,8 @@ urlpatterns = [
     path('admin-portal/api/update-quota/', views.api_update_quota, name='api_update_quota'),
     path('admin-portal/api/toggle-holiday/', views.api_toggle_holiday, name='api_toggle_holiday'),
     path('api/dashboard/stats/', views.api_dashboard_stats, name='api_dashboard_stats'),
-    path('api/debug/counts/', views.api_debug_counts, name='api_debug_counts'),
     path('admin-portal/api/import-calendar/', views.api_import_calendar_csv, name='api_import_calendar_csv'),
     path('admin-portal/api/import-visits/', views.api_import_visits_excel, name='api_import_visits_excel'),
-    path('admin-portal/api/debug-calendar/', views.api_debug_calendar_settings, name='api_debug_calendar_settings'),
     path('admin-portal/kalender/download-template/', views.admin_kalender_download_template, name='admin_kalender_download_template'),
     path('admin-portal/api/chat/send/', views.api_send_chat_message, name='api_send_chat_send'),
     path('admin-portal/api/chat/messages/', views.api_get_chat_messages, name='api_get_chat_messages'),
@@ -73,6 +73,8 @@ urlpatterns = [
     path('chat/', views.user_chat_view, name='user_chat'),
     path('riwayat/cetak/', views.tamu_kunjungan_cetak_pdf, name='tamu_kunjungan_cetak_pdf'),
     path('profil/', views.profil_view, name='profil'),
+    path('profil/ekspor-data/', views.tamu_export_personal_data, name='tamu_export_personal_data'),
+    path('profil/hapus-akun/', views.tamu_delete_account_view, name='tamu_delete_account'),
     path('admin-portal/api/kunjungan/quick/', views.api_quick_checkin, name='api_quick_checkin'),
     path('api/holidays/<int:year>/', views.api_google_holidays, name='api_google_holidays'),
 
@@ -94,6 +96,9 @@ urlpatterns = [
     path('api/notifikasi/read-all/', views.api_mark_all_notifications_read, name='api_mark_all_notifications_read'),
     path('admin-portal/api/kunjungan/status/', views.api_update_kunjungan_status, name='api_update_kunjungan_status'),
     path('api/admin/change-password/', views.api_change_password, name='api_change_password'),
+    path('api/admin/2fa/setup/', views.api_admin_2fa_setup, name='api_admin_2fa_setup'),
+    path('api/admin/2fa/enable/', views.api_admin_2fa_enable, name='api_admin_2fa_enable'),
+    path('api/admin/2fa/disable/', views.api_admin_2fa_disable, name='api_admin_2fa_disable'),
     path('api/admin/profile-picture/', views.api_update_profile_picture, name='api_update_profile_picture'),
     path('api/admin/profile-data/', views.api_update_profile_data, name='api_update_profile_data'),
     path('api/admin/notification-settings/', views.api_update_notification_settings, name='api_update_notification_settings'),
@@ -101,6 +106,7 @@ urlpatterns = [
     path('api/admin/recent-notifications/', views.api_get_recent_notifications, name='api_get_recent_notifications'),
     path('api/admin/visits-by-date/', views.api_get_visits_by_date, name='api_get_visits_by_date'),
     path('api/check-quota/', views.api_check_quota, name='api_check_quota'),
+    path('healthz/', views.healthz_view, name='healthz'),
 
     # ── Pegawai Portal ──────────────────────────────────────────────────────
     path('pegawai-portal/login/',  views.pegawai_login_view,  name='pegawai_login'),
@@ -114,3 +120,10 @@ urlpatterns = [
     # Tamu Chat with Pegawai
     path('chat/pegawai/<uuid:kunjungan_id>/', views.tamu_chat_pegawai_view, name='tamu_chat_pegawai'),
 ]
+
+# Endpoint debug hanya terdaftar saat DEBUG=True (tidak tersedia di production)
+if settings.DEBUG:
+    urlpatterns += [
+        path('api/debug/counts/', views.api_debug_counts, name='api_debug_counts'),
+        path('admin-portal/api/debug-calendar/', views.api_debug_calendar_settings, name='api_debug_calendar_settings'),
+    ]

@@ -20,6 +20,14 @@ def pegawai_login_required(view_func):
         
         try:
             pegawai = Pegawai.objects.get(pk=pegawai_id, account_status='active')
+            if getattr(pegawai, 'must_change_password', False):
+                url_name = getattr(getattr(request, 'resolver_match', None), 'url_name', None)
+                if url_name not in ('pegawai_profile', 'pegawai_logout'):
+                    messages.warning(
+                        request,
+                        'Wajib mengganti password sementara Anda di halaman Profil sebelum melanjutkan.',
+                    )
+                    return redirect('tamu:pegawai_profile')
             request.pegawai = pegawai
             request._pegawai = pegawai
         except Pegawai.DoesNotExist:

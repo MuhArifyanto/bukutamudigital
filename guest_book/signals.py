@@ -1,8 +1,8 @@
 import logging
 import os
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
-from .models import Tamu
+from .models import LoginAttempt, Tamu
 import firebase_admin
 from firebase_admin import auth
 
@@ -56,3 +56,15 @@ def delete_firebase_user(sender, instance, **kwargs):
                 
     except Exception as e:
         logger.error(f"Error syncing deletion to Firebase for user {email}: {str(e)}")
+
+
+@receiver(post_save, sender=LoginAttempt)
+def monitor_failed_login_spikes(sender, instance, created, **kwargs):
+    """Deteksi otomatis lonjakan kegagalan LoginAttempt untuk alerting real-time."""
+    if not created or instance.success:
+        return
+    try:
+        from .monitoring import evaluate_login_attempt_spike
+        evaluate_login_attempt_spike(instance)
+    except Exception as exc:
+        logger.warning("Gagal mengevaluasi alert lonjakan login: %s", exc)

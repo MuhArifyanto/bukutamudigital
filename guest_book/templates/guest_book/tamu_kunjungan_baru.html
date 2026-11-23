@@ -427,7 +427,7 @@
 <!-- Flatpickr CSS & JS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
     // Set min date and default date to today
     const today = new Date().toISOString().split('T')[0];
     let isCurrentDateHoliday = false;

@@ -15,7 +15,7 @@ from django.http import HttpResponse
 from django.db.models import Count, Q
 from django.core.paginator import Paginator
 
-from .base import admin_login_required, get_admin_context
+from .base import admin_login_required, clamp_page_size, get_admin_context
 from ..models import Kunjungan, Tamu, Pegawai, Departemen, Instansi
 
 
@@ -113,13 +113,16 @@ def admin_kunjungan_list_view(request):
     page_obj = paginator.get_page(page_number)
 
     page_items = list(page_obj)
-    unique_dates = {k.arrival_time.date() for k in page_items}
+    unique_dates = {timezone.localtime(k.arrival_time).date() for k in page_items if k.arrival_time}
 
     nomor_map = {}
     if unique_dates:
-        combined_filter = Q(arrival_time__date=unique_dates.pop())
+        from ..validators import get_day_range_aware
+
+        combined_filter = Q()
         for d in unique_dates:
-            combined_filter |= Q(arrival_time__date=d)
+            start_day, next_day = get_day_range_aware(d)
+            combined_filter |= Q(arrival_time__gte=start_day, arrival_time__lt=next_day)
 
         all_day_kunjungan = list(
             Kunjungan.objects
@@ -130,7 +133,7 @@ def admin_kunjungan_list_view(request):
 
         day_counter = {}
         for item in all_day_kunjungan:
-            d = item.arrival_time.date()
+            d = timezone.localtime(item.arrival_time).date()
             day_counter[d] = day_counter.get(d, 0) + 1
             nomor_map[item.id] = day_counter[d]
 
@@ -160,53 +163,89 @@ def admin_kunjungan_manual_create(request):
     from ..utils import send_notification
 
     if request.method == 'POST':
-        name = request.POST.get('name')
-        nik = request.POST.get('nik')
-        phone = request.POST.get('phone')
-        email = request.POST.get('email')
-        instansi = request.POST.get('instansi')
+        from django.contrib.auth.hashers import make_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.core.validators import validate_email
+        from django.db import transaction
+        from ..validators import normalize_and_validate_phone, validate_kunjungan_schedule
+
+        name = (request.POST.get('name') or '').strip()[:255]
+        raw_nik = (request.POST.get('nik') or '').strip()
+        raw_phone = request.POST.get('phone')
+        raw_email = (request.POST.get('email') or '').strip().lower()
+        instansi = (request.POST.get('instansi') or '').strip()[:255]
         pegawai_id = request.POST.get('pegawai') or request.POST.get('pegawai_id')
-        purpose = request.POST.get('purpose')
+        purpose = (request.POST.get('purpose') or '').strip()[:500]
 
-        tamu = None
-        if email:
-            tamu = Tamu.objects.filter(email=email).first()
-        if not tamu and nik:
-            tamu = Tamu.objects.filter(nik=nik).first()
-        if not tamu:
-            from django.contrib.auth.hashers import make_password
-            dummy_password = make_password('manual_login_dummy')
-            if not email:
-                import uuid
-                email = f"tamu_{uuid.uuid4().hex[:8]}@manual.local"
-            tamu = Tamu.objects.create(
-                name=name, nik=nik, phone=phone, email=email,
-                instansi=instansi, password=dummy_password,
-                registration_type='manual', account_status='active'
-            )
+        if len(name) < 2:
+            messages.error(request, "Nama tamu wajib diisi (minimal 2 karakter).")
+            return redirect('tamu:admin_kunjungan_list')
 
-        pegawai = None
-        if pegawai_id:
-            pegawai = Pegawai.objects.filter(pk=pegawai_id).first()
+        if not purpose:
+            messages.error(request, "Tujuan / keperluan kunjungan wajib diisi.")
+            return redirect('tamu:admin_kunjungan_list')
+
+        try:
+            phone = normalize_and_validate_phone(raw_phone, allow_placeholder=True)
+        except DjangoValidationError as phone_err:
+            messages.error(request, phone_err.messages[0])
+            return redirect('tamu:admin_kunjungan_list')
+
+        nik = None
+        if raw_nik:
+            if not raw_nik.isdigit() or len(raw_nik) != 16:
+                messages.error(request, "NIK harus berupa tepat 16 digit angka.")
+                return redirect('tamu:admin_kunjungan_list')
+            nik = raw_nik
+
+        email = None
+        if raw_email:
+            try:
+                validate_email(raw_email)
+                email = raw_email
+            except DjangoValidationError:
+                messages.error(request, "Format email tamu tidak valid.")
+                return redirect('tamu:admin_kunjungan_list')
 
         arrival_now = timezone.now()
-        from ..validators import validate_kunjungan_schedule
-        from django.core.exceptions import ValidationError as DjangoValidationError
         try:
-            validate_kunjungan_schedule(
-                arrival_time=arrival_now,
-                is_admin=True,
-                is_import=False
-            )
+            with transaction.atomic():
+                tamu = None
+                if email:
+                    tamu = Tamu.objects.filter(email=email).first()
+                if not tamu and nik:
+                    tamu = Tamu.objects.filter(Tamu.nik_lookup_q(nik)).first()
+                if not tamu:
+                    # Akun walk-in/manual tidak memiliki password default yang dapat ditebak
+                    dummy_password = make_password(None)
+                    if not email:
+                        import uuid
+                        email = f"tamu_{uuid.uuid4().hex[:8]}@manual.local"
+                    tamu = Tamu.objects.create(
+                        name=name, nik=nik, phone=phone, email=email,
+                        instansi=instansi, password=dummy_password,
+                        registration_type='manual', account_status='active'
+                    )
+
+                pegawai = None
+                if pegawai_id:
+                    pegawai = Pegawai.objects.filter(pk=pegawai_id).first()
+
+                validate_kunjungan_schedule(
+                    arrival_time=arrival_now,
+                    is_admin=True,
+                    is_import=False,
+                    lock_for_update=True,
+                )
+
+                kunjungan = Kunjungan.objects.create(
+                    tamu=tamu, pegawai=pegawai, purpose=purpose,
+                    arrival_time=arrival_now, status='in_progress',
+                )
         except DjangoValidationError as e:
             err_msg = e.message if hasattr(e, 'message') else str(e)
             messages.error(request, f"Gagal mencatat kunjungan manual: {err_msg}")
             return redirect('tamu:admin_kunjungan_list')
-
-        kunjungan = Kunjungan.objects.create(
-            tamu=tamu, pegawai=pegawai, purpose=purpose,
-            arrival_time=arrival_now, status='in_progress',
-        )
 
         if pegawai:
             try:
@@ -264,10 +303,48 @@ def admin_kunjungan_export_excel(request):
 
 @admin_login_required
 def admin_kunjungan_cetak_pdf(request):
-    """Cetak semua kunjungan sebagai PDF"""
-    kunjungan_all = Kunjungan.objects.all().order_by('-arrival_time')
+    """Cetak laporan kunjungan sebagai PDF (bebas N+1, mendukung filter, dan dibatasi barisnya)."""
+    import uuid
+
+    status = request.GET.get('status', 'all').strip()
+    q = request.GET.get('q', '').strip()
+    date_range = request.GET.get('range', 'all').strip()
+    dept_id = request.GET.get('dept', 'all').strip()
+    limit = clamp_page_size(request.GET.get('limit'), default=500, min_size=1, max_size=1000)
+
+    qs = Kunjungan.objects.select_related('tamu', 'pegawai', 'pegawai__department_rel').order_by('-arrival_time')
+
+    if status and status != 'all':
+        qs = qs.filter(status=status)
+
+    if q:
+        qs = qs.filter(Q(tamu__name__icontains=q) | Q(purpose__icontains=q) | Q(tamu__instansi__icontains=q))
+
+    local_now = timezone.localtime(timezone.now())
+    if date_range == 'today':
+        start_of_today = timezone.make_aware(datetime.combine(local_now.date(), datetime.min.time()))
+        end_of_today = timezone.make_aware(datetime.combine(local_now.date(), datetime.max.time()))
+        qs = qs.filter(arrival_time__range=(start_of_today, end_of_today))
+    elif date_range == 'week':
+        start_of_week = (local_now - timedelta(days=local_now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        qs = qs.filter(arrival_time__gte=start_of_week)
+    elif date_range == 'month':
+        import calendar as cal
+        _, last_day = cal.monthrange(local_now.year, local_now.month)
+        start_of_month = timezone.make_aware(datetime(local_now.year, local_now.month, 1, 0, 0, 0))
+        end_of_month = timezone.make_aware(datetime(local_now.year, local_now.month, last_day, 23, 59, 59))
+        qs = qs.filter(arrival_time__range=(start_of_month, end_of_month))
+
+    if dept_id and dept_id != 'all':
+        try:
+            dept_uuid = uuid.UUID(dept_id)
+            qs = qs.filter(pegawai__department_rel_id=dept_uuid)
+        except (ValueError, TypeError):
+            pass
+
+    kunjungan_all = list(qs[:limit])
     context = get_admin_context(request)
-    context.update({'kunjungan_all': kunjungan_all})
+    context.update({'kunjungan_all': kunjungan_all, 'print_limit': limit})
     return render(request, 'guest_book/admin_kunjungan_cetak_pdf.html', context)
 
 
@@ -295,7 +372,7 @@ def api_scan_tiket(request):
     import re
     from django.http import JsonResponse
     from django.db import transaction
-    from ..models import Kunjungan, KunjunganStatusHistory
+    from ..models import Kunjungan, KunjunganStatus, KunjunganStatusHistory
     from ..utils import send_notification
 
     if request.method != 'POST':
@@ -365,36 +442,56 @@ def api_scan_tiket(request):
         'status_display': kunjungan.get_status_display(),
     }
 
-    if kunjungan.status == 'cancelled':
-        return JsonResponse({
-            'success': False,
-            'error': f'Tiket #{code_display} telah Dibatalkan (Cancelled). Tidak dapat melakukan check-in.',
-            'data': guest_data
-        }, status=400)
+    allowed_checkin_statuses = (
+        KunjunganStatus.DISETUJUI,
+        KunjunganStatus.DISETUJUI_PEGAWAI,
+    )
 
-    if kunjungan.status == 'completed':
-        return JsonResponse({
-            'success': False,
-            'error': f'Kunjungan tiket #{code_display} telah selesai (Completed) sebelumnya.',
-            'data': guest_data
-        }, status=400)
-
-    if kunjungan.status == 'in_progress':
-        return JsonResponse({
-            'success': True,
-            'already_in_progress': True,
-            'message': f'Tamu {tamu.name} sudah berstatus Hadir di Kantor (In Progress).',
-            'data': guest_data
-        })
-
-    old_status = kunjungan.status
-    now_local = timezone.localtime(timezone.now())
     with transaction.atomic():
-        kunjungan.status = 'in_progress'
-        kunjungan.save(update_fields=['status', 'updated_at'])
+        locked_kunjungan = Kunjungan.objects.select_for_update().get(pk=kunjungan.pk)
+        guest_data['status'] = locked_kunjungan.status
+        guest_data['status_display'] = locked_kunjungan.get_status_display()
+
+        if locked_kunjungan.status == 'cancelled':
+            return JsonResponse({
+                'success': False,
+                'error': f'Tiket #{code_display} telah Dibatalkan (Cancelled). Tidak dapat melakukan check-in.',
+                'data': guest_data
+            }, status=400)
+
+        if locked_kunjungan.status == 'completed':
+            return JsonResponse({
+                'success': False,
+                'error': f'Kunjungan tiket #{code_display} telah selesai (Completed) sebelumnya.',
+                'data': guest_data
+            }, status=400)
+
+        if locked_kunjungan.status == 'in_progress':
+            return JsonResponse({
+                'success': True,
+                'already_in_progress': True,
+                'message': f'Tamu {tamu.name} sudah berstatus Hadir di Kantor (In Progress).',
+                'data': guest_data
+            })
+
+        if locked_kunjungan.status not in allowed_checkin_statuses:
+            if locked_kunjungan.status in (KunjunganStatus.DITOLAK_ADMIN, KunjunganStatus.DITOLAK_PEGAWAI):
+                err_msg = f'Tiket #{code_display} telah ditolak ({locked_kunjungan.get_status_display()}). Tidak dapat melakukan check-in.'
+            else:
+                err_msg = f'Tiket #{code_display} belum disetujui untuk check-in (Status saat ini: {locked_kunjungan.get_status_display()}).'
+            return JsonResponse({
+                'success': False,
+                'error': err_msg,
+                'data': guest_data
+            }, status=400)
+
+        old_status = locked_kunjungan.status
+        now_local = timezone.localtime(timezone.now())
+        locked_kunjungan.status = 'in_progress'
+        locked_kunjungan.save(update_fields=['status', 'updated_at'])
 
         KunjunganStatusHistory.objects.create(
-            kunjungan=kunjungan,
+            kunjungan=locked_kunjungan,
             old_status=old_status,
             new_status='in_progress',
             changed_by_id=str(request.session.get('admin_id') or 'admin'),

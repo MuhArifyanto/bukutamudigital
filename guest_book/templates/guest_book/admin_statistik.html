@@ -324,7 +324,7 @@
             <div class="days-selection">
                 {% for d in days_config %}
                 <button type="button" class="day-toggle-btn {% if d.active %}on{% endif %}"
-                        onclick="toggleDay(this)" data-day="{{ d.index }}">{{ d.label }}</button>
+                        data-day="{{ d.index }}">{{ d.label }}</button>
                 {% endfor %}
             </div>
             <input type="hidden" name="hari_kerja" id="hariKerjaInput" value="{{ operasional.hari_kerja }}">
@@ -436,11 +436,11 @@
                                 <li><a class="dropdown-item" href="{% url 'tamu:admin_kunjungan_detail' j.id %}" style="font-size:0.85rem; font-weight:600;"><i class="fas fa-eye me-2 text-primary"></i> Detail Kunjungan</a></li>
                                 {% if j.status == 'pending' %}
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="#" onclick="updateStatus('{{ j.id }}', 'in_progress')" style="font-size:0.85rem; font-weight:600; color:#16a34a;"><i class="fas fa-check me-2"></i> Setujui Kunjungan</a></li>
-                                    <li><a class="dropdown-item" href="#" onclick="updateStatus('{{ j.id }}', 'cancelled')" style="font-size:0.85rem; font-weight:600; color:#dc2626;"><i class="fas fa-times me-2"></i> Tolak Kunjungan</a></li>
+                                    <li><a class="dropdown-item js-stats-update-status" href="#" data-visit-id="{{ j.id }}" data-status="in_progress" style="font-size:0.85rem; font-weight:600; color:#16a34a;"><i class="fas fa-check me-2"></i> Setujui Kunjungan</a></li>
+                                    <li><a class="dropdown-item js-stats-update-status" href="#" data-visit-id="{{ j.id }}" data-status="cancelled" style="font-size:0.85rem; font-weight:600; color:#dc2626;"><i class="fas fa-times me-2"></i> Tolak Kunjungan</a></li>
                                 {% elif j.status == 'in_progress' %}
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="#" onclick="updateStatus('{{ j.id }}', 'completed')" style="font-size:0.85rem; font-weight:600; color:#2563eb;"><i class="fas fa-sign-out-alt me-2"></i> Selesaikan (Check-out)</a></li>
+                                    <li><a class="dropdown-item js-stats-update-status" href="#" data-visit-id="{{ j.id }}" data-status="completed" style="font-size:0.85rem; font-weight:600; color:#2563eb;"><i class="fas fa-sign-out-alt me-2"></i> Selesaikan (Check-out)</a></li>
                                 {% endif %}
                             </ul>
                         </div>
@@ -470,7 +470,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function(){
     "use strict";
     
@@ -625,8 +625,19 @@
         });
         document.getElementById('hariKerjaInput').value = activeDays.join(',');
     };
+    document.querySelectorAll('.day-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            window.toggleDay(this);
+        });
+    });
 
     // 4. Global Update Status Function
+    document.querySelectorAll('.js-stats-update-status').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.updateStatus(this.dataset.visitId, this.dataset.status);
+        });
+    });
     window.updateStatus = function(id, status) {
         const statusLabels = {
             'pending': 'Menunggu',
@@ -700,6 +711,10 @@
                                     <option value="{{ dept.id }}">{{ dept.nama }}</option>
                                 {% endfor %}
                             </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold" style="font-size: 0.8rem; color: #64748b;">PASSWORD AWAL (OPSIONAL — WAJIB DIGANTI SAAT LOGIN)</label>
+                            <input type="password" name="password" class="form-control" placeholder="Minimal 8 karakter campuran (kosongkan jika akun non-password sementara)" autocomplete="new-password" style="border-radius: 12px; padding: 0.6rem 1rem;">
                         </div>
                     </div>
                     

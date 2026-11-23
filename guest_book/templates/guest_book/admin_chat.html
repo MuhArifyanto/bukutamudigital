@@ -764,11 +764,11 @@
             {% for conv in conversations %}
             <div class="chat-item {% if forloop.first %}active{% endif %}" 
                  data-id="{{ conv.session_id }}"
+                 data-session-id="{{ conv.session_id }}"
                  data-name="{{ conv.name|lower }}"
                  data-role="{{ conv.participant_type }}"
                  data-dept="{{ conv.subtitle|default:''|lower }}"
-                 data-unread="{{ conv.unread_count }}"
-                 onclick="loadChat('{{ conv.session_id }}')">
+                 data-unread="{{ conv.unread_count }}">
                 
                 {% if conv.participant_type == 'pegawai' %}
                     <div class="avatar-squircle initials-avatar" data-name="{{ conv.name }}">
@@ -778,7 +778,7 @@
                 {% else %}
                     {% if conv.guest.profile_picture %}
                         <div style="position: relative; flex-shrink: 0;">
-                            <img src="{{ conv.guest.profile_picture.url }}" class="avatar-squircle" style="object-fit: cover;" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ conv.name|urlencode }}&background=2563eb&color=fff';">
+                            <img src="{{ conv.guest.profile_picture.url }}" class="avatar-squircle" style="object-fit: cover;" data-fallback-src="https://ui-avatars.com/api/?name={{ conv.name|urlencode }}&background=2563eb&color=fff">
                             <span class="avatar-live-dot"></span>
                         </div>
                     {% else %}
@@ -822,7 +822,7 @@
                 </div>
             </div>
             {% empty %}
-            <div style="text-align: center; padding: 3rem 1rem; color: #94a3b8; font-size: 0.85rem;">
+            <div class="chat-empty-initial" style="text-align: center; padding: 3rem 1rem; color: #94a3b8; font-size: 0.85rem;">
                 <i class="fas fa-inbox fa-2x mb-2 text-muted"></i>
                 <div>Belum ada percakapan aktif.</div>
             </div>
@@ -837,14 +837,14 @@
 
     <!-- Right Chat Window -->
     <div class="chat-window">
-        {% if conversations %}
+        <div id="activeRoomShell" style="display: {% if conversations %}flex{% else %}none{% endif %}; flex-direction: column; height: 100%; min-height: 0;">
         {% with first_conv=conversations.0 %}
         <div class="chat-header">
             <div class="active-user-info">
                 <a href="{% url 'tamu:admin_chat' %}" class="chat-back-btn" id="btnAdminMobileBack"><i class="fas fa-arrow-left"></i></a>
                 
                 <div class="room-icon-square">
-                    {% if first_conv.participant_type == 'pegawai' %}
+                    {% if first_conv and first_conv.participant_type == 'pegawai' %}
                         <i class="fas fa-user-tie"></i>
                     {% else %}
                         <i class="fas fa-user-tag"></i>
@@ -853,9 +853,9 @@
 
                 <div class="room-details">
                     <div class="d-flex align-items-center gap-2">
-                        <span class="room-title">{{ first_conv.name }}</span>
+                        <span class="room-title">{{ first_conv.name|default:"Percakapan" }}</span>
                         <span class="room-tag-pill">
-                            {% if first_conv.participant_type == 'pegawai' %}Pegawai Dinas{% else %}Tamu Resmi{% endif %}
+                            {% if first_conv and first_conv.participant_type == 'pegawai' %}Pegawai Dinas{% else %}Tamu Resmi{% endif %}
                         </span>
                     </div>
                     <div class="room-subtitle">
@@ -866,6 +866,7 @@
         </div>
 
         <div class="message-area" id="messageArea">
+            {% if first_conv %}
             {% for msg in first_conv.messages %}
             
             <!-- Date Separator -->
@@ -917,6 +918,7 @@
                 <p>Kirim pesan untuk berkoordinasi secara langsung.</p>
             </div>
             {% endfor %}
+            {% endif %}
         </div>
 
         <div class="chat-input-area">
@@ -930,7 +932,7 @@
                     <button type="button" class="btn-attach" id="btnAttach" title="Lampirkan File">
                         <i class="fas fa-paperclip"></i>
                     </button>
-                    <input type="file" id="chatFileInput" style="display: none;" accept=".doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.svg">
+                    <input type="file" id="chatFileInput" style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
                     <input type="text" id="chatInput" placeholder="Ketik pesan..." autocomplete="off">
                     <button type="submit" class="btn-send-pill">
                         <i class="fas fa-paper-plane"></i>
@@ -940,13 +942,12 @@
             </form>
         </div>
         {% endwith %}
-        {% else %}
-        <div class="empty-chat">
+        </div>
+        <div class="empty-chat" id="roomEmptyPlaceholder" style="display: {% if conversations %}none{% else %}flex{% endif %};">
             <div class="empty-chat-icon"><i class="fas fa-comments"></i></div>
             <h5>Pilih percakapan</h5>
             <p>Pilih salah satu kontak di sebelah kiri untuk mulai mengobrol.</p>
         </div>
-        {% endif %}
     </div>
 </div>
 
@@ -954,7 +955,7 @@
 
 {% block extra_js %}
 <script src="{% static 'js/chat_client.js' %}"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
     let activeSession = "{% if conversations %}{{ conversations.0.session_id }}{% endif %}";
     let lastMsgId = "{% if conversations %}{% with last=conversations.0.messages|last %}{{ last.id }}{% endwith %}{% endif %}";
     let chatSocket;
@@ -978,12 +979,12 @@
         // Filter Tabs & Search Filtering
         const filterButtons = document.querySelectorAll('.tab-pill-btn');
         const searchInput = document.getElementById('inputSearchUser');
-        const chatItems = document.querySelectorAll('.chat-item');
         const emptyFilterEl = document.getElementById('chatFilterEmpty');
         const emptyTitleEl = document.getElementById('chatFilterEmptyTitle');
         const emptySubEl = document.getElementById('chatFilterEmptySub');
 
         function applyFilters() {
+            const chatItems = document.querySelectorAll('#chatListContainer .chat-item');
             const activeTab = document.querySelector('.tab-pill-btn.active');
             const filter = activeTab ? activeTab.getAttribute('data-filter') : 'all';
             const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
@@ -1059,54 +1060,25 @@
         }
 
         applyFilters();
+        window.__applyChatFilters = applyFilters;
 
         // Scroll to bottom
         const msgArea = document.getElementById('messageArea');
         if (msgArea) msgArea.scrollTop = msgArea.scrollHeight;
 
-        // Handle Chat Form
+        // Handle Chat Form & Dynamic ChatClient Initialization
         const chatForm = document.getElementById('chatForm');
         const chatInput = document.getElementById('chatInput');
+        let inputHandlersBound = false;
 
-        if (activeSession) {
-            const sendBtn = chatForm ? chatForm.querySelector('.btn-send-pill') : null;
-            chatSocket = new ChatClient({
-                sessionId: activeSession,
-                senderId: 'admin',
-                senderType: 'admin',
-                sendButton: sendBtn,
-                lastMessageId: lastMsgId,
-                historyApiUrl: '/api/chat/messages/',
-                onMessageReceived: (data, isLive = true) => {
-                    const type = data.sender_type === 'admin' ? 'sent' : 'received';
-                    if (type === 'received' && isLive) {
-                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                        audio.play().catch(e => console.log('Autoplay diblokir browser'));
-                    }
-                    addMessageToUI(data.message, type, data.created_at, data.message_type, data.file_url, data.message_id);
-                },
-                onMessageUpdated: (data) => {
-                    const msgEl = document.querySelector(`.msg-group[data-id="${data.message_id}"]`);
-                    if (msgEl) {
-                        const bubble = msgEl.querySelector('.msg-bubble');
-                        if (data.action === 'edit') {
-                            const isAi = (data.message || '').indexOf('🤖') !== -1 || (data.message || '').indexOf('Asisten AI') !== -1;
-                            if (isAi) msgEl.classList.add('is-ai-msg');
-                            bubble.innerHTML = formatChatMessageHtml(data.message, msgEl.classList.contains('sent') && !isAi);
-                        } else if (data.action === 'delete') {
-                            bubble.innerHTML = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
-                            const btns = msgEl.querySelectorAll('.edit-msg-btn, .delete-msg-btn');
-                            btns.forEach(b => b.remove());
-                        }
-                    }
-                },
-                onError: (err) => alert(err)
-            });
-            chatSocket.connect();
+        function bindInputHandlersOnce() {
+            if (inputHandlersBound) return;
+            inputHandlersBound = true;
 
             if (chatForm) {
                 chatForm.onsubmit = (e) => {
                     e.preventDefault();
+                    if (!chatSocket) return;
                     const text = chatInput.value.trim();
                     if (!text) return;
 
@@ -1146,13 +1118,13 @@
 
                 chatFileInput.addEventListener('change', function() {
                     const file = this.files[0];
-                    if (!file) return;
+                    if (!file || !chatSocket) return;
 
-                    const allowedExtensions = ['doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'svg'];
+                    const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
                     const fileExt = file.name.split('.').pop().toLowerCase();
                     
                     if (!allowedExtensions.includes(fileExt)) {
-                        alert('Format file tidak didukung! Hanya file Word, Excel, PNG, JPG, dan SVG yang diperbolehkan.');
+                        alert('Format file tidak didukung! Hanya file PDF, Word, Excel, PNG, dan JPG yang diperbolehkan.');
                         this.value = '';
                         return;
                     }
@@ -1167,9 +1139,11 @@
                     const formData = new FormData();
                     formData.append('file', file);
 
+                    const csrfEl = document.querySelector('#chatForm [name=csrfmiddlewaretoken]') || document.querySelector('[name=csrfmiddlewaretoken]');
                     fetch('/api/chat/upload/', {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        headers: csrfEl ? { 'X-CSRFToken': csrfEl.value } : {}
                     })
                     .then(response => response.json())
                     .then(data => {
@@ -1198,132 +1172,62 @@
                 });
             }
         }
+
+        window.__initAdminChatSocket = function(sessionId, msgId) {
+            if (!sessionId) return;
+            bindInputHandlersOnce();
+            const sendBtn = chatForm ? chatForm.querySelector('.btn-send-pill') : null;
+            chatSocket = new ChatClient({
+                sessionId: sessionId,
+                senderId: 'admin',
+                senderType: 'admin',
+                sendButton: sendBtn,
+                lastMessageId: msgId || null,
+                historyApiUrl: '/api/chat/messages/',
+                onMessageReceived: (data, isLive = true) => {
+                    const type = data.sender_type === 'admin' ? 'sent' : 'received';
+                    if (type === 'received' && isLive) {
+                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                        audio.play().catch(e => console.log('Autoplay diblokir browser'));
+                    }
+                    addMessageToUI(data.message, type, data.created_at, data.message_type, data.file_url, data.message_id);
+                },
+                onMessageUpdated: (data) => {
+                    const msgEl = document.querySelector(`.msg-group[data-id="${data.message_id}"]`);
+                    if (msgEl) {
+                        const bubble = msgEl.querySelector('.msg-bubble');
+                        if (data.action === 'edit') {
+                            const isAi = (data.message || '').indexOf('🤖') !== -1 || (data.message || '').indexOf('Asisten AI') !== -1;
+                            if (isAi) msgEl.classList.add('is-ai-msg');
+                            bubble.innerHTML = formatChatMessageHtml(data.message, msgEl.classList.contains('sent') && !isAi);
+                        } else if (data.action === 'delete') {
+                            bubble.innerHTML = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
+                            const btns = msgEl.querySelectorAll('.edit-msg-btn, .delete-msg-btn');
+                            btns.forEach(b => b.remove());
+                        }
+                    }
+                },
+                onError: (err) => alert(err)
+            });
+            chatSocket.connect();
+        };
+
+        if (activeSession) {
+            window.__initAdminChatSocket(activeSession, lastMsgId);
+        } else {
+            bindInputHandlersOnce();
+        }
     })();
 
     function escapeHtml(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function formatBlockLines(text) {
-        const lines = text.split('\n');
-        let out = [];
-        for (let line of lines) {
-            let trimLine = line.trim();
-            if (!trimLine) continue;
-
-            if (trimLine.startsWith('•') || trimLine.startsWith('-') || trimLine.startsWith('* ')) {
-                let content = trimLine.replace(/^[•\-\*]\s*/, '').trim();
-                out.push(`<div class="chat-list-row"><span class="chat-bullet-symbol">•</span><span class="chat-list-text">${content}</span></div>`);
-            } else if (/^\d+\.\s+/.test(trimLine)) {
-                let match = trimLine.match(/^(\d+\.)\s+(.*)$/);
-                if (match) {
-                    out.push(`<div class="chat-list-row"><span class="chat-num-symbol">${match[1]}</span><span class="chat-list-text">${match[2]}</span></div>`);
-                } else {
-                    out.push(`<div class="chat-text-row">${trimLine}</div>`);
-                }
-            } else {
-                out.push(`<div class="chat-text-row">${trimLine}</div>`);
-            }
-        }
-        return out.join('');
+        return window.SecurityUtils ? window.SecurityUtils.escapeHtml(str) : ChatMultiRoomHelper.escapeHtml(str);
     }
 
     function formatChatMessageHtml(rawText, isPureSent = false) {
-        if (!rawText) return '';
-        let cleaned = (rawText || '').trim();
-
-        let chips = [];
-        cleaned = cleaned.replace(/\[\[chip:([^|\]]+)(?:\|([^\]]+))?\]\]/g, function(match, action, label) {
-            chips.push({ action: action.trim(), label: (label || action).trim() });
-            return '';
-        });
-
-        cleaned = cleaned.replace(/👉\s*\**\s*(?:sentuh\s+)?pilihan\s+tindakan(?:\s+cepat)?:\s*\**\s*$/gim, '').trim();
-
-        const isAiMessage = /^🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/i.test(cleaned);
-        if (isAiMessage) {
-            cleaned = cleaned.replace(/^🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/i, '').trim();
+        if (window.SecurityUtils && typeof window.SecurityUtils.formatRichChatMessage === 'function') {
+            return window.SecurityUtils.formatRichChatMessage(rawText, isPureSent);
         }
-
-        let safe = escapeHtml(cleaned);
-
-        safe = safe.replace(
-            /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-            function(match, text, url) {
-                const isMaps = url.indexOf('maps.google') !== -1 || url.indexOf('goo.gl') !== -1 || url.indexOf('/maps') !== -1;
-                if (isMaps) {
-                    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-maps-btn"><i class="fas fa-map-marked-alt"></i> <span>${text}</span> <i class="fas fa-external-link-alt chat-ext-icon"></i></a>`;
-                }
-                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${text} <i class="fas fa-external-link-alt chat-ext-icon"></i></a>`;
-            }
-        );
-
-        const strongColor = isPureSent ? 'color:#ffffff;' : '';
-        safe = safe.replace(/\*\*([^*]+)\*\*/g, `<strong class="chat-bold" style="${strongColor}">$1</strong>`);
-        safe = safe.replace(/(^|[^\*])\*([^\*\n]+)\*([^\*]|$)/g, '$1<em class="chat-italic">$2</em>$3');
-        safe = safe.replace(/`([^`\n]+)`/g, '<code class="chat-code">$1</code>');
-
-        if (isPureSent && !isAiMessage) {
-            return safe;
-        }
-
-        const blocks = safe.split(/\n{2,}/);
-        let renderedHtml = '';
-
-        if (isAiMessage) {
-            renderedHtml += `
-                <div class="ai-header-card">
-                    <div class="ai-header-badge">
-                        <i class="fas fa-robot"></i>
-                        <span>Asisten AI Diskominfosantik</span>
-                    </div>
-                    <span class="ai-header-live"><span class="ai-live-dot"></span> Aktif</span>
-                </div>
-            `;
-        }
-
-        for (let block of blocks) {
-            block = block.trim();
-            if (!block) continue;
-
-            if (block.startsWith('⚠️')) {
-                renderedHtml += `<div class="chat-callout callout-warning">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('⏱️')) {
-                renderedHtml += `<div class="chat-callout callout-sla">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('📌') || block.startsWith('📋') || block.startsWith('✅')) {
-                renderedHtml += `<div class="chat-callout callout-info">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('💡')) {
-                renderedHtml += `<div class="chat-callout callout-tip">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('📍')) {
-                renderedHtml += `<div class="chat-callout callout-location">${formatBlockLines(block)}</div>`;
-            } else {
-                renderedHtml += `<div class="chat-block">${formatBlockLines(block)}</div>`;
-            }
-        }
-
-        if (chips.length > 0) {
-            let chipsHtml = chips.map(c => 
-                `<button type="button" class="chat-action-chip" data-action="${escapeHtml(c.action)}">
-                    ${escapeHtml(c.label)}
-                </button>`
-            ).join('');
-
-            renderedHtml += `
-                <div class="chat-action-panel">
-                    <div class="chat-action-title">
-                        <i class="fas fa-hand-pointer"></i> <span>Pilihan Tindakan Cepat:</span>
-                    </div>
-                    <div class="chat-action-chips">
-                        ${chipsHtml}
-                    </div>
-                </div>
-            `;
-        }
-
-        return renderedHtml || safe;
+        return escapeHtml(rawText || '');
     }
 
     // Format initial messages in DOM
@@ -1353,18 +1257,10 @@
         let bubbleContent = '';
         if (messageType === 'deleted') {
             bubbleContent = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
-        } else if (messageType === 'image') {
-            bubbleContent = `<img src="${encodeURI(fileUrl || '')}" style="max-width: 240px; max-height: 240px; object-fit: contain; border-radius: 10px;" alt="Gambar">`;
-        } else if (messageType === 'file') {
-            const rawFilename = (fileUrl || '').split('/').pop();
-            const filename = escapeHtml(rawFilename);
-            bubbleContent = `<a href="${encodeURI(fileUrl || '')}" target="_blank" rel="noopener noreferrer" class="file-card">
-                <i class="fas fa-file-alt"></i>
-                <div class="file-info">
-                    <span class="file-name">${filename}</span>
-                    <span class="file-size">Klik untuk mengunduh</span>
-                </div>
-            </a>`;
+        } else if (messageType === 'image' || messageType === 'file') {
+            bubbleContent = window.SecurityUtils
+                ? window.SecurityUtils.renderChatAttachmentHtml(messageType, fileUrl)
+                : `<span style="font-style: italic; opacity: 0.7;">Lampiran tidak valid</span>`;
         } else {
             bubbleContent = formatChatMessageHtml(content, type === 'sent' && !isAi);
         }
@@ -1390,7 +1286,7 @@
         msgGroup.innerHTML = `
             <div class="msg-bubble">${bubbleContent}</div>
             <div class="msg-meta-row">
-                <span class="msg-time">${time}</span>
+                <span class="msg-time">${escapeHtml(time || '')}</span>
                 ${ticks}
                 ${actionButtons}
             </div>
@@ -1484,9 +1380,116 @@
         }
     });
 
-    window.loadChat = function(sessionId) {
-        location.href = `?session=${sessionId}`; 
-    };
+    function createAdminSidebarItem({ sessionId, name, subtitle, role, preview, time, unread }) {
+        const div = document.createElement('div');
+        div.className = 'chat-item';
+        div.setAttribute('data-id', sessionId);
+        div.setAttribute('data-session-id', sessionId);
+        div.setAttribute('data-name', (name || '').toLowerCase());
+        div.setAttribute('data-role', role || 'tamu');
+        div.setAttribute('data-dept', (subtitle || '').toLowerCase());
+        div.setAttribute('data-unread', String(unread || 0));
+        div.addEventListener('click', () => window.loadChat(sessionId));
+
+        const initials = ChatMultiRoomHelper.escapeHtml((name || 'US').slice(0, 2).toUpperCase());
+        const safeName = ChatMultiRoomHelper.escapeHtml(name || 'Kontak');
+        const safeSub = ChatMultiRoomHelper.escapeHtml(subtitle || '');
+        const roleBadge = role === 'pegawai'
+            ? '<span class="badge-role badge-role-pegawai">Pegawai</span>'
+            : '<span class="badge-role badge-role-tamu">Tamu</span>';
+        const deptBadge = safeSub ? `<span class="badge-dept">${safeSub.slice(0, 20)}</span>` : '';
+        const unreadHtml = unread > 0 ? `<span class="badge-unread">${unread}</span>` : '';
+
+        div.innerHTML = `
+            <div class="avatar-squircle initials-avatar" data-name="${safeName}">
+                ${initials}
+                <span class="avatar-live-dot"></span>
+            </div>
+            <div class="info">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="name">${safeName}</span>
+                    <span class="time">${ChatMultiRoomHelper.escapeHtml(time || '')}</span>
+                </div>
+                <div class="d-flex align-items-center gap-1 mb-1">
+                    ${roleBadge}
+                    ${deptBadge}
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="last-msg">${ChatMultiRoomHelper.escapeHtml(preview || 'Belum ada pesan')}</div>
+                    ${unreadHtml}
+                </div>
+            </div>
+        `;
+        return div;
+    }
+
+    window.loadChat = ChatMultiRoomHelper.initMultiRoomChat({
+        containerId: 'chatListContainer',
+        chatCardId: 'adminChatCard',
+        backButtonId: 'btnAdminMobileBack',
+        mySenderType: 'admin',
+        getActiveSession: () => activeSession,
+        setActiveSession: (sid) => { activeSession = sid; },
+        getChatSocket: () => chatSocket,
+        initChatSocket: (sid, msgId) => window.__initAdminChatSocket && window.__initAdminChatSocket(sid, msgId),
+        formatMessageFn: formatChatMessageHtml,
+        applyFilters: () => window.__applyChatFilters && window.__applyChatFilters(),
+        ensureRoomVisible: () => {
+            const shell = document.getElementById('activeRoomShell');
+            const emptyPh = document.getElementById('roomEmptyPlaceholder');
+            if (shell) shell.style.display = 'flex';
+            if (emptyPh) emptyPh.style.display = 'none';
+        },
+        getHeaderIconHtml: (meta) => meta.participant_type === 'pegawai'
+            ? '<i class="fas fa-user-tie"></i>'
+            : '<i class="fas fa-user-tag"></i>',
+        createSidebarItemFromEvent: (ev) => createAdminSidebarItem({
+            sessionId: ev.session_id,
+            name: ev.room_name || 'Kontak Baru',
+            subtitle: ev.room_subtitle || '',
+            role: ev.participant_type || 'tamu',
+            preview: ev.preview || '',
+            time: ev.created_at || '',
+            unread: ev.sender_type !== 'admin' ? 1 : 0,
+        }),
+        createSidebarItemFromMeta: (meta, msgs) => {
+            const last = msgs && msgs.length ? msgs[msgs.length - 1] : null;
+            return createAdminSidebarItem({
+                sessionId: meta.session_id,
+                name: meta.name || 'Kontak Baru',
+                subtitle: meta.subtitle || '',
+                role: meta.participant_type || 'tamu',
+                preview: last ? last.content : 'Belum ada pesan',
+                time: last ? last.created_at : '',
+                unread: 0,
+            });
+        },
+        onResetEditMode: () => {
+            editingMessageId = null;
+            const ind = document.getElementById('editModeIndicator');
+            if (ind) ind.style.display = 'none';
+            const inp = document.getElementById('chatInput');
+            if (inp) inp.placeholder = 'Ketik pesan...';
+        },
+        onSyncBellBadge: (count) => {
+            const badge = document.getElementById('globalNotifBadge');
+            if (count > 0 && badge) badge.innerText = count;
+            else if (badge && count === 0) badge.remove();
+        },
+    });
+
+    const adminSidebarListEl = document.getElementById('chatListContainer');
+    if (adminSidebarListEl) {
+        adminSidebarListEl.addEventListener('click', function(e) {
+            const chatItem = e.target.closest('.chat-item[data-session-id]');
+            if (chatItem && adminSidebarListEl.contains(chatItem)) {
+                const sid = chatItem.getAttribute('data-session-id');
+                if (sid && typeof window.loadChat === 'function') {
+                    window.loadChat(sid);
+                }
+            }
+        });
+    }
 
     const inputSearchUser = document.getElementById('inputSearchUser');
     const searchResultList = document.getElementById('searchResultList');
@@ -1499,7 +1502,7 @@
                 return;
             }
 
-            fetch(`{% url 'tamu:api_search_users' %}?q=${query}`)
+            fetch(`{% url 'tamu:api_search_users' %}?q=${encodeURIComponent(query)}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
@@ -1513,9 +1516,14 @@
                             item.style.backgroundColor = '#f8fafc';
                             item.style.marginBottom = '4px';
                             item.style.fontSize = '0.85rem';
-                            item.innerHTML = `<strong>${user.name}</strong> <span style="color: #64748b;">(${user.email || user.role || ''})</span>`;
+                            const safeName = escapeHtml(String(user.name ?? ''));
+                            const safeMeta = escapeHtml(String(user.email || user.role || ''));
+                            item.innerHTML = `<strong>${safeName}</strong> <span style="color: #64748b;">(${safeMeta})</span>`;
                             item.addEventListener('click', () => {
-                                loadChat(user.id);
+                                searchResultList.innerHTML = '';
+                                inputSearchUser.value = '';
+                                if (window.__applyChatFilters) window.__applyChatFilters();
+                                loadChat(user.session_id || user.id);
                             });
                             searchResultList.appendChild(item);
                         });

@@ -3,6 +3,8 @@ import json
 import logging
 import ipaddress
 import secrets
+import threading
+import time
 from django.conf import settings
 from django.core.cache import cache
 from django.db import IntegrityError
@@ -11,74 +13,183 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.utils import timezone
 from django.templatetags.static import static
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.debug import sensitive_variables
+from django.views.decorators.http import require_POST
 
 from ..models import Tamu
 from ..forms import TamuLoginForm, TamuRegisterForm
+from .base import get_tamu_from_session
+from ..security_utils import (
+    hash_identifier,
+    hash_nik,
+    revoke_user_sessions,
+    tamu_reset_token_generator,
+    verify_pegawai_password,
+)
 
 security_logger = logging.getLogger('guest_book.security')
+
+_LOCAL_RL_LOCK = threading.Lock()
+_LOCAL_RL_FALLBACK = {}
+
+
+def _fallback_rl_get(key):
+    now = time.monotonic()
+    with _LOCAL_RL_LOCK:
+        entry = _LOCAL_RL_FALLBACK.get(key)
+        if not entry:
+            return 0
+        count, expires_at = entry
+        if expires_at <= now:
+            _LOCAL_RL_FALLBACK.pop(key, None)
+            return 0
+        return count
+
+
+def _fallback_rl_incr(key, timeout_seconds=900):
+    now = time.monotonic()
+    with _LOCAL_RL_LOCK:
+        if len(_LOCAL_RL_FALLBACK) > 5000:
+            expired = [k for k, (_, exp) in _LOCAL_RL_FALLBACK.items() if exp <= now]
+            for k in expired:
+                _LOCAL_RL_FALLBACK.pop(k, None)
+        entry = _LOCAL_RL_FALLBACK.get(key)
+        if not entry or entry[1] <= now:
+            _LOCAL_RL_FALLBACK[key] = (1, now + max(1, int(timeout_seconds)))
+            return 1
+        new_count = entry[0] + 1
+        _LOCAL_RL_FALLBACK[key] = (new_count, entry[1])
+        return new_count
+
+
+def _fallback_rl_clear(key):
+    with _LOCAL_RL_LOCK:
+        _LOCAL_RL_FALLBACK.pop(key, None)
+
+
+def _atomic_cache_incr(key, timeout_seconds=900):
+    """Naikkan counter rate limit secara atomik di cache, fallback thread-safe jika cache bermasalah."""
+    try:
+        if cache.add(key, 1, timeout=timeout_seconds):
+            return 1
+        try:
+            return cache.incr(key)
+        except ValueError:
+            cache.set(key, 1, timeout=timeout_seconds)
+            return 1
+    except Exception as exc:
+        security_logger.warning("Cache rate-limit fallback aktif pada key=%s (%s)", key[:24], exc.__class__.__name__)
+        return _fallback_rl_incr(key, timeout_seconds=timeout_seconds)
+
+
+_DEFAULT_TRUSTED_PROXY_NETWORKS = (
+    ipaddress.ip_network('127.0.0.0/8'),
+    ipaddress.ip_network('10.0.0.0/8'),
+    ipaddress.ip_network('172.16.0.0/12'),
+    ipaddress.ip_network('192.168.0.0/16'),
+    ipaddress.ip_network('100.64.0.0/10'),
+    ipaddress.ip_network('::1/128'),
+    ipaddress.ip_network('fc00::/7'),
+    ipaddress.ip_network('fe80::/10'),
+)
+
+
+def _is_trusted_proxy_ip(ip_str):
+    if not ip_str:
+        return False
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+
+    cidrs = getattr(settings, 'TRUSTED_PROXY_CIDRS', None) or []
+    if cidrs:
+        for cidr in cidrs:
+            try:
+                if ip_obj in ipaddress.ip_network(cidr, strict=False):
+                    return True
+            except ValueError:
+                continue
+        return False
+
+    return any(ip_obj in net for net in _DEFAULT_TRUSTED_PROXY_NETWORKS)
 
 
 def get_client_ip(request):
     """
     Mengambil IP address klien secara aman di belakang reverse proxy hosting.
-    - Hanya mempercayai header forwarded jika REMOTE_ADDR berasal dari proxy/loopback/private IP.
-    - Fallback aman ke REMOTE_ADDR jika tidak ada proxy atau format tidak valid.
+    - Hanya memeriksa header proxy jika REMOTE_ADDR berasal dari proxy tepercaya dan TRUST_X_FORWARDED_FOR aktif.
+    - Pada X-Forwarded-For, telusuri dari kanan ke kiri melewati hop proxy tepercaya agar klien tak bisa memalsukan hop kiri.
+    - HTTP_CF_CONNECTING_IP hanya dipercaya bila TRUST_CF_CONNECTING_IP diaktifkan eksplisit.
     """
     remote_addr = (request.META.get('REMOTE_ADDR') or '').strip()
-    is_trusted_proxy = False
     if remote_addr:
         try:
-            ip_obj = ipaddress.ip_address(remote_addr)
-            if ip_obj.is_loopback or ip_obj.is_private:
-                is_trusted_proxy = True
+            remote_addr = str(ipaddress.ip_address(remote_addr))
         except ValueError:
-            pass
+            remote_addr = ''
 
-    if is_trusted_proxy:
-        # 1. Cloudflare connecting IP
-        cf_ip = (request.META.get('HTTP_CF_CONNECTING_IP') or '').strip()
-        if cf_ip:
-            try:
-                ipaddress.ip_address(cf_ip)
-                return cf_ip
-            except ValueError:
-                pass
+    trust_xff = getattr(settings, 'TRUST_X_FORWARDED_FOR', True)
+    if trust_xff and remote_addr and _is_trusted_proxy_ip(remote_addr):
+        if getattr(settings, 'TRUST_CF_CONNECTING_IP', False):
+            cf_ip = (request.META.get('HTTP_CF_CONNECTING_IP') or '').strip()
+            if cf_ip:
+                try:
+                    return str(ipaddress.ip_address(cf_ip))
+                except ValueError:
+                    pass
 
-        # 2. X-Forwarded-For (ambil IP publik/klien pertama yang valid)
         x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
         if x_forwarded:
-            ips = [i.strip() for i in x_forwarded.split(',') if i.strip()]
-            for ip_candidate in ips:
+            candidates = [i.strip() for i in x_forwarded.split(',') if i.strip()]
+            first_valid = None
+            for ip_candidate in reversed(candidates):
                 try:
-                    ipaddress.ip_address(ip_candidate)
-                    return ip_candidate
+                    normalized = str(ipaddress.ip_address(ip_candidate))
                 except ValueError:
-                    continue
+                    break
+                if first_valid is None:
+                    first_valid = normalized
+                if not _is_trusted_proxy_ip(normalized):
+                    return normalized
+            if first_valid:
+                return first_valid
 
     return remote_addr or '127.0.0.1'
 
 
-def check_rate_limit(key, max_attempts=5):
-    """Cek apakah batas percobaan pada cache terlampaui."""
+def check_rate_limit(key, max_attempts=5, fail_closed=None):
+    """
+    Cek apakah batas percobaan terlampaui.
+    Jika cache gagal, gunakan fallback counter lokal; untuk mode `fail_closed=True`
+    (atau saat RATE_LIMIT_FAIL_CLOSED aktif), langsung blokir demi keamanan.
+    """
+    effective_fail_closed = (
+        getattr(settings, 'RATE_LIMIT_FAIL_CLOSED', True)
+        if fail_closed is None
+        else bool(fail_closed)
+    )
     try:
-        attempts = cache.get(key, 0)
-        return attempts >= max_attempts
-    except Exception:
-        return False
+        attempts = cache.get(key, None)
+        if attempts is not None:
+            return int(attempts) >= max_attempts
+        return _fallback_rl_get(key) >= max_attempts
+    except Exception as exc:
+        security_logger.warning("Cache read rate-limit gagal pada key=%s (%s)", key[:24], exc.__class__.__name__)
+        if effective_fail_closed or getattr(settings, 'RATE_LIMIT_FORCE_BLOCK_ON_CACHE_ERROR', False):
+            return True
+        return _fallback_rl_get(key) >= max_attempts
 
 
 def record_rate_limit_attempt(key, timeout_seconds=900):
-    """Tambah 1 percobaan gagal pada cache rate limit."""
-    try:
-        attempts = cache.get(key, 0)
-        cache.set(key, attempts + 1, timeout=timeout_seconds)
-    except Exception:
-        pass
+    """Tambah 1 percobaan gagal pada cache rate limit secara atomik."""
+    _atomic_cache_incr(key, timeout_seconds=timeout_seconds)
 
 
 def clear_rate_limit(key):
     """Reset percobaan pada cache rate limit saat berhasil."""
+    _fallback_rl_clear(key)
     try:
         cache.delete(key)
     except Exception:
@@ -232,15 +343,17 @@ def validate_grid_captcha(request, selected_tiles_json=None, trajectory_json=Non
 def check_login_rate_limit(ip_address, user_type=None, max_attempts=5, timeout_minutes=15):
     """
     Cek apakah IP telah melebihi batas percobaan gagal login.
-    Memanfaatkan backend cache terkonfigurasi (DatabaseCache di production, LocMemCache di local),
+    Memanfaatkan backend cache terkonfigurasi dengan fallback thread-safe lokal
     serta sinkron dengan record LoginAttempt di database.
     """
     key = _get_rate_limit_key(ip_address, user_type or 'all')
     cache_attempts = 0
     try:
-        cache_attempts = cache.get(key, 0)
-    except Exception:
-        pass
+        cached = cache.get(key, None)
+        cache_attempts = int(cached) if cached is not None else _fallback_rl_get(key)
+    except Exception as exc:
+        security_logger.warning("Cache read rate-limit gagal pada login (%s)", exc.__class__.__name__)
+        cache_attempts = _fallback_rl_get(key)
     if cache_attempts >= max_attempts:
         return True
 
@@ -258,14 +371,10 @@ def check_login_rate_limit(ip_address, user_type=None, max_attempts=5, timeout_m
 
 def record_failed_login(ip_address, email='', user_type='all', timeout_seconds=900):
     """
-    Catat kegagalan login di cache dan di tabel LoginAttempt.
+    Catat kegagalan login di cache secara atomik dan di tabel LoginAttempt.
     """
     key = _get_rate_limit_key(ip_address, user_type)
-    try:
-        current = cache.get(key, 0)
-        cache.set(key, current + 1, timeout=timeout_seconds)
-    except Exception:
-        pass
+    _atomic_cache_incr(key, timeout_seconds=timeout_seconds)
 
     try:
         from ..models import LoginAttempt
@@ -283,17 +392,15 @@ def clear_failed_login(ip_address, user_type='all'):
     Reset cache percobaan gagal saat login berhasil.
     """
     key = _get_rate_limit_key(ip_address, user_type)
-    try:
-        cache.delete(key)
-    except Exception:
-        pass
+    clear_rate_limit(key)
 
 
+@ensure_csrf_cookie
 def login_view(request):
     """View untuk Login Tamu & Admin"""
     from ..models import LoginAttempt
     
-    if request.session.get('tamu_id'):
+    if get_tamu_from_session(request):
         return redirect('tamu:dashboard')
 
     form = TamuLoginForm(request.POST or None)
@@ -347,9 +454,10 @@ def login_view(request):
         'user_logged_in': False,
     })
 
+@ensure_csrf_cookie
 def register_view(request):
     """View untuk Registrasi Tamu Baru"""
-    if request.session.get('tamu_id'):
+    if get_tamu_from_session(request):
         return redirect('tamu:dashboard')
 
     form = TamuRegisterForm(request.POST or None)
@@ -374,36 +482,44 @@ def register_view(request):
         'user_logged_in': False,
     })
 
+@require_POST
 def logout_view(request):
-    """View untuk Logout"""
+    """View untuk Logout (wajib POST + CSRF)."""
     request.session.flush()
     messages.success(request, "Anda telah berhasil keluar.")
     return redirect('tamu:login')
-
-from django.views.decorators.csrf import csrf_exempt
-
 
 def _establish_tamu_session(request, tamu):
     """
     Buat sesi Tamu yang bersih: rotasi session key (anti session fixation),
     hapus kunci peran lain, lalu isi tamu_id.
+    Akun administrator tidak boleh pernah mendapatkan sesi portal Tamu.
     """
+    if getattr(tamu, 'is_admin', False) or getattr(tamu, 'nik', None) == 'admin':
+        raise ValueError("Akun administrator tidak diizinkan masuk melalui sesi tamu.")
     from django.contrib.auth import logout as django_logout
     if getattr(request, 'user', None) and request.user.is_authenticated:
         django_logout(request)
     request.session.cycle_key()
-    for stale_key in ('pegawai_id', 'pegawai_name', 'pegawai_role', 'is_admin', 'admin_id', 'is_staff', 'role', '_auth_user_id', '_auth_user_backend', '_auth_user_hash'):
+    for stale_key in (
+        'pegawai_id', 'pegawai_name', 'pegawai_role',
+        'is_admin', 'admin_id', 'is_staff', 'role',
+        '_auth_user_id', '_auth_user_backend', '_auth_user_hash',
+        '_admin_2fa_verified_user_id',
+    ):
         request.session.pop(stale_key, None)
+    _clear_pending_2fa_session(request.session)
     request.session['tamu_id'] = str(tamu.pk)
     request.session.set_expiry(86400)  # Sesi aktif 1 hari
 
-@csrf_exempt
 def api_firebase_login(request):
     """API untuk Login/Register via Firebase (Google SSO & Email/Password)"""
+    from django.core.exceptions import ValidationError as DjangoValidationError
     from django.http import JsonResponse
     from django.urls import reverse
     from google.oauth2 import id_token
     from google.auth.transport import requests as google_requests
+    from ..validators import normalize_and_validate_phone
     import json
     
     if request.method != 'POST':
@@ -446,19 +562,31 @@ def api_firebase_login(request):
         email_verified = bool(id_info.get('email_verified', False))
             
         # Dapatkan data tambahan dari payload (jika dikirim untuk pendaftaran)
-        name = data.get('name') or id_info.get('name') or email.split('@')[0]
+        name = (data.get('name') or id_info.get('name') or email.split('@')[0])[:255]
         nik = data.get('nik')
-        phone = data.get('phone') or '-'
-        instansi = data.get('instansi') or '-'
+        raw_phone = data.get('phone')
+        try:
+            phone = normalize_and_validate_phone(raw_phone, allow_placeholder=True)
+        except DjangoValidationError as exc:
+            return JsonResponse({'success': False, 'message': exc.messages[0]}, status=400)
+        instansi = (data.get('instansi') or '-')[:255]
         registration_type = data.get('registration_type') or 'google_sso'
-        
+
         from ..models import Tamu, LoginAttempt
-        
+
         # Cari tamu berdasarkan email terverifikasi
         tamu = Tamu.objects.filter(email=email).first()
         created = False
-        
+
         if tamu:
+            # Blokir akun administrator agar wajib login lewat Portal Admin (/admin-portal/login/)
+            if tamu.is_admin or tamu.nik == 'admin':
+                record_rate_limit_attempt(rl_key)
+                record_failed_login(client_ip, email=email, user_type='tamu')
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Akun Administrator wajib masuk melalui Portal Admin.'
+                }, status=403)
             # Periksa status akun (nonaktif atau diblokir wajib ditolak)
             if tamu.account_status != 'active':
                 record_rate_limit_attempt(rl_key)
@@ -468,17 +596,23 @@ def api_firebase_login(request):
                     'message': 'Akun Anda dinonaktifkan atau diblokir. Silakan hubungi Administrator.'
                 }, status=403)
 
-            # Email belum terverifikasi hanya boleh membuat sesi bila UID Firebase ini
-            # sudah terikat ke akun Tamu tersebut (bukti kepemilikan sebelumnya).
-            if not email_verified and not (tamu.google_id and tamu.google_id == uid):
+            # Wajib email terverifikasi sebelum login / pengikatan UID Firebase
+            if not email_verified:
                 record_rate_limit_attempt(rl_key)
                 return JsonResponse({
                     'success': False,
                     'message': 'Email belum diverifikasi di Firebase. Silakan verifikasi email Anda terlebih dahulu.'
                 }, status=403)
+
+            if tamu.google_id and uid and tamu.google_id != uid:
+                record_rate_limit_attempt(rl_key)
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Identitas akun Firebase tidak cocok dengan akun terdaftar.'
+                }, status=403)
         else:
             # Akun baru dari email belum terverifikasi hanya boleh lewat registrasi email
-            # (yang tidak membuat sesi, pengguna diarahkan ke halaman login).
+            # (yang tidak membuat sesi dan tidak mengikat google_id sebelum verifikasi email).
             if not email_verified and registration_type != 'firebase_email':
                 record_rate_limit_attempt(rl_key)
                 return JsonResponse({
@@ -494,7 +628,7 @@ def api_firebase_login(request):
                     record_rate_limit_attempt(rl_key)
                     return JsonResponse({'success': False, 'message': captcha_err}, status=400)
 
-            # Jika tamu belum terdaftar di MySQL, buat tamu baru (pastikan bukan admin)
+            # Jika tamu belum terdaftar di MySQL, buat tamu baru (jangan ikat google_id bila email belum diverifikasi)
             tamu = Tamu.objects.create(
                 email=email,
                 name=name,
@@ -502,18 +636,18 @@ def api_firebase_login(request):
                 phone=phone,
                 instansi=instansi,
                 registration_type=registration_type,
-                google_id=uid,
+                google_id=(uid if email_verified else None),
                 account_status='active',
                 is_admin=False
             )
             created = True
 
         if not created:
-            # Jika tamu sudah terdaftar tapi data google_id kosong, perbarui
-            if not tamu.google_id:
+            # Hanya ikat google_id bila email sudah terverifikasi
+            if email_verified and uid and not tamu.google_id:
                 tamu.google_id = uid
                 tamu.save(update_fields=['google_id'])
-            
+
             # Jika ada update profil opsional yang dikirim saat login
             updated_fields = []
             if nik and not tamu.nik:
@@ -527,9 +661,9 @@ def api_firebase_login(request):
                 updated_fields.append('instansi')
             if updated_fields:
                 tamu.save(update_fields=updated_fields)
-        
-        # Set session untuk Django
-        if created and registration_type == 'firebase_email':
+
+        # Set session untuk Django (HANYA jika email sudah terverifikasi & bukan registrasi awal firebase_email)
+        if not email_verified or (created and registration_type == 'firebase_email'):
             # Jika baru registrasi secara manual/email, jangan set session login, arahkan ke login page
             from django.contrib import messages
             messages.success(request, 'Registrasi berhasil! Silakan masuk menggunakan akun Anda.')
@@ -627,7 +761,7 @@ def api_validate_register(request):
     record_rate_limit_attempt(nik_key, timeout_seconds=VALIDATE_REGISTER_WINDOW)
 
     try:
-        already_used = Tamu.objects.filter(Q(email__iexact=email) | Q(nik=nik)).exists()
+        already_used = Tamu.objects.filter(Q(email__iexact=email) | Tamu.nik_lookup_q(nik)).exists()
     except Exception as exc:
         security_logger.error('Validasi registrasi gagal diproses (%s).', type(exc).__name__)
         return JsonResponse({
@@ -719,9 +853,14 @@ def api_tamu_login(request):
         if kind == 'email':
             tamu = Tamu.objects.filter(email__iexact=identifier).first()
         else:
-            matches = list(Tamu.objects.filter(nik=identifier)[:2])
+            matches = list(Tamu.objects.filter(Tamu.nik_lookup_q(identifier))[:2])
             if len(matches) == 1:
                 tamu = matches[0]
+
+        # Blokir akun administrator agar tidak bisa login melalui API portal tamu
+        if tamu and (tamu.is_admin or tamu.nik == 'admin'):
+            del password
+            return fail('admin_portal_only')
 
         # 2. Verifikasi Password Lokal (Django check_password):
         from django.contrib.auth.hashers import check_password
@@ -807,19 +946,27 @@ def api_tamu_login(request):
 
 def admin_login_view(request):
     """View untuk Login Khusus Admin"""
-    from django.contrib.auth import authenticate, login
     from django.contrib.auth.forms import AuthenticationForm
-    from ..models import LoginAttempt, Tamu
-    
-    if request.user.is_authenticated and request.user.is_staff:
-        return redirect('tamu:admin_dashboard')
-    
+    from django.utils.http import url_has_allowed_host_and_scheme
+    from ..models import Tamu
+    from .base import ADMIN_2FA_VERIFIED_SESSION_KEY, is_admin_2fa_verified
+
+    raw_next = (request.POST.get('next') or request.GET.get('next') or '').strip()
+    safe_next = (
+        raw_next
+        if raw_next and url_has_allowed_host_and_scheme(
+            raw_next, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        )
+        else ''
+    )
+
+    if request.user.is_authenticated and request.user.is_staff and is_admin_2fa_verified(request, request.user):
+        return redirect(safe_next or 'tamu:admin_dashboard')
+
     form = AuthenticationForm()
-    
+
     if request.method == 'POST':
         ip_address = get_client_ip(request)
-        from django.utils import timezone
-        from datetime import timedelta
 
         # Rate Limiting Admin Login (Max 5 failed attempts in 15 mins via cache & db)
         if check_login_rate_limit(ip_address, user_type='admin'):
@@ -827,6 +974,7 @@ def admin_login_view(request):
             return render(request, 'guest_book/admin_login.html', {
                 'form': form,
                 'user_logged_in': False,
+                'next': safe_next,
             })
 
         post_data = request.POST.copy()
@@ -846,28 +994,40 @@ def admin_login_view(request):
         if form.is_valid():
             user = form.get_user()
             if user.is_staff:
-                # Find the Tamu admin email to associate with this login attempt
-                tamu_admin = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
-                admin_email = tamu_admin.email if tamu_admin else user.email
-                if not admin_email:
-                    admin_email = "admin@bukudigital.local"
-                
-                # Reset rate limit on success
-                clear_failed_login(ip_address, user_type='admin')
+                import time as _time
+                from .base import resolve_admin_record
+                from ..security_utils import decrypt_secret
 
-                # Record successful login attempt
-                LoginAttempt.objects.create(
-                    email=admin_email,
-                    user_type='admin',
-                    success=True,
-                    ip_address=ip_address
+                user_email = (getattr(user, 'email', None) or '').strip()
+                tamu_admin = Tamu.objects.filter(email__iexact=user_email, is_admin=True).first() if user_email else None
+                admin_record = resolve_admin_record(user)
+                has_2fa = bool(
+                    admin_record
+                    and admin_record.two_fa_enabled
+                    and admin_record.two_fa_secret
+                    and decrypt_secret(admin_record.two_fa_secret)
                 )
-                
-                login(request, user)
-                request.session.pop('pegawai_id', None)
-                request.session.pop('tamu_id', None)
-                messages.success(request, "Selamat datang kembali, Administrator!")
-                return redirect('tamu:admin_dashboard')
+                if has_2fa:
+                    request.session.cycle_key()
+                    for stale_key in (
+                        'pegawai_id', 'tamu_id',
+                        '_auth_user_id', '_auth_user_backend', '_auth_user_hash',
+                        ADMIN_2FA_VERIFIED_SESSION_KEY,
+                    ):
+                        request.session.pop(stale_key, None)
+                    request.session['pending_2fa_user_id'] = str(user.pk)
+                    request.session['pending_2fa_backend'] = getattr(
+                        user, 'backend', 'django.contrib.auth.backends.ModelBackend'
+                    )
+                    request.session['pending_2fa_admin_id'] = str(admin_record.id)
+                    request.session['pending_2fa_expires_at'] = int(_time.time()) + 300
+                    if safe_next:
+                        request.session['pending_2fa_next_url'] = safe_next
+                    else:
+                        request.session.pop('pending_2fa_next_url', None)
+                    return redirect('tamu:admin_verify_2fa')
+
+                return _complete_admin_login(request, user, tamu_admin, ip_address, next_url=safe_next)
             else:
                 # Record failed attempt (user is not staff/admin)
                 record_failed_login(ip_address, email=user.email or user.username, user_type='admin')
@@ -880,88 +1040,115 @@ def admin_login_view(request):
                 from django.contrib.auth.models import User
                 from django.db.models import Q
                 user_obj = User.objects.filter(Q(username=username) | Q(email=username)).first()
-                email = user_obj.email if user_obj else username
-                if not email or email == "":
-                    # Try to fall back to tamu admin email
-                    tamu_admin = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
-                    if tamu_admin and (username == tamu_admin.name or username == 'admin'):
-                        email = tamu_admin.email
-                
+                email = (user_obj.email if user_obj and user_obj.email else '') or username
+
                 if not email:
                     email = "admin@bukudigital.local"
-                
+
             record_failed_login(ip_address, email=email, user_type='admin')
 
-            
     return render(request, 'guest_book/admin_login.html', {
         'form': form,
         'user_logged_in': False,
+        'next': safe_next,
     })
 
 
 def tamu_password_reset_request(request):
-    """View untuk meminta link reset password tamu"""
+    """View untuk meminta link reset password tamu (anti-enumerasi, rate-limited)."""
     from django.core.mail import send_mail
     from django.template.loader import render_to_string
     from django.utils.http import urlsafe_base64_encode
     from django.utils.encoding import force_bytes
-    from django.contrib.auth.tokens import default_token_generator
     from django.contrib.sites.shortcuts import get_current_site
     from ..forms import TamuPasswordResetForm
-    
+
     form = TamuPasswordResetForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        email = form.cleaned_data['email']
-        tamu = Tamu.objects.get(email=email, account_status='active')
-        
-        # Generate token and uid
-        uid = urlsafe_base64_encode(force_bytes(tamu.pk))
-        token = default_token_generator.make_token(tamu)
-        
-        # Send email
-        current_site = get_current_site(request)
-        mail_subject = 'Reset Password Buku Tamu Digital'
-        message = render_to_string('guest_book/registration/password_reset_email.html', {
-            'tamu': tamu,
-            'domain': current_site.domain,
-            'uid': uid,
-            'token': token,
-            'protocol': 'https' if request.is_secure() else 'http'
-        })
-        
-        # Gunakan email pengirim dari settings jika ada, atau placeholder
-        from django.conf import settings
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'Buku Tamu Digital <noreply@example.com>')
-        
-        # Kirim email di latar belakang menggunakan thread agar tidak memblokir UI (Asynchronous)
-        import threading
-        threading.Thread(target=send_mail, args=(mail_subject, message, from_email, [email])).start()
-        
-        return redirect('tamu:password_reset_done')
-        
+    if request.method == 'POST':
+        client_ip = get_client_ip(request)
+        ip_rl_key = f"rl_pw_reset_ip_{client_ip}"
+        if check_rate_limit(ip_rl_key, max_attempts=5, fail_closed=True):
+            form.add_error(None, 'Terlalu banyak permintaan reset password. Silakan coba lagi nanti dalam 15 menit.')
+            return render(
+                request,
+                'guest_book/registration/password_reset_form.html',
+                {'form': form},
+                status=429,
+            )
+
+        record_rate_limit_attempt(ip_rl_key, timeout_seconds=900)
+
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            email_rl_key = f"rl_pw_reset_email_{hash_identifier(email)}"
+            if not check_rate_limit(email_rl_key, max_attempts=3):
+                record_rate_limit_attempt(email_rl_key, timeout_seconds=900)
+                tamu = (
+                    Tamu.objects.filter(
+                        email__iexact=email,
+                        account_status='active',
+                        is_admin=False,
+                    )
+                    .exclude(Tamu.nik_lookup_q('admin'))
+                    .first()
+                )
+                if tamu is not None:
+                    uid = urlsafe_base64_encode(force_bytes(tamu.pk))
+                    token = tamu_reset_token_generator.make_token(tamu)
+
+                    current_site = get_current_site(request)
+                    mail_subject = 'Reset Password Buku Tamu Digital'
+                    message = render_to_string('guest_book/registration/password_reset_email.html', {
+                        'tamu': tamu,
+                        'domain': current_site.domain,
+                        'uid': uid,
+                        'token': token,
+                        'protocol': 'https' if request.is_secure() else 'http',
+                    })
+
+                    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'Buku Tamu Digital <noreply@example.com>')
+                    try:
+                        send_mail(mail_subject, message, from_email, [tamu.email], fail_silently=False)
+                    except Exception as exc:
+                        security_logger.warning(
+                            "Gagal mengirim email reset password tamu: %s",
+                            exc.__class__.__name__,
+                        )
+
+            return redirect('tamu:password_reset_done')
+
     return render(request, 'guest_book/registration/password_reset_form.html', {'form': form})
 
 
+@sensitive_variables('new_password')
 def tamu_password_reset_confirm(request, uidb64, token):
-    """View untuk memproses password baru tamu"""
+    """View untuk memproses password baru tamu dan mencabut seluruh sesi aktifnya."""
     from django.utils.http import urlsafe_base64_decode
     from django.utils.encoding import force_str
-    from django.contrib.auth.tokens import default_token_generator
     from django.contrib.auth.hashers import make_password
     from ..forms import TamuSetPasswordForm
-    
+
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
-        tamu = Tamu.objects.get(pk=uid, account_status='active')
-    except (TypeError, ValueError, OverflowError, Tamu.DoesNotExist):
+        tamu = (
+            Tamu.objects.filter(
+                pk=uid,
+                account_status='active',
+                is_admin=False,
+            )
+            .exclude(Tamu.nik_lookup_q('admin'))
+            .first()
+        )
+    except (TypeError, ValueError, OverflowError):
         tamu = None
-        
-    if tamu is not None and default_token_generator.check_token(tamu, token):
+
+    if tamu is not None and tamu_reset_token_generator.check_token(tamu, token):
         form = TamuSetPasswordForm(request.POST or None)
         if request.method == 'POST' and form.is_valid():
             new_password = form.cleaned_data['password1']
             tamu.password = make_password(new_password)
-            tamu.save()
+            tamu.save(update_fields=['password'])
+            revoke_user_sessions('tamu', str(tamu.pk))
             return redirect('tamu:password_reset_complete')
         return render(request, 'guest_book/registration/password_reset_confirm.html', {'form': form, 'validlink': True})
     else:
@@ -973,9 +1160,16 @@ def pegawai_login_view(request):
     from django.contrib.auth.hashers import check_password
     from ..models import Pegawai, LoginAttempt
 
-    # Jika sudah login sebagai pegawai, redirect ke dashboard
-    if request.session.get('pegawai_id'):
-        return redirect('tamu:pegawai_dashboard')
+    # Jika sudah login sebagai pegawai aktif, redirect ke dashboard
+    pegawai_session_id = request.session.get('pegawai_id')
+    if pegawai_session_id:
+        try:
+            if Pegawai.objects.filter(pk=pegawai_session_id, account_status='active').exists():
+                return redirect('tamu:pegawai_dashboard')
+        except Exception:
+            pass
+        for stale_key in ('pegawai_id', 'pegawai_name', 'pegawai_role'):
+            request.session.pop(stale_key, None)
 
     if request.method == 'POST':
         login_id = request.POST.get('login_id', '').strip().lower()
@@ -1006,17 +1200,8 @@ def pegawai_login_view(request):
             messages.error(request, 'Email/Username atau password yang Anda masukkan salah.')
             return render(request, 'guest_book/pegawai_login.html')
 
-        # Verifikasi password (hashed dengan Django's check_password)
-        password_valid = check_password(password, pegawai.password)
-        if not password_valid and pegawai.password and '$' not in pegawai.password and len(pegawai.password) == 64:
-            import hashlib
-            import hmac
-            from django.contrib.auth.hashers import make_password
-            legacy_sha256 = hashlib.sha256(password.encode()).hexdigest()
-            if hmac.compare_digest(pegawai.password, legacy_sha256):
-                password_valid = True
-                pegawai.password = make_password(password)
-                pegawai.save(update_fields=['password'])
+        # Verifikasi password (hashed dengan Django's check_password atau migrasi SHA-256 legacy)
+        password_valid = verify_pegawai_password(pegawai, password, auto_upgrade=True)
 
         if not password_valid:
             record_failed_login(ip, email=login_id, user_type='pegawai')
@@ -1033,18 +1218,29 @@ def pegawai_login_view(request):
             email=login_id, user_type='pegawai', success=True, ip_address=ip
         )
 
-
         # Simpan session pegawai dengan rotasi key untuk mencegah session fixation
         from django.contrib.auth import logout as django_logout
         if getattr(request, 'user', None) and request.user.is_authenticated:
             django_logout(request)
         request.session.cycle_key()
-        for stale_key in ('tamu_id', 'is_admin', 'admin_id', 'is_staff', 'role', '_auth_user_id', '_auth_user_backend', '_auth_user_hash'):
+        for stale_key in (
+            'tamu_id', 'is_admin', 'admin_id', 'is_staff', 'role',
+            '_auth_user_id', '_auth_user_backend', '_auth_user_hash',
+            '_admin_2fa_verified_user_id',
+        ):
             request.session.pop(stale_key, None)
+        _clear_pending_2fa_session(request.session)
         request.session['pegawai_id']   = str(pegawai.pk)
         request.session['pegawai_name'] = pegawai.name
         request.session['pegawai_role'] = pegawai.role
         request.session.set_expiry(86400)  # Session aktif 1 hari
+
+        if getattr(pegawai, 'must_change_password', False):
+            messages.warning(
+                request,
+                'Password Anda masih bersifat sementara. Silakan buat password baru sekarang.',
+            )
+            return redirect('tamu:pegawai_profile')
 
         messages.success(request, f'Selamat datang, {pegawai.name}!')
         return redirect('tamu:pegawai_dashboard')
@@ -1052,10 +1248,141 @@ def pegawai_login_view(request):
     return render(request, 'guest_book/pegawai_login.html')
 
 
+@require_POST
 def pegawai_logout_view(request):
-    """Logout pegawai — flush seluruh sesi untuk keamanan."""
+    """Logout pegawai — flush seluruh sesi untuk keamanan (wajib POST + CSRF)."""
     request.session.flush()
     messages.success(request, 'Anda telah keluar dari Portal Pegawai.')
     return redirect('tamu:pegawai_login')
+
+
+def _clear_pending_2fa_session(session):
+    for key in (
+        'pending_2fa_user_id',
+        'pending_2fa_backend',
+        'pending_2fa_admin_id',
+        'pending_2fa_expires_at',
+        'pending_2fa_next_url',
+    ):
+        session.pop(key, None)
+
+
+def _complete_admin_login(request, user, tamu_admin, ip_address, next_url=''):
+    """Finalisasi sesi login administrator setelah verifikasi kredensial (& 2FA jika aktif)."""
+    from django.contrib.auth import login
+    from django.utils.http import url_has_allowed_host_and_scheme
+    from ..models import LoginAttempt
+    from .base import ADMIN_2FA_VERIFIED_SESSION_KEY
+
+    admin_email = (tamu_admin.email if tamu_admin else None) or user.email or "admin@bukudigital.local"
+    clear_failed_login(ip_address, user_type='admin')
+    LoginAttempt.objects.create(
+        email=admin_email,
+        user_type='admin',
+        success=True,
+        ip_address=ip_address,
+    )
+    login(request, user)
+    request.session[ADMIN_2FA_VERIFIED_SESSION_KEY] = str(user.pk)
+    request.session['_admin_last_activity_ts'] = int(time.time())
+    request.session.pop('pegawai_id', None)
+    request.session.pop('tamu_id', None)
+    saved_next = (next_url or request.session.get('pending_2fa_next_url') or '').strip()
+    _clear_pending_2fa_session(request.session)
+    messages.success(request, "Selamat datang kembali, Administrator!")
+    if saved_next and url_has_allowed_host_and_scheme(
+        saved_next, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return redirect(saved_next)
+    return redirect('tamu:admin_dashboard')
+
+
+@sensitive_variables('otp_code', 'totp_secret')
+def admin_verify_2fa_view(request):
+    """Halaman verifikasi OTP 6-digit (TOTP) untuk login administrator dengan 2FA aktif."""
+    import time as _time
+    from django.contrib.auth.models import User
+    from ..models import Admin, LoginAttempt
+    from ..security_utils import decrypt_secret, verify_totp_code
+
+    pending_user_id = request.session.get('pending_2fa_user_id')
+    pending_admin_id = request.session.get('pending_2fa_admin_id')
+    pending_backend = request.session.get('pending_2fa_backend', 'django.contrib.auth.backends.ModelBackend')
+    expires_at = request.session.get('pending_2fa_expires_at')
+
+    if not pending_user_id or not pending_admin_id or not expires_at or _time.time() > float(expires_at):
+        _clear_pending_2fa_session(request.session)
+        messages.warning(request, "Sesi verifikasi 2FA telah berakhir. Silakan login kembali.")
+        return redirect('tamu:admin_login')
+
+    ip_address = get_client_ip(request)
+    rl_key = f"rl_admin_2fa_{ip_address}_{pending_user_id}"
+    rl_user_key = f"rl_admin_2fa_user_{pending_user_id}"
+
+    if check_rate_limit(rl_key, max_attempts=5) or check_rate_limit(rl_user_key, max_attempts=10):
+        _clear_pending_2fa_session(request.session)
+        return render(
+            request,
+            'guest_book/admin_verify_2fa.html',
+            {'error_msg': 'Terlalu banyak percobaan kode 2FA yang salah. Silakan login ulang setelah 15 menit.'},
+            status=429,
+        )
+
+    if request.method == 'POST':
+        otp_code = (request.POST.get('otp_code') or '').strip()
+        user = User.objects.filter(pk=pending_user_id, is_staff=True, is_active=True).first()
+        admin_record = Admin.objects.filter(id=pending_admin_id, two_fa_enabled=True, account_status='active').first()
+
+        if not user or not admin_record:
+            _clear_pending_2fa_session(request.session)
+            messages.error(request, "Konfigurasi akun administrator tidak valid.")
+            return redirect('tamu:admin_login')
+
+        totp_secret = decrypt_secret(admin_record.two_fa_secret)
+        if totp_secret and verify_totp_code(
+            totp_secret,
+            otp_code,
+            valid_window=1,
+            replay_scope=f"admin_login_{admin_record.id}",
+        ):
+            cache.delete(rl_key)
+            cache.delete(rl_user_key)
+            user.backend = pending_backend
+            admin_record.last_login = timezone.now()
+            admin_record.save(update_fields=['last_login'])
+            tamu_admin = (
+                Tamu.objects.filter(email__iexact=admin_record.email, is_admin=True).first()
+                if admin_record.email else None
+            )
+
+            from .base import record_audit_log
+            record_audit_log(
+                user_id=str(user.pk),
+                user_type='admin',
+                action='update',
+                table_name='admin',
+                record_id=str(admin_record.id),
+                new_value='Verifikasi login Admin 2FA TOTP berhasil.',
+                ip_address=ip_address,
+            )
+            return _complete_admin_login(request, user, tamu_admin, ip_address)
+
+        record_rate_limit_attempt(rl_key)
+        record_rate_limit_attempt(rl_user_key)
+        LoginAttempt.objects.create(
+            email=admin_record.email,
+            user_type='admin',
+            success=False,
+            ip_address=ip_address,
+        )
+        security_logger.warning("Kegagalan verifikasi 2FA Admin dari IP %s", ip_address)
+        return render(
+            request,
+            'guest_book/admin_verify_2fa.html',
+            {'error_msg': 'Kode autentikasi 6 digit tidak valid atau sudah kedaluwarsa.'},
+            status=400,
+        )
+
+    return render(request, 'guest_book/admin_verify_2fa.html')
 
 

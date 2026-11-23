@@ -1,4 +1,9 @@
-from .models import Notification, Tamu, Kunjungan, ChatMessage
+from .models import Notification, Tamu, Kunjungan, ChatMessage, ChatRoom
+
+def csp_nonce(request):
+    """Ekspos nonce skrip CSP per-request agar tag <script nonce="{{ csp_nonce }}"> terizinkan tanpa unsafe-inline."""
+    return {'csp_nonce': getattr(request, 'csp_nonce', '')}
+
 
 def notifications_context(request):
     """
@@ -18,6 +23,10 @@ def notifications_context(request):
 
     # ── Admin via Django Auth (Staff) ────────────────────────────────────
     if request.user.is_authenticated and request.user.is_staff:
+        from .views.base import is_admin_2fa_verified
+
+        if not is_admin_2fa_verified(request, request.user):
+            return {}
         unread_count = Notification.objects.filter(
             recipient_type='admin', status='unread'
         ).count()
@@ -32,10 +41,12 @@ def notifications_context(request):
 
     if tamu is None:
         # Fallback: halaman yang tidak pakai @tamu_login_required
-        # (misal: landing, tentang kami) — query 1x sebagai pengaman
-        tamu = Tamu.objects.filter(pk=tamu_id).first()
+        # (misal: landing, tentang kami) — query 1x dengan cek status aktif
+        tamu = Tamu.objects.filter(pk=tamu_id, account_status='active').first()
         if tamu is None:
             return {}
+    elif getattr(tamu, 'account_status', 'active') != 'active':
+        return {}
 
     # ── Tamu dengan role admin ───────────────────────────────────────────
     if tamu.nik == 'admin' or tamu.is_admin:
@@ -54,7 +65,7 @@ def pegawai_notifications_context(request):
     Context processor untuk badge notifikasi & counter sidebar di Portal Pegawai.
     """
     pegawai = getattr(request, '_pegawai', None)
-    if not pegawai:
+    if not pegawai or getattr(pegawai, 'account_status', 'active') != 'active':
         return {}
 
     pegawai_id_str = str(pegawai.id)
@@ -70,14 +81,16 @@ def pegawai_notifications_context(request):
         status='menunggu_pegawai'
     ).count()
 
-    # Hitung pesan chat belum dibaca untuk pegawai ini (dari Admin maupun Tamu)
+    # Hitung pesan chat belum dibaca untuk pegawai ini memakai index komposit (session_id, is_read, sender_type)
     kunjungan_ids = list(
         Kunjungan.objects.filter(
             pegawai=pegawai,
             status__in=['disetujui_pegawai', 'disetujui', 'in_progress', 'completed']
         ).values_list('id', flat=True)
     )
-    chat_sessions = [f'pegawai_admin_{pegawai_id_str}'] + [f'kunjungan_{kid}' for kid in kunjungan_ids]
+    chat_sessions = [ChatRoom.session_id_for_pegawai_admin(pegawai_id_str)] + [
+        ChatRoom.session_id_for_kunjungan(kid) for kid in kunjungan_ids
+    ]
     unread_chat_count = ChatMessage.objects.filter(
         session_id__in=chat_sessions,
         is_read=False

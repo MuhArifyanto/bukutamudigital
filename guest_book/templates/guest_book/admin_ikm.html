@@ -489,11 +489,13 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+{{ chart_data.labels|json_script:"ikm-chart-labels" }}
+{{ chart_data.ratings|json_script:"ikm-chart-ratings" }}
+<script nonce="{{ csp_nonce }}">
 document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('ikmMonthlyChart').getContext('2d');
-    const chartLabels = {{ chart_data.labels|safe }};
-    const chartRatings = {{ chart_data.ratings|safe }};
+    const chartLabels = JSON.parse(document.getElementById('ikm-chart-labels').textContent);
+    const chartRatings = JSON.parse(document.getElementById('ikm-chart-ratings').textContent);
 
     new Chart(ctx, {
         type: 'line',

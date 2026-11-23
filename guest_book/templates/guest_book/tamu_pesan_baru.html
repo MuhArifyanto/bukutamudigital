@@ -52,7 +52,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
   document.getElementById('pesanForm')?.addEventListener('submit', function() {
     const btn = document.getElementById('btnSend');
     btn.disabled = true;

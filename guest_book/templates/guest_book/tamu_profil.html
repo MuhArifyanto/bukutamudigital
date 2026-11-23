@@ -313,9 +313,9 @@
                             {{ days_since_change }} hari terakhir. Demi keamanan, harap perbarui secara berkala.</p>
                     </div>
                 </div>
-                <button class="btn"
-                    style="background: #fff; color: #991b1b; border: 1px solid #fecaca; border-radius: 8px; font-size: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; cursor: pointer;">UBAH
-                    SEKARANG</button>
+                <a href="{% url 'tamu:password_reset' %}" class="btn"
+                    style="background: #fff; color: #991b1b; border: 1px solid #fecaca; border-radius: 8px; font-size: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; cursor: pointer; text-decoration: none;">UBAH
+                    SEKARANG</a>
             </div>
             {% else %}
             <div class="security-card"
@@ -332,11 +332,87 @@
                             diperbarui {{ days_since_change }} hari yang lalu.</p>
                     </div>
                 </div>
-                <button class="btn"
-                    style="background: #fff; color: #166534; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; cursor: pointer;">UBAH
-                    SEKARANG</button>
+                <a href="{% url 'tamu:password_reset' %}" class="btn"
+                    style="background: #fff; color: #166534; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; cursor: pointer; text-decoration: none;">UBAH
+                    SEKARANG</a>
             </div>
             {% endif %}
+
+            <!-- HAK PRIVASI & DATA PRIBADI (UU PDP) -->
+            <div class="pdp-card"
+                style="background: #fff; border-radius: 16px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 1rem; align-items: flex-start; max-width: 520px;">
+                        <div
+                            style="width: 40px; height: 40px; background: #eff6ff; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #1d4ed8; font-size: 1.15rem; flex-shrink: 0;">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem;">
+                                Privasi &amp; Data Pribadi (UU PDP)</h4>
+                            <p style="font-size: 0.78rem; color: #64748b; margin: 0; line-height: 1.5;">
+                                Sesuai <a href="{% url 'tamu:kebijakan_privasi' %}" style="color: #1d4ed8; font-weight: 600; text-decoration: none;">Kebijakan Privasi</a>, Anda dapat mengunduh salinan data pribadi Anda atau mengajukan penghapusan/anonimisasi akun secara permanen.
+                            </p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center;">
+                        <a href="{% url 'tamu:tamu_export_personal_data' %}" class="btn" id="btnExportPersonalData"
+                            style="background: #f8fafc; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.78rem; padding: 0.55rem 0.95rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem;">
+                            <i class="fas fa-download"></i> Unduh Data Saya (JSON)
+                        </a>
+                        <button type="button" class="btn" id="btnOpenDeleteAccountModal"
+                            style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 8px; font-size: 0.78rem; padding: 0.55rem 0.95rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem;">
+                            <i class="fas fa-trash-alt"></i> Hapus Akun Saya
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL KONFIRMASI HAPUS AKUN (UU PDP) -->
+    <div id="deleteAccountModal" role="dialog" aria-modal="true" aria-labelledby="deleteAccountModalTitle"
+        style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); z-index: 2000; align-items: center; justify-content: center; padding: 1rem;">
+        <div style="background: #fff; border-radius: 16px; max-width: 460px; width: 100%; padding: 1.75rem; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h4 id="deleteAccountModalTitle" style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #991b1b; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-exclamation-triangle"></i> Hapus Akun &amp; Data Pribadi
+                </h4>
+                <button type="button" id="btnCloseDeleteAccountModal" aria-label="Tutup"
+                    style="background: transparent; border: none; color: #64748b; font-size: 1.1rem; cursor: pointer; padding: 0.25rem;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p style="font-size: 0.82rem; color: #475569; line-height: 1.6; margin-bottom: 1rem;">
+                Tindakan ini <strong>bersifat permanen</strong>. Identitas pribadi (nama, email, NIK, nomor telepon, instansi, foto profil), riwayat chat, dan pesan Anda akan dihapus/dianonimkan sesuai UU PDP, serta jadwal kunjungan aktif akan dibatalkan.
+            </p>
+            <form method="post" action="{% url 'tamu:tamu_delete_account' %}" id="deleteAccountForm">
+                {% csrf_token %}
+                {% if has_local_password %}
+                <div style="margin-bottom: 0.9rem;">
+                    <label for="delete_current_password" style="display: block; font-size: 0.72rem; font-weight: 800; color: #475569; margin-bottom: 0.35rem;">KATA SANDI SAAT INI</label>
+                    <input type="password" id="delete_current_password" name="current_password" required autocomplete="current-password"
+                        placeholder="Masukkan kata sandi akun Anda"
+                        style="width: 100%; padding: 0.6rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem;">
+                </div>
+                {% endif %}
+                <div style="margin-bottom: 1.25rem;">
+                    <label for="delete_confirm_text" style="display: block; font-size: 0.72rem; font-weight: 800; color: #475569; margin-bottom: 0.35rem;">KETIK <span style="color: #b91c1c;">HAPUS</span> UNTUK KONFIRMASI</label>
+                    <input type="text" id="delete_confirm_text" name="confirm_text" required autocomplete="off"
+                        placeholder="HAPUS"
+                        style="width: 100%; padding: 0.6rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem;">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 0.65rem;">
+                    <button type="button" id="btnCancelDeleteAccount"
+                        style="background: #fff; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.82rem; padding: 0.55rem 1rem; font-weight: 600; cursor: pointer;">
+                        Batal
+                    </button>
+                    <button type="submit"
+                        style="background: #dc2626; color: #fff; border: none; border-radius: 8px; font-size: 0.82rem; padding: 0.55rem 1rem; font-weight: 700; cursor: pointer;">
+                        Ya, Hapus Permanen
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -382,7 +458,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     const fileInput = document.getElementById('profile_pic');
     const avatarContainer = document.querySelector('label[for="profile_pic"]').parentNode;
 
@@ -464,6 +540,27 @@
                     submitBtn.innerHTML = originalBtnContent;
                     submitBtn.disabled = false;
                 });
+        });
+    }
+
+    const deleteModal = document.getElementById('deleteAccountModal');
+    const btnOpenDelete = document.getElementById('btnOpenDeleteAccountModal');
+    const btnCloseDelete = document.getElementById('btnCloseDeleteAccountModal');
+    const btnCancelDelete = document.getElementById('btnCancelDeleteAccount');
+
+    function closeDeleteModal() {
+        if (deleteModal) deleteModal.style.display = 'none';
+    }
+    if (btnOpenDelete && deleteModal) {
+        btnOpenDelete.addEventListener('click', function () {
+            deleteModal.style.display = 'flex';
+        });
+    }
+    if (btnCloseDelete) btnCloseDelete.addEventListener('click', closeDeleteModal);
+    if (btnCancelDelete) btnCancelDelete.addEventListener('click', closeDeleteModal);
+    if (deleteModal) {
+        deleteModal.addEventListener('click', function (ev) {
+            if (ev.target === deleteModal) closeDeleteModal();
         });
     }
 </script>

@@ -829,6 +829,7 @@
             <a href="?session={{ conv.session_id }}" 
                class="chat-item {% if active_conv and active_conv.session_id == conv.session_id %}active{% endif %}"
                data-id="{{ conv.session_id }}"
+               data-session-id="{{ conv.session_id }}"
                data-name="{{ conv.name|lower }}"
                data-role="{{ conv.type }}"
                data-dept="{{ conv.subtitle|default:''|lower }}"
@@ -909,8 +910,7 @@
                     </div>
                 </div>
             </div>
-            {% if active_conv.type == 'admin' %}
-            <div class="header-actions d-flex align-items-center gap-2">
+            <div id="tamuAiHeaderActions" class="header-actions align-items-center gap-2 {% if active_conv.type == 'admin' %}d-flex{% else %}d-none{% endif %}">
                 <button type="button" id="btnToggleAiMode" class="ai-mode-btn {% if ai_handoff_active %}human-mode{% endif %}" title="{% if ai_handoff_active %}Saat ini terhubung langsung dengan Admin. Klik jika ingin kembali ke Asisten AI.{% else %}Dilayani oleh Asisten AI terlebih dahulu (otomatis beralih ke Admin jika 3x belum terjawab/kurang sesuai){% endif %}">
                     {% if ai_handoff_active %}
                         <i class="fas fa-user-shield"></i> <span class="d-none d-sm-inline">Terhubung ke </span>Admin
@@ -919,7 +919,6 @@
                     {% endif %}
                 </button>
             </div>
-            {% endif %}
         </div>
 
         <div class="message-area" id="messageArea">
@@ -981,8 +980,7 @@
                 <i class="fas fa-circle-notch fa-spin"></i> <span>Asisten AI sedang memproses jawaban...</span>
             </div>
             
-            {% if active_conv.type == 'admin' %}
-            <div class="ai-quick-chips" id="aiQuickChips" {% if ai_handoff_active %}style="display: none;"{% endif %}>
+            <div class="ai-quick-chips" id="aiQuickChips" style="display: {% if active_conv.type == 'admin' and not ai_handoff_active %}flex{% else %}none{% endif %};">
                 <button type="button" class="ai-chip-btn" data-prompt="Cek status kunjungan saya saat ini">Cek Status Kunjungan</button>
                 <button type="button" class="ai-chip-btn" data-prompt="Berapa sisa kuota kunjungan dan jam operasional hari ini?">Jadwal & Sisa Kuota</button>
                 <button type="button" class="ai-chip-btn" data-prompt="SOP permohonan TTE BSrE dan pengajuan subdomain hosting OPD">SOP TTE & Hosting</button>
@@ -992,7 +990,6 @@
                 <button type="button" class="ai-chip-btn" data-fill="Buatkan saya daftar kunjungan untuk hari Senin jam 09:00 keperluan ">Buat Kunjungan</button>
                 <button type="button" class="ai-chip-btn" data-fill="Saya ingin menyampaikan masukan/keluhan: ">Keluhan & Masukan</button>
             </div>
-            {% endif %}
 
             <div id="editModeIndicator" class="edit-mode-bar" style="display: none;">
                 <span><i class="fas fa-pencil-alt me-1"></i> Sedang mengedit pesan...</span>
@@ -1004,7 +1001,7 @@
                     <button type="button" class="btn-attach" id="btnAttach" title="Lampirkan File">
                         <i class="fas fa-paperclip"></i>
                     </button>
-                    <input type="file" id="chatFileInput" style="display: none;" accept=".doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.svg">
+                    <input type="file" id="chatFileInput" style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
                     <input type="text" id="chatInput" placeholder="Ketik pesan..." autocomplete="off">
                     <button type="submit" class="btn-send-pill">
                         <i class="fas fa-paper-plane"></i>
@@ -1027,7 +1024,7 @@
 
 {% block extra_js %}
 <script src="{% static 'js/chat_client.js' %}"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
     let activeSession = "{% if active_conv %}{{ active_conv.session_id }}{% endif %}";
     let isAdminConv = "{% if active_conv and active_conv.type == 'admin' %}true{% else %}false{% endif %}" === "true";
     let isHandoffActive = "{% if ai_handoff_active %}true{% else %}false{% endif %}" === "true";
@@ -1068,6 +1065,20 @@
         if (chatInput) chatInput.placeholder = 'Tanya Asisten AI atau ketik pesan...';
     }
 
+    function hideAiControlsForPegawai() {
+        isAdminConv = false;
+        isHandoffActive = false;
+        aiAssistantEnabled = false;
+        const hdr = document.getElementById('tamuAiHeaderActions');
+        const aiChips = document.getElementById('aiQuickChips');
+        const typingEl = document.getElementById('aiTypingIndicator');
+        const chatInput = document.getElementById('chatInput');
+        if (hdr) { hdr.classList.remove('d-flex'); hdr.classList.add('d-none'); }
+        if (aiChips) aiChips.style.display = 'none';
+        if (typingEl) typingEl.style.display = 'none';
+        if (chatInput) chatInput.placeholder = 'Ketik pesan...';
+    }
+
     (function() {
         "use strict";
 
@@ -1086,12 +1097,12 @@
         // Filter Tabs & Search Filtering
         const filterButtons = document.querySelectorAll('.tab-pill-btn');
         const searchInput = document.getElementById('chatSearchInput');
-        const chatItems = document.querySelectorAll('.chat-item');
         const emptyFilterEl = document.getElementById('chatFilterEmpty');
         const emptyTitleEl = document.getElementById('chatFilterEmptyTitle');
         const emptySubEl = document.getElementById('chatFilterEmptySub');
 
         function applyFilters() {
+            const chatItems = document.querySelectorAll('#chatListContainer .chat-item');
             const activeTab = document.querySelector('.tab-pill-btn.active');
             const filter = activeTab ? activeTab.getAttribute('data-filter') : 'all';
             const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
@@ -1156,6 +1167,22 @@
                 filterButtons.forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 applyFilters();
+        window.__applyChatFilters = applyFilters;
+
+        // Intersep klik kontak sidebar agar berpindah room tanpa reload halaman penuh
+        const listContainer = document.getElementById('chatListContainer');
+        if (listContainer) {
+            listContainer.addEventListener('click', function(e) {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                const item = e.target.closest('.chat-item[data-session-id]');
+                if (!item) return;
+                e.preventDefault();
+                const sid = item.getAttribute('data-session-id');
+                if (sid && window.loadChat) {
+                    window.loadChat(sid);
+                }
+            });
+        }
             });
         });
 
@@ -1164,6 +1191,22 @@
         }
 
         applyFilters();
+        window.__applyChatFilters = applyFilters;
+
+        // Intersep klik kontak sidebar agar berpindah room tanpa reload halaman penuh
+        const listContainer = document.getElementById('chatListContainer');
+        if (listContainer) {
+            listContainer.addEventListener('click', function(e) {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                const item = e.target.closest('.chat-item[data-session-id]');
+                if (!item) return;
+                e.preventDefault();
+                const sid = item.getAttribute('data-session-id');
+                if (sid && window.loadChat) {
+                    window.loadChat(sid);
+                }
+            });
+        }
 
         // Mobile back button to show conversation list
         const btnMobileBack = document.getElementById('btnMobileBackToList');
@@ -1328,11 +1371,11 @@
                     const file = this.files[0];
                     if (!file) return;
 
-                    const allowedExtensions = ['doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'svg'];
+                    const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
                     const fileExt = file.name.split('.').pop().toLowerCase();
                     
                     if (!allowedExtensions.includes(fileExt)) {
-                        alert('Format file tidak didukung! Hanya file Word, Excel, PNG, JPG, dan SVG yang diperbolehkan.');
+                        alert('Format file tidak didukung! Hanya file PDF, Word, Excel, PNG, dan JPG yang diperbolehkan.');
                         this.value = '';
                         return;
                     }
@@ -1384,129 +1427,14 @@
     })();
 
     function escapeHtml(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function formatBlockLines(text) {
-        const lines = text.split('\n');
-        let out = [];
-        for (let line of lines) {
-            let trimLine = line.trim();
-            if (!trimLine) continue;
-
-            if (trimLine.startsWith('•') || trimLine.startsWith('-') || trimLine.startsWith('* ')) {
-                let content = trimLine.replace(/^[•\-\*]\s*/, '').trim();
-                out.push(`<div class="chat-list-row"><span class="chat-bullet-symbol">•</span><span class="chat-list-text">${content}</span></div>`);
-            } else if (/^\d+\.\s+/.test(trimLine)) {
-                let match = trimLine.match(/^(\d+\.)\s+(.*)$/);
-                if (match) {
-                    out.push(`<div class="chat-list-row"><span class="chat-num-symbol">${match[1]}</span><span class="chat-list-text">${match[2]}</span></div>`);
-                } else {
-                    out.push(`<div class="chat-text-row">${trimLine}</div>`);
-                }
-            } else {
-                out.push(`<div class="chat-text-row">${trimLine}</div>`);
-            }
-        }
-        return out.join('');
+        return window.SecurityUtils ? window.SecurityUtils.escapeHtml(str) : ChatMultiRoomHelper.escapeHtml(str);
     }
 
     function formatChatMessageHtml(rawText, isPureSent = false) {
-        if (!rawText) return '';
-        let cleaned = (rawText || '').trim();
-
-        let chips = [];
-        cleaned = cleaned.replace(/\[\[chip:([^|\]]+)(?:\|([^\]]+))?\]\]/g, function(match, action, label) {
-            chips.push({ action: action.trim(), label: (label || action).trim() });
-            return '';
-        });
-
-        cleaned = cleaned.replace(/👉\s*\**\s*(?:sentuh\s+)?pilihan\s+tindakan(?:\s+cepat)?:\s*\**\s*$/gim, '').trim();
-
-        const isAiMessage = /^🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/i.test(cleaned);
-        if (isAiMessage) {
-            cleaned = cleaned.replace(/^🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/i, '').trim();
+        if (window.SecurityUtils && typeof window.SecurityUtils.formatRichChatMessage === 'function') {
+            return window.SecurityUtils.formatRichChatMessage(rawText, isPureSent);
         }
-
-        let safe = escapeHtml(cleaned);
-
-        safe = safe.replace(
-            /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-            function(match, text, url) {
-                const isMaps = url.indexOf('maps.google') !== -1 || url.indexOf('goo.gl') !== -1 || url.indexOf('/maps') !== -1;
-                if (isMaps) {
-                    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-maps-btn"><i class="fas fa-map-marked-alt"></i> <span>${text}</span> <i class="fas fa-external-link-alt chat-ext-icon"></i></a>`;
-                }
-                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${text} <i class="fas fa-external-link-alt chat-ext-icon"></i></a>`;
-            }
-        );
-
-        const strongColor = isPureSent ? 'color:#ffffff;' : '';
-        safe = safe.replace(/\*\*([^*]+)\*\*/g, `<strong class="chat-bold" style="${strongColor}">$1</strong>`);
-        safe = safe.replace(/(^|[^\*])\*([^\*\n]+)\*([^\*]|$)/g, '$1<em class="chat-italic">$2</em>$3');
-        safe = safe.replace(/`([^`\n]+)`/g, '<code class="chat-code">$1</code>');
-
-        if (isPureSent && !isAiMessage) {
-            return safe;
-        }
-
-        const blocks = safe.split(/\n{2,}/);
-        let renderedHtml = '';
-
-        if (isAiMessage) {
-            renderedHtml += `
-                <div class="ai-header-card">
-                    <div class="ai-header-badge">
-                        <i class="fas fa-robot"></i>
-                        <span>Asisten AI Diskominfosantik</span>
-                    </div>
-                    <span class="ai-header-live"><span class="ai-live-dot"></span> Aktif</span>
-                </div>
-            `;
-        }
-
-        for (let block of blocks) {
-            block = block.trim();
-            if (!block) continue;
-
-            if (block.startsWith('⚠️')) {
-                renderedHtml += `<div class="chat-callout callout-warning">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('⏱️')) {
-                renderedHtml += `<div class="chat-callout callout-sla">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('📌') || block.startsWith('📋') || block.startsWith('✅')) {
-                renderedHtml += `<div class="chat-callout callout-info">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('💡')) {
-                renderedHtml += `<div class="chat-callout callout-tip">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('📍')) {
-                renderedHtml += `<div class="chat-callout callout-location">${formatBlockLines(block)}</div>`;
-            } else {
-                renderedHtml += `<div class="chat-block">${formatBlockLines(block)}</div>`;
-            }
-        }
-
-        if (chips.length > 0) {
-            let chipsHtml = chips.map(c => 
-                `<button type="button" class="chat-action-chip" data-action="${escapeHtml(c.action)}">
-                    ${escapeHtml(c.label)}
-                </button>`
-            ).join('');
-
-            renderedHtml += `
-                <div class="chat-action-panel">
-                    <div class="chat-action-title">
-                        <i class="fas fa-hand-pointer"></i> <span>Pilihan Tindakan Cepat:</span>
-                    </div>
-                    <div class="chat-action-chips">
-                        ${chipsHtml}
-                    </div>
-                </div>
-            `;
-        }
-
-        return renderedHtml || safe;
+        return escapeHtml(rawText || '');
     }
 
     // Format initial messages in DOM
@@ -1536,18 +1464,10 @@
         let bubbleContent = '';
         if (messageType === 'deleted') {
             bubbleContent = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
-        } else if (messageType === 'image') {
-            bubbleContent = `<img src="${encodeURI(fileUrl || '')}" style="max-width: 240px; max-height: 240px; object-fit: contain; border-radius: 10px;" alt="Gambar">`;
-        } else if (messageType === 'file') {
-            const rawFilename = (fileUrl || '').split('/').pop();
-            const filename = escapeHtml(rawFilename);
-            bubbleContent = `<a href="${encodeURI(fileUrl || '')}" target="_blank" rel="noopener noreferrer" class="file-card">
-                <i class="fas fa-file-alt"></i>
-                <div class="file-info">
-                    <span class="file-name">${filename}</span>
-                    <span class="file-size">Klik untuk mengunduh</span>
-                </div>
-            </a>`;
+        } else if (messageType === 'image' || messageType === 'file') {
+            bubbleContent = window.SecurityUtils
+                ? window.SecurityUtils.renderChatAttachmentHtml(messageType, fileUrl)
+                : `<span style="font-style: italic; opacity: 0.7;">Lampiran tidak valid</span>`;
         } else {
             bubbleContent = formatChatMessageHtml(content, type === 'sent' && !isAi);
         }
@@ -1565,7 +1485,7 @@
             `;
         } else if (!isSent && messageType === 'text' && content && content.indexOf('🤖 Asisten AI') !== -1 && content.indexOf('[Dialihkan Otomatis ke Petugas Admin]') === -1 && !isHandoffActive) {
             actionButtons = `
-                <button type="button" onclick="sendAiUnsatisfiedFeedback(this)" style="background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; border-radius: 99px; padding: 0.15rem 0.55rem; font-size: 0.68rem; font-weight: 600; cursor: pointer; margin-left: 0.35rem;">
+                <button type="button" class="btn-ai-unsatisfied" style="background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; border-radius: 99px; padding: 0.15rem 0.55rem; font-size: 0.68rem; font-weight: 600; cursor: pointer; margin-left: 0.35rem;">
                     👎 Jawaban kurang sesuai
                 </button>
             `;
@@ -1579,7 +1499,7 @@
         msgGroup.innerHTML = `
             <div class="msg-bubble">${bubbleContent}</div>
             <div class="msg-meta-row">
-                <span class="msg-time">${time}</span>
+                <span class="msg-time">${escapeHtml(time || '')}</span>
                 ${ticks}
                 ${actionButtons}
             </div>
@@ -1605,6 +1525,16 @@
             chatInput.value = 'Jawaban kurang sesuai';
             chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
         }
+    }
+
+    const msgAreaEl = document.getElementById('messageArea');
+    if (msgAreaEl) {
+        msgAreaEl.addEventListener('click', function(e) {
+            const feedbackBtn = e.target.closest('.btn-ai-unsatisfied');
+            if (feedbackBtn && msgAreaEl.contains(feedbackBtn)) {
+                sendAiUnsatisfiedFeedback(feedbackBtn);
+            }
+        });
     }
 
     // Handle Edit Click
@@ -1673,6 +1603,96 @@
             chatInput.value = '';
             chatInput.placeholder = "Ketik pesan...";
         }
+    });
+
+    function createTamuSidebarItem(ev) {
+        const a = document.createElement('a');
+        a.href = `?session=${encodeURIComponent(ev.session_id)}`;
+        a.className = 'chat-item';
+        a.setAttribute('data-id', ev.session_id);
+        a.setAttribute('data-session-id', ev.session_id);
+        a.setAttribute('data-name', (ev.room_name || '').toLowerCase());
+        a.setAttribute('data-role', ev.participant_type === 'admin' ? 'admin' : 'pegawai');
+        a.setAttribute('data-dept', (ev.room_subtitle || '').toLowerCase());
+        a.setAttribute('data-unread', ev.sender_type !== 'tamu' ? '1' : '0');
+        a.style.textDecoration = 'none';
+
+        const safeName = ChatMultiRoomHelper.escapeHtml(ev.room_name || 'Kontak');
+        const initials = ChatMultiRoomHelper.escapeHtml((ev.room_name || 'AD').slice(0, 2).toUpperCase());
+        const roleBadge = ev.participant_type === 'admin'
+            ? '<span class="badge-role badge-role-admin">Resepsionis</span>'
+            : '<span class="badge-role badge-role-pegawai">Pegawai</span>';
+        const deptBadge = ev.room_subtitle
+            ? `<span class="badge-dept">${ChatMultiRoomHelper.escapeHtml(ev.room_subtitle).slice(0, 20)}</span>`
+            : '';
+        const unreadHtml = ev.sender_type !== 'tamu' ? '<span class="badge-unread">1</span>' : '';
+
+        a.innerHTML = `
+            <div class="avatar-squircle initials-avatar" data-name="${safeName}">
+                ${initials}
+                <span class="avatar-live-dot"></span>
+            </div>
+            <div class="info">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="name">${safeName}</span>
+                    <span class="time">${ChatMultiRoomHelper.escapeHtml(ev.created_at || '')}</span>
+                </div>
+                <div class="d-flex align-items-center gap-1 mb-1">
+                    ${roleBadge}
+                    ${deptBadge}
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="last-msg">${ChatMultiRoomHelper.escapeHtml(ev.preview || 'Belum ada pesan')}</div>
+                    ${unreadHtml}
+                </div>
+            </div>
+        `;
+        return a;
+    }
+
+    window.loadChat = ChatMultiRoomHelper.initMultiRoomChat({
+        containerId: 'chatListContainer',
+        chatCardId: 'tamuChatCard',
+        backButtonId: 'btnMobileBackToList',
+        mySenderType: 'tamu',
+        getActiveSession: () => activeSession,
+        setActiveSession: (sid) => { activeSession = sid; },
+        getChatSocket: () => chatSocket,
+        formatMessageFn: formatChatMessageHtml,
+        applyFilters: () => window.__applyChatFilters && window.__applyChatFilters(),
+        emptyRoomText: 'Kirim pesan untuk berkonsultasi atau bertanya seputar kunjungan dinas.',
+        getHeaderIconHtml: (meta) => meta.is_admin_room
+            ? '<i class="fas fa-headset"></i>'
+            : '<i class="fas fa-user-tie"></i>',
+        createSidebarItemFromEvent: createTamuSidebarItem,
+        onRoomSwitched: (data) => {
+            const meta = data.room_meta || {};
+            if (meta.is_admin_room) {
+                isAdminConv = true;
+                const hdr = document.getElementById('tamuAiHeaderActions');
+                if (hdr) { hdr.classList.remove('d-none'); hdr.classList.add('d-flex'); }
+                if (meta.ai_handoff_active) {
+                    switchUiToAdminHandoff();
+                } else {
+                    switchUiToAiAssistant();
+                }
+            } else {
+                hideAiControlsForPegawai();
+            }
+        },
+        onResetEditMode: () => {
+            editingMessageId = null;
+            const ind = document.getElementById('editModeIndicator');
+            if (ind) ind.style.display = 'none';
+            if (aiTypingTimeout) clearTimeout(aiTypingTimeout);
+            const typingEl = document.getElementById('aiTypingIndicator');
+            if (typingEl) typingEl.style.display = 'none';
+        },
+        onSyncBellBadge: (count) => {
+            const badge = document.querySelector('#notifDropdownBtn .notif-badge');
+            if (count > 0 && badge) badge.innerText = count;
+            else if (badge && count === 0) badge.remove();
+        },
     });
 
 </script>

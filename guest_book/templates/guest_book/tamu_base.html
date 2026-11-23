@@ -219,6 +219,7 @@
             width: 32px; height: 32px;
             display: flex; align-items: center; justify-content: center;
             border-radius: 8px;
+            border: none; padding: 0; cursor: pointer;
             color: rgba(255,255,255,0.35);
             background: rgba(255,255,255,0.05);
             transition: var(--transition);
@@ -414,7 +415,7 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <div class="brand-logo" style="background: #ffffff; padding: 4px;">
-                <img src="{% static 'images/logo-diskominfosantik.png' %}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png'">
+                <img src="{% static 'images/logo-diskominfosantik.png' %}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" data-fallback-src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png">
             </div>
             <div class="brand-text">
                 <h3>Buku Tamu Digital</h3>
@@ -469,14 +470,17 @@
         <div class="sidebar-footer">
             <img src="{% if tamu.profile_picture %}{{ tamu.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff{% endif %}"
                  class="admin-avatar-sidebar" alt="Avatar Tamu"
-                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff';">
+                 data-fallback-src="https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff">
             <div class="admin-info">
                 <p class="name">{{ tamu.name }}</p>
                 <p class="role">Tamu</p>
             </div>
-            <a href="{% url 'tamu:logout' %}" class="logout-btn" title="Logout">
-                <i class="fas fa-sign-out-alt"></i>
-            </a>
+            <form method="post" action="{% url 'tamu:logout' %}" class="m-0 d-inline-flex">
+                {% csrf_token %}
+                <button type="submit" class="logout-btn" title="Logout" aria-label="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </form>
         </div>
     </aside>
 
@@ -507,7 +511,7 @@
                         <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
                             <h5 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #0f172a;">Notifikasi</h5>
                             {% if unread_notifications_count > 0 %}
-                            <span style="font-size: 0.75rem; color: #3b82f6; cursor: pointer;" onclick="markAllRead()">Tandai dibaca</span>
+                            <span id="tamuMarkAllReadBtn" style="font-size: 0.75rem; color: #3b82f6; cursor: pointer;">Tandai dibaca</span>
                             {% endif %}
                         </div>
                         <div id="tamuNotifList" style="max-height: 300px; overflow-y: auto;">
@@ -523,7 +527,7 @@
                 <div class="admin-chip">
                     <img src="{% if tamu.profile_picture %}{{ tamu.profile_picture.url }}{% else %}https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff{% endif %}"
                          alt="Avatar"
-                         onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff';">
+                         data-fallback-src="https://ui-avatars.com/api/?name={{ tamu.name|urlencode }}&background=3b82f6&color=fff">
                     <span>{{ tamu.name }}</span>
                 </div>
             </div>
@@ -558,9 +562,10 @@
 
     </div>
 
-    <!-- Bootstrap JS -->
+    <!-- Security Utilities & Bootstrap JS -->
+    <script src="{% static 'js/security_utils.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         function initTamuApp() {
         const sidebar        = document.getElementById('sidebar');
         const sidebarToggle  = document.getElementById('sidebarToggle');
@@ -599,39 +604,71 @@
                         .then(res => res.json())
                         .then(data => {
                             const notifList = document.getElementById('tamuNotifList');
+                            notifList.innerHTML = '';
                             if (data.notifications && data.notifications.length > 0) {
-                                notifList.innerHTML = data.notifications.map(n => {
-                                    let url = "#";
-                                    let onclickAttr = "";
-                                    
+                                const frag = document.createDocumentFragment();
+                                data.notifications.forEach(n => {
+                                    let targetUrl = null;
+                                    let missingVisit = false;
                                     if (n.notification_type === 'message_replied') {
-                                        url = "{% url 'tamu:user_chat' %}";
-                                        onclickAttr = `onclick="window.location.href='${url}'"`;
+                                        targetUrl = "{% url 'tamu:user_chat' %}";
                                     } else if (n.notification_type === 'visit_registered' || n.notification_type === 'system_alert') {
                                         if (n.related_object_id && !['null', 'undefined', 'none'].includes(String(n.related_object_id).toLowerCase())) {
-                                            url = "/kunjungan/" + n.related_object_id + "/";
-                                            onclickAttr = `onclick="window.location.href='${url}'"`;
+                                            targetUrl = "/kunjungan/" + encodeURIComponent(String(n.related_object_id)) + "/";
                                         } else {
-                                            onclickAttr = `onclick="alert('Maaf, detail kunjungan tidak tersedia untuk notifikasi ini.'); return false;"`;
+                                            missingVisit = true;
                                         }
                                     } else {
-                                        url = "{% url 'tamu:notifications' %}";
-                                        onclickAttr = `onclick="window.location.href='${url}'"`;
+                                        targetUrl = "{% url 'tamu:notifications' %}";
                                     }
-                                    
-                                    return `
-                                        <div class="notif-dropdown-item ${n.status === 'unread' ? 'unread' : ''}" style="padding: 1rem; border-bottom: 1px solid #f1f5f9; display: flex; gap: 0.75rem; cursor: pointer;" ${onclickAttr}>
-                                            <div class="notif-icon-box ${n.notification_type === 'message_replied' ? 'replied' : 'default'}" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                                <i class="fas ${n.notification_type === 'message_replied' ? 'fa-comment-dots' : 'fa-bell'}" style="font-size: 0.85rem;"></i>
-                                            </div>
-                                            <div style="flex: 1;">
-                                                <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin-bottom: 0.2rem;">${n.title}</div>
-                                                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">${n.message}</div>
-                                                <div style="font-size: 0.65rem; color: #94a3b8;"><i class="far fa-clock"></i> ${n.created_at}</div>
-                                            </div>
-                                        </div>
-                                    `;
-                                }).join('');
+                                    const safeUrl = targetUrl && window.SecurityUtils ? window.SecurityUtils.sanitizeSafeUrl(targetUrl) : null;
+
+                                    const item = document.createElement('div');
+                                    item.className = `notif-dropdown-item ${n.status === 'unread' ? 'unread' : ''}`;
+                                    item.style.cssText = 'padding: 1rem; border-bottom: 1px solid #f1f5f9; display: flex; gap: 0.75rem; cursor: pointer;';
+                                    if (missingVisit) {
+                                        item.addEventListener('click', (ev) => {
+                                            ev.preventDefault();
+                                            alert('Maaf, detail kunjungan tidak tersedia untuk notifikasi ini.');
+                                        });
+                                    } else if (safeUrl) {
+                                        item.addEventListener('click', () => { window.location.href = safeUrl; });
+                                    }
+
+                                    const iconBox = document.createElement('div');
+                                    iconBox.className = `notif-icon-box ${n.notification_type === 'message_replied' ? 'replied' : 'default'}`;
+                                    iconBox.style.cssText = 'width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;';
+                                    const iconEl = document.createElement('i');
+                                    iconEl.className = `fas ${n.notification_type === 'message_replied' ? 'fa-comment-dots' : 'fa-bell'}`;
+                                    iconEl.style.fontSize = '0.85rem';
+                                    iconBox.appendChild(iconEl);
+
+                                    const bodyDiv = document.createElement('div');
+                                    bodyDiv.style.flex = '1';
+
+                                    const titleDiv = document.createElement('div');
+                                    titleDiv.style.cssText = 'font-size: 0.85rem; font-weight: 700; color: #0f172a; margin-bottom: 0.2rem;';
+                                    titleDiv.textContent = n.title || '';
+
+                                    const msgDiv = document.createElement('div');
+                                    msgDiv.style.cssText = 'font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;';
+                                    msgDiv.textContent = n.message || '';
+
+                                    const timeDiv = document.createElement('div');
+                                    timeDiv.style.cssText = 'font-size: 0.65rem; color: #94a3b8;';
+                                    const clockIcon = document.createElement('i');
+                                    clockIcon.className = 'far fa-clock';
+                                    timeDiv.appendChild(clockIcon);
+                                    timeDiv.appendChild(document.createTextNode(' ' + (n.created_at || '')));
+
+                                    bodyDiv.appendChild(titleDiv);
+                                    bodyDiv.appendChild(msgDiv);
+                                    bodyDiv.appendChild(timeDiv);
+                                    item.appendChild(iconBox);
+                                    item.appendChild(bodyDiv);
+                                    frag.appendChild(item);
+                                });
+                                notifList.appendChild(frag);
                             } else {
                                 notifList.innerHTML = `
                                     <div style="padding: 2rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
@@ -649,6 +686,11 @@
                     notifDropdownMenu.style.display = 'none';
                 }
             });
+        }
+
+        const tamuMarkAllBtn = document.getElementById('tamuMarkAllReadBtn');
+        if (tamuMarkAllBtn) {
+            tamuMarkAllBtn.addEventListener('click', () => window.markAllRead && window.markAllRead());
         }
 
         window.markAllRead = function() {
@@ -702,7 +744,14 @@
         window.tamuNotifSocket.onmessage = function(e) {
             try {
                 const data = JSON.parse(e.data);
-                if (data.action === 'pong' || data.type === 'pong' || (!data.message && !data.title)) {
+                if (data.action === 'pong' || data.type === 'pong') {
+                    return;
+                }
+                window.dispatchEvent(new CustomEvent('ws:notification', { detail: data }));
+                if (data.event_type === 'chat_sidebar_update' || data.suppress_toast) {
+                    return;
+                }
+                if (!data.message && !data.title) {
                     return;
                 }
                 

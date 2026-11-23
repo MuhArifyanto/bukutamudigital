@@ -447,7 +447,7 @@
             <p>Monitoring aktivitas pengunjung secara real-time</p>
         </div>
         <form method="get" class="d-flex gap-2" action="{% url 'tamu:dashboard' %}">
-            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="search-input" placeholder="Cari kunjungan..." oninput="debounceSubmit(this.form)">
+            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="search-input js-debounce-search" placeholder="Cari kunjungan...">
             <a href="{% url 'tamu:kunjungan_baru' %}" class="btn btn-primary btn-sm d-flex align-items-center gap-1" style="border-radius: var(--radius-sm);">
                 <i class="fas fa-plus"></i> Buat Kunjungan
             </a>
@@ -498,7 +498,7 @@
 </div>
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     var searchTimeout;
     function debounceSubmit(form) {
         clearTimeout(searchTimeout);
@@ -528,6 +528,12 @@
             });
         }, 400);
     }
+
+    document.querySelectorAll('.js-debounce-search').forEach(inp => {
+        inp.addEventListener('input', function() {
+            debounceSubmit(this.form);
+        });
+    });
 </script>
 {% endblock %}
 {% endblock %}

@@ -36,22 +36,30 @@ class SessionAndAuthTestCase(BaseSecurityTestCase):
         self.assertIsNone(client.session.get('pegawai_id'))
 
     def test_logout_flushes_session_completely(self):
-        """Logout tamu dan pegawai harus melakukan flush penuh pada sesi."""
-        # 1. Tamu logout
+        """Logout tamu dan pegawai harus POST-only dan melakukan flush penuh pada sesi."""
+        # 1. Tamu logout (GET harus ditolak 405 tanpa menghapus sesi)
         tamu_client = self.get_client('tamu_a')
         self.assertIsNotNone(tamu_client.session.get('tamu_id'))
 
         logout_url = reverse('tamu:logout')
-        resp = tamu_client.get(logout_url)
+        get_resp = tamu_client.get(logout_url)
+        self.assertEqual(get_resp.status_code, 405)
+        self.assertIsNotNone(tamu_client.session.get('tamu_id'))
+
+        resp = tamu_client.post(logout_url)
         self.assertEqual(resp.status_code, 302)
         self.assertIsNone(tamu_client.session.get('tamu_id'))
 
-        # 2. Pegawai logout
+        # 2. Pegawai logout (GET harus ditolak 405 tanpa menghapus sesi)
         pegawai_client = self.get_client('pegawai')
         self.assertIsNotNone(pegawai_client.session.get('pegawai_id'))
 
         pegawai_logout_url = reverse('tamu:pegawai_logout')
-        resp = pegawai_client.get(pegawai_logout_url)
+        get_pegawai_resp = pegawai_client.get(pegawai_logout_url)
+        self.assertEqual(get_pegawai_resp.status_code, 405)
+        self.assertIsNotNone(pegawai_client.session.get('pegawai_id'))
+
+        resp = pegawai_client.post(pegawai_logout_url)
         self.assertEqual(resp.status_code, 302)
         self.assertIsNone(pegawai_client.session.get('pegawai_id'))
         self.assertIsNone(pegawai_client.session.get('pegawai_name'))
@@ -126,14 +134,25 @@ class SessionAndAuthTestCase(BaseSecurityTestCase):
         self.assertIn('Email/Username atau password yang Anda masukkan salah.', messages_2)
 
     def test_pegawai_profile_password_change_allows_login(self):
-        """Pegawai yang mengganti password di halaman profil tetap dapat login dengan password baru."""
+        """Pegawai yang mengganti password di halaman profil wajib memverifikasi current_password dan tetap dapat login dengan password baru."""
         from django.contrib.auth.hashers import check_password
         pegawai_client = self.get_client('pegawai')
         profile_url = reverse('tamu:pegawai_profile')
 
+        # Tanpa current_password harus gagal mengganti password (render ulang 200 dengan pesan error)
+        resp_missing = pegawai_client.post(profile_url, {
+            'name': 'Pegawai Satu Updated',
+            'phone': '081234567892',
+            'new_password': 'NewPassword2026!'
+        })
+        self.assertEqual(resp_missing.status_code, 200)
+        self.pegawai.refresh_from_db()
+        self.assertFalse(check_password('NewPassword2026!', self.pegawai.password))
+
         resp = pegawai_client.post(profile_url, {
             'name': 'Pegawai Satu Updated',
             'phone': '081234567892',
+            'current_password': 'password123',
             'new_password': 'NewPassword2026!'
         })
         self.assertEqual(resp.status_code, 302)
@@ -142,7 +161,7 @@ class SessionAndAuthTestCase(BaseSecurityTestCase):
         self.assertTrue(check_password('NewPassword2026!', self.pegawai.password))
 
         # Logout lalu login ulang menggunakan password baru
-        pegawai_client.get(reverse('tamu:pegawai_logout'))
+        pegawai_client.post(reverse('tamu:pegawai_logout'))
         login_resp = pegawai_client.post(reverse('tamu:pegawai_login'), {
             'login_id': self.pegawai.email,
             'password': 'NewPassword2026!'
@@ -170,32 +189,51 @@ class SessionAndAuthTestCase(BaseSecurityTestCase):
         self.assertTrue(check_password('LegacyPass123!', self.pegawai.password))
 
     def test_admin_statistik_add_pegawai_hashes_password(self):
-        """Penambahan pegawai dari halaman statistik admin wajib meng-hash password dengan make_password."""
+        """Penambahan pegawai dari statistik admin harus meng-hash password tanpa fallback default 'password123'."""
         from django.contrib.auth.hashers import check_password
         from ..models import Pegawai
         admin_client = self.get_client('admin')
+
+        # 1. Jika password awal diisi eksplisit oleh admin
         resp = admin_client.post(reverse('tamu:admin_statistik'), {
             'action': 'add_pegawai',
             'name': 'Pegawai Baru Statistik',
             'email': 'pegawai.baru@bekasikab.go.id',
             'phone': '081299998888',
             'department': str(self.departemen.pk),
+            'password': 'PegawaiBaru@2026!',
         })
         self.assertEqual(resp.status_code, 302)
 
         new_pegawai = Pegawai.objects.filter(email='pegawai.baru@bekasikab.go.id').first()
         self.assertIsNotNone(new_pegawai)
-        self.assertNotEqual(new_pegawai.password, 'password123')
-        self.assertTrue(check_password('password123', new_pegawai.password))
+        self.assertNotEqual(new_pegawai.password, 'PegawaiBaru@2026!')
+        self.assertTrue(check_password('PegawaiBaru@2026!', new_pegawai.password))
+        self.assertTrue(new_pegawai.must_change_password)
 
-        # Pastikan pegawai baru bisa login
+        # Login pertama berhasil tetapi wajib diarahkan ke profil untuk ganti password
         client = Client()
         login_resp = client.post(reverse('tamu:pegawai_login'), {
             'login_id': 'pegawai.baru@bekasikab.go.id',
-            'password': 'password123',
+            'password': 'PegawaiBaru@2026!',
         })
         self.assertEqual(login_resp.status_code, 302)
+        self.assertEqual(login_resp.url, reverse('tamu:pegawai_profile'))
         self.assertEqual(client.session.get('pegawai_id'), str(new_pegawai.pk))
+
+        # 2. Jika password dikosongkan, tidak boleh memakai password default 'password123'
+        resp_no_pw = admin_client.post(reverse('tamu:admin_statistik'), {
+            'action': 'add_pegawai',
+            'name': 'Pegawai Tanpa Password Default',
+            'email': 'pegawai.nopw@bekasikab.go.id',
+            'phone': '081299997777',
+            'department': str(self.departemen.pk),
+        })
+        self.assertEqual(resp_no_pw.status_code, 302)
+        no_pw_pegawai = Pegawai.objects.filter(email='pegawai.nopw@bekasikab.go.id').first()
+        self.assertIsNotNone(no_pw_pegawai)
+        self.assertFalse(check_password('password123', no_pw_pegawai.password))
+        self.assertTrue(no_pw_pegawai.must_change_password)
 
     def test_admin_login_uses_get_client_ip_behind_proxy(self):
         """admin_login_view wajib menggunakan get_client_ip(request) agar rate-limit tidak salah memblokir proxy."""

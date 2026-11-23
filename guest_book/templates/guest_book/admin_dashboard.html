@@ -408,7 +408,7 @@
                     <td style="text-align: right;">
                         <div class="btn-group-custom" style="justify-content: flex-end;">
                             {% if k.status == 'in_progress' %}
-                            <button onclick="updateStatus('{{ k.id }}', 'completed')" class="action-btn-circle" style="color:#3b82f6; background:#eff6ff;" title="Selesaikan (Check-out)">
+                            <button type="button" data-visit-id="{{ k.id }}" data-status="completed" class="action-btn-circle js-dashboard-update-status" style="color:#3b82f6; background:#eff6ff;" title="Selesaikan (Check-out)">
                                 <i class="fas fa-sign-out-alt"></i>
                             </button>
                             {% endif %}
@@ -445,7 +445,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
     (function() {
         "use strict";
 
@@ -623,7 +623,7 @@
         }, 20000);
 
         // Global Update Status Function
-        window.updateStatus = function(id, status) {
+        window.updateStatus = function(id, status, triggerBtn) {
             const statusLabels = {
                 'pending': 'Verifikasi',
                 'in_progress': 'Bertamu',
@@ -633,10 +633,12 @@
             const label = statusLabels[status] || status;
             if (!confirm(`Apakah Anda yakin ingin mengubah status kunjungan ini menjadi ${label}?`)) return;
             
-            const btn = event.currentTarget;
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
+            const btn = triggerBtn || null;
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                btn.disabled = true;
+            }
 
             fetch('{% url "tamu:api_update_kunjungan_status" %}', {
                 method: 'POST',
@@ -653,17 +655,27 @@
                     window.location.reload(); 
                 } else {
                     alert('Gagal memperbarui status: ' + (data.error || 'Terjadi kesalahan'));
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
+                    if (btn) {
+                        btn.innerHTML = originalHtml;
+                        btn.disabled = false;
+                    }
                 }
             })
             .catch(err => {
                 console.error(err);
                 alert('Terjadi kesalahan koneksi.');
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
             });
         };
+
+        document.querySelectorAll('.js-dashboard-update-status').forEach(btn => {
+            btn.addEventListener('click', function() {
+                window.updateStatus(this.dataset.visitId, this.dataset.status, this);
+            });
+        });
     })();
 </script>
 {% endblock %}

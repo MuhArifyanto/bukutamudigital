@@ -235,6 +235,7 @@
             width: 32px; height: 32px;
             display: flex; align-items: center; justify-content: center;
             border-radius: 8px;
+            border: none; padding: 0; cursor: pointer;
             color: rgba(255,255,255,0.35);
             background: rgba(255,255,255,0.05);
             transition: var(--transition);
@@ -551,7 +552,7 @@
         <!-- Brand -->
         <div class="sidebar-brand">
             <div class="brand-logo" style="background: #ffffff; padding: 4px;">
-                <img src="{% static 'images/logo-diskominfosantik.png' %}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png'">
+                <img src="{% static 'images/logo-diskominfosantik.png' %}" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;" data-fallback-src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png">
             </div>
             <div class="brand-text">
                 <h3>Buku Tamu Digital</h3>
@@ -660,14 +661,17 @@
         <div class="sidebar-footer">
             <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}"
                  class="admin-avatar-sidebar" alt="Avatar Admin"
-                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff';">
+                 data-fallback-src="https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff">
             <div class="admin-info">
                 <p class="name">{{ admin_name }}</p>
                 <p class="role">Administrator</p>
             </div>
-            <a href="{% url 'tamu:logout' %}" class="logout-btn" title="Logout">
-                <i class="fas fa-sign-out-alt"></i>
-            </a>
+            <form method="post" action="{% url 'tamu:logout' %}" class="m-0 d-inline-flex">
+                {% csrf_token %}
+                <button type="submit" class="logout-btn" title="Logout" aria-label="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </form>
         </div>
     </aside>
 
@@ -716,14 +720,14 @@
                         <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
                             <h6 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #1e293b;">Notifikasi</h6>
                             {% if unread_notifications_count > 0 %}
-                            <span id="markAllReadBtn" style="font-size: 0.75rem; color: #3b82f6; cursor: pointer;" onclick="markAllRead()">Tandai dibaca</span>
+                            <span id="markAllReadBtn" style="font-size: 0.75rem; color: #3b82f6; cursor: pointer;">Tandai dibaca</span>
                             {% endif %}
                         </div>
                         <div id="notifList" style="max-height: 250px; overflow-y: auto;">
                             <p style="color: #64748b; font-size: 0.85rem; padding: 1rem; text-align: center; margin: 0;">Memuat...</p>
                         </div>
                         <div style="padding: 0.5rem 0.75rem; border-top: 1px solid #e2e8f0; background: #f8fafc; text-align: center;">
-                            <button type="button" class="btn btn-sm btn-light w-100" style="font-size: 0.75rem; font-weight: 600; color: #2563eb; border: 1px solid #bfdbfe;" onclick="playAdminChimeAlert()">
+                            <button type="button" id="btnTestAdminChime" class="btn btn-sm btn-light w-100" style="font-size: 0.75rem; font-weight: 600; color: #2563eb; border: 1px solid #bfdbfe;">
                                 <i class="fas fa-volume-up me-1"></i> Uji Bunyi Lonceng (Chime Alert)
                             </button>
                         </div>
@@ -735,7 +739,7 @@
                 <div class="admin-chip">
                     <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}"
                          alt="Avatar"
-                         onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff';">
+                         data-fallback-src="https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff">
                     <span>{{ admin_name }}</span>
                 </div>
             </div>
@@ -768,9 +772,10 @@
         </main>
     </div>
 
-    <!-- Bootstrap JS -->
+    <!-- Security Utilities & Bootstrap JS -->
+    <script src="{% static 'js/security_utils.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         /* ── Search Toggle (mobile) ── */
         const searchToggleBtn = document.getElementById('searchToggleBtn');
         const searchOverlay = document.getElementById('searchOverlay');
@@ -858,6 +863,17 @@
                 .catch(err => console.error(err));
             };
             
+            const markAllBtnEl = document.getElementById('markAllReadBtn');
+            if (markAllBtnEl) {
+                markAllBtnEl.addEventListener('click', () => window.markAllRead());
+            }
+            const testChimeBtnEl = document.getElementById('btnTestAdminChime');
+            if (testChimeBtnEl) {
+                testChimeBtnEl.addEventListener('click', () => {
+                    if (typeof window.playAdminChimeAlert === 'function') window.playAdminChimeAlert();
+                });
+            }
+
             if (notifBtn && notifDropdown) {
                 notifBtn.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -875,28 +891,46 @@
                         fetch("{% url 'tamu:api_get_recent_notifications' %}")
                             .then(res => res.json())
                             .then(data => {
+                                notifList.innerHTML = '';
                                 if (data.notifications && data.notifications.length > 0) {
-                                    notifList.innerHTML = data.notifications.map(n => {
+                                    const frag = document.createDocumentFragment();
+                                    data.notifications.forEach(n => {
                                         let url = "{% url 'tamu:notifications' %}";
+                                        const relId = n.related_object_id ? encodeURIComponent(String(n.related_object_id)) : '';
                                         if (n.notification_type === 'message_received' || n.notification_type === 'message_replied') {
-                                            url = "{% url 'tamu:admin_chat' %}?guest=" + n.related_object_id;
+                                            url = "{% url 'tamu:admin_chat' %}?guest=" + relId;
                                         } else if (n.notification_type === 'visit_registered') {
                                             if (n.related_object_id && !['null', 'undefined', 'none'].includes(String(n.related_object_id).toLowerCase())) {
-                                                url = "/admin-portal/kunjungan/" + n.related_object_id + "/";
+                                                url = "/admin-portal/kunjungan/" + relId + "/";
                                             } else {
                                                 url = "{% url 'tamu:admin_kunjungan_list' %}";
                                             }
                                         } else if (n.notification_type === 'quota_reached') {
                                             url = "{% url 'tamu:admin_kalender' %}";
                                         }
-                                        return `
-                                            <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; text-align: left;" onclick="location.href='${url}'">
-                                                <div style="font-weight: 600; font-size: 0.85rem; color: #1e293b;">${n.title}</div>
-                                                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">${n.message}</div>
-                                                <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">${n.created_at}</div>
-                                            </div>
-                                        `;
-                                    }).join('');
+                                        const safeUrl = (window.SecurityUtils && window.SecurityUtils.sanitizeSafeUrl(url)) || "{% url 'tamu:notifications' %}";
+                                        const item = document.createElement('div');
+                                        item.style.cssText = 'padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; text-align: left;';
+                                        item.addEventListener('click', () => { location.href = safeUrl; });
+
+                                        const titleDiv = document.createElement('div');
+                                        titleDiv.style.cssText = 'font-weight: 600; font-size: 0.85rem; color: #1e293b;';
+                                        titleDiv.textContent = n.title || '';
+
+                                        const msgDiv = document.createElement('div');
+                                        msgDiv.style.cssText = 'font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;';
+                                        msgDiv.textContent = n.message || '';
+
+                                        const timeDiv = document.createElement('div');
+                                        timeDiv.style.cssText = 'font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;';
+                                        timeDiv.textContent = n.created_at || '';
+
+                                        item.appendChild(titleDiv);
+                                        item.appendChild(msgDiv);
+                                        item.appendChild(timeDiv);
+                                        frag.appendChild(item);
+                                    });
+                                    notifList.appendChild(frag);
                                 } else {
                                     notifList.innerHTML = '<p style="color: #64748b; font-size: 0.85rem; padding: 1rem; text-align: center; margin: 0;">Tidak ada notifikasi baru.</p>';
                                 }
@@ -988,7 +1022,14 @@
         window.notificationSocket.onmessage = function(e) {
             try {
                 const data = JSON.parse(e.data);
-                if (data.action === 'pong' || data.type === 'pong' || (!data.message && !data.title)) {
+                if (data.action === 'pong' || data.type === 'pong') {
+                    return;
+                }
+                window.dispatchEvent(new CustomEvent('ws:notification', { detail: data }));
+                if (data.event_type === 'chat_sidebar_update' || data.suppress_toast) {
+                    return;
+                }
+                if (!data.message && !data.title) {
                     return;
                 }
                 console.log("Notifikasi Baru:", data);
@@ -1067,8 +1108,9 @@
                     if (e.target.classList.contains('btn-close')) return;
                     
                     const url = this.getAttribute('data-url');
-                    if (url) {
-                        location.href = url;
+                    const safeUrl = url && window.SecurityUtils ? window.SecurityUtils.sanitizeSafeUrl(url) : url;
+                    if (safeUrl) {
+                        location.href = safeUrl;
                     }
                 });
             }

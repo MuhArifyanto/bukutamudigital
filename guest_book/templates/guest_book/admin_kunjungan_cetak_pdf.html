@@ -163,12 +163,12 @@
         }
     </style>
 </head>
-<body onload="window.print()">
+<body data-auto-print="1">
     <div class="no-print" style="margin-bottom: 20px; text-align: right; background: #f1f5f9; padding: 15px; border-radius: 8px; font-family: 'Plus Jakarta Sans', sans-serif;">
         <p style="margin: 0 0 10px 0; text-align: left; font-size: 13px; color: #334155;">
             <i class="fas fa-info-circle"></i> <strong>Instruksi Logo:</strong> Pastikan Anda telah menyimpan 2 gambar logo yang Anda miliki ke dalam folder aplikasi Anda di <code>c:\bukudigital\static\images\</code> dengan nama <code>logo-bekasi.jpg</code> dan <code>logo-diskominfosantik.png</code> agar tampil di kop surat ini.
         </p>
-        <button onclick="window.print()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 5px rgba(59,130,246,0.3);">
+        <button data-action="print" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 5px rgba(59,130,246,0.3);">
             <i class="fas fa-print"></i> Cetak Sekarang / Simpan PDF
         </button>
     </div>
@@ -177,7 +177,7 @@
     <div class="kop-surat">
         <!-- Logo Kiri: Kabupaten Bekasi -->
         <div class="logo-kiri">
-            <img src="{% static 'images/logo-bekasi.jpg' %}" alt="Logo Kab Bekasi" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png'">
+            <img src="{% static 'images/logo-bekasi.jpg' %}" alt="Logo Kab Bekasi" data-fallback-src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png">
         </div>
         
         <!-- Teks Kop Surat -->
@@ -264,5 +264,6 @@
             <p style="font-size: 10px;">NIP. {{ admin_nip|default:"_________________________" }}</p>
         </div>
     </div>
+    <script src="{% static 'js/security_utils.js' %}"></script>
 </body>
 </html>

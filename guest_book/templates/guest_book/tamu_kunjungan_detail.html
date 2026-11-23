@@ -101,7 +101,7 @@
 
                 <div class="actions-wrapper">
                     {% if kunjungan.status == 'pending' %}
-                        <form method="post" action="{% url 'tamu:kunjungan_batal' kunjungan.pk %}" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan kunjungan ini?')">
+                        <form method="post" action="{% url 'tamu:kunjungan_batal' kunjungan.pk %}" data-confirm="Apakah Anda yakin ingin membatalkan kunjungan ini?">
                             {% csrf_token %}
                             <button type="submit" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                                 <i class="fas fa-times-circle"></i> Batalkan Kunjungan
@@ -163,16 +163,16 @@
                             <small style="color: #64748b;">Kunjungan Anda telah selesai. Berikan penilaian Anda untuk membantu kami meningkatkan kualitas pelayanan.</small>
                         </div>
                         
-                        <form id="ikmSurveyForm" onsubmit="submitIkmSurvey(event)">
+                        <form id="ikmSurveyForm">
                             {% csrf_token %}
                             <div class="mb-3">
                                 <label style="font-size: 0.72rem; font-weight: 800; color: #475569; text-transform: uppercase; display: block; margin-bottom: 0.4rem;">Rating Kepuasan Pelayanan</label>
                                 <div id="starRatingGroup" style="display: flex; gap: 0.5rem; font-size: 1.6rem; cursor: pointer; color: #cbd5e1;">
-                                    <i class="fas fa-star text-warning rating-star" data-val="1" onclick="setRating(1)"></i>
-                                    <i class="fas fa-star text-warning rating-star" data-val="2" onclick="setRating(2)"></i>
-                                    <i class="fas fa-star text-warning rating-star" data-val="3" onclick="setRating(3)"></i>
-                                    <i class="fas fa-star text-warning rating-star" data-val="4" onclick="setRating(4)"></i>
-                                    <i class="fas fa-star text-warning rating-star" data-val="5" onclick="setRating(5)"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="1"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="2"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="3"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="4"></i>
+                                    <i class="fas fa-star text-warning rating-star" data-val="5"></i>
                                 </div>
                                 <input type="hidden" name="rating" id="ratingInput" value="5">
                                 <small id="ratingLabel" style="color: #f59e0b; font-weight: 700; font-size: 0.8rem; margin-top: 3px; display: block;">5 Bintang — Sangat Baik / Puas</small>
@@ -257,7 +257,7 @@
 
 <!-- QRCode.js & IKM Survey Script -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
     document.addEventListener('DOMContentLoaded', function () {
         // 1. Render QR Code Tiket
         const qrBox = document.getElementById("detailQrCode");
@@ -351,6 +351,18 @@
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-paper-plane"></i> Kirim Penilaian IKM';
         });
+    }
+
+    document.querySelectorAll('.rating-star').forEach(star => {
+        star.addEventListener('click', function() {
+            const val = parseInt(this.getAttribute('data-val'), 10);
+            if (!isNaN(val)) setRating(val);
+        });
+    });
+
+    const ikmForm = document.getElementById('ikmSurveyForm');
+    if (ikmForm) {
+        ikmForm.addEventListener('submit', submitIkmSurvey);
     }
 </script>
 {% endblock %}

@@ -189,13 +189,13 @@
         }
     </style>
 </head>
-<body onload="window.print()">
+<body data-auto-print="1">
     <!-- Tombol Aksi Cetak di Browser -->
     <div class="no-print" style="margin-bottom: 20px; text-align: right; background: #f8fafc; padding: 12px 18px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: 'Plus Jakarta Sans', sans-serif;">
         <span style="float: left; font-size: 13px; color: #475569; padding-top: 6px;">
             <i class="fas fa-file-pdf text-danger me-1"></i> Format Laporan Evaluasi PermenPAN-RB No. 14 Tahun 2017
         </span>
-        <button onclick="window.print()" style="padding: 8px 18px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(37,99,235,0.2);">
+        <button data-action="print" style="padding: 8px 18px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(37,99,235,0.2);">
             <i class="fas fa-print me-1"></i> Cetak Dokumen / Simpan PDF
         </button>
     </div>
@@ -203,7 +203,7 @@
     <!-- KOP SURAT RESMI PEMKAB BEKASI -->
     <div class="kop-surat">
         <div class="logo-kiri">
-            <img src="{% static 'images/logo-bekasi.jpg' %}" alt="Logo Kab Bekasi" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png'">
+            <img src="{% static 'images/logo-bekasi.jpg' %}" alt="Logo Kab Bekasi" data-fallback-src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Lambang_Kabupaten_Bekasi.png/600px-Lambang_Kabupaten_Bekasi.png">
         </div>
         <div class="kop-text">
             <h1>PEMERINTAH KABUPATEN BEKASI</h1>
@@ -388,6 +388,7 @@
             <p>NIP. 19720515 199203 1 004</p>
         </div>
     </div>
+    <script src="{% static 'js/security_utils.js' %}"></script>
 </body>
 </html>
 

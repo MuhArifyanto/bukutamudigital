@@ -425,7 +425,7 @@
         </div>
 
         <div>
-            <select name="status" class="filter-select-modern" onchange="this.form.submit()">
+            <select name="status" class="filter-select-modern" data-auto-submit="1">
                 <option value="">Semua Status</option>
                 {% for code, label in status_choices %}
                 <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
@@ -434,7 +434,7 @@
         </div>
 
         <div>
-            <select name="role" class="filter-select-modern" onchange="this.form.submit()">
+            <select name="role" class="filter-select-modern" data-auto-submit="1">
                 <option value="">Semua Role</option>
                 {% for code, label in role_choices %}
                 <option value="{{ code }}" {% if role_filter == code %}selected{% endif %}>{{ label }}</option>
@@ -443,7 +443,7 @@
         </div>
 
         <div>
-            <select name="dept" class="filter-select-modern" onchange="this.form.submit()">
+            <select name="dept" class="filter-select-modern" data-auto-submit="1">
                 <option value="">Semua Bidang</option>
                 {% for d in departemen_list %}
                 <option value="{{ d.id }}" {% if dept_filter == d.id|stringformat:"s" %}selected{% endif %}>{{ d.nama }}</option>
@@ -521,7 +521,7 @@
                     <!-- 4. Role Akses -->
                     <td>
                         <div class="select-pill-wrap">
-                            <select class="role-sel-{{ p.role }}" onchange="changePegawaiRole('{{ p.id }}', this.value, '{{ p.name|escapejs }}')">
+                            <select class="role-sel-{{ p.role }} js-pegawai-role-select" data-pegawai-id="{{ p.id }}" data-pegawai-name="{{ p.name }}">
                                 {% for code, label in role_choices %}
                                 <option value="{{ code }}" {% if p.role == code %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
@@ -532,7 +532,7 @@
                     <!-- 5. Status Akun -->
                     <td>
                         <div class="select-pill-wrap">
-                            <select class="status-sel-{{ p.account_status }}" onchange="changePegawaiStatus('{{ p.id }}', this.value, '{{ p.name|escapejs }}')">
+                            <select class="status-sel-{{ p.account_status }} js-pegawai-status-select" data-pegawai-id="{{ p.id }}" data-pegawai-name="{{ p.name }}">
                                 {% for code, label in status_choices %}
                                 <option value="{{ code }}" {% if p.account_status == code %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
@@ -585,7 +585,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 function changePegawaiRole(pegawaiId, newRole, pegawaiName) {
     if (!confirm(`Ubah hak akses role ${pegawaiName} menjadi '${newRole}'?`)) {
         window.location.reload();
@@ -647,5 +647,16 @@ function changePegawaiStatus(pegawaiId, newStatus, pegawaiName) {
         window.location.reload();
     });
 }
+
+document.querySelectorAll('.js-pegawai-role-select').forEach(sel => {
+    sel.addEventListener('change', function() {
+        changePegawaiRole(this.dataset.pegawaiId, this.value, this.dataset.pegawaiName);
+    });
+});
+document.querySelectorAll('.js-pegawai-status-select').forEach(sel => {
+    sel.addEventListener('change', function() {
+        changePegawaiStatus(this.dataset.pegawaiId, this.value, this.dataset.pegawaiName);
+    });
+});
 </script>
 {% endblock %}

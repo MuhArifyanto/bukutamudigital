@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # ── Decorator Auth ──────────────────────────────────────────────────────────
 
 def pegawai_login_required(view_func):
-    """Decorator: redirect ke login pegawai jika belum autentikasi."""
+    """Decorator: redirect ke login pegawai jika belum autentikasi atau wajib ganti password sementara."""
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         pegawai_id = request.session.get('pegawai_id')
@@ -28,6 +28,16 @@ def pegawai_login_required(view_func):
             request.session.flush()
             messages.error(request, 'Sesi tidak valid. Silakan masuk kembali.')
             return redirect('tamu:pegawai_login')
+
+        if getattr(pegawai, 'must_change_password', False):
+            url_name = getattr(getattr(request, 'resolver_match', None), 'url_name', None)
+            if url_name not in ('pegawai_profile', 'pegawai_logout'):
+                messages.warning(
+                    request,
+                    'Wajib mengganti password sementara Anda di halaman Profil sebelum mengakses Portal Pegawai.',
+                )
+                return redirect('tamu:pegawai_profile')
+
         request._pegawai = pegawai
         return view_func(request, *args, pegawai=pegawai, **kwargs)
     return wrapper
@@ -60,13 +70,17 @@ def pegawai_dashboard_view(request, pegawai=None):
         ).exclude(pegawai=pegawai).select_related('tamu', 'pegawai').order_by('-created_at')[:10]
     
     # Statistik
+    from ..validators import get_day_range_aware
+
+    local_today = timezone.localtime(now).date()
+    day_start, next_day_start = get_day_range_aware(local_today)
     base_qs = Kunjungan.objects.filter(pegawai=pegawai)
     stats = {
         'total': base_qs.count(),
         'pending': pending_approvals.count(),
         'in_progress': base_qs.filter(status='in_progress').count(),
         'completed': base_qs.filter(status='completed').count(),
-        'hari_ini': base_qs.filter(arrival_time__date=now.date()).count(),
+        'hari_ini': base_qs.filter(arrival_time__gte=day_start, arrival_time__lt=next_day_start).count(),
     }
     
     # Kunjungan yang sudah disetujui (upcoming visits)
@@ -296,7 +310,8 @@ def pegawai_kunjungan_list_view(request, pegawai=None):
     # Filter by date
     date_filter = request.GET.get('date')
     if date_filter:
-        kunjungan_qs = kunjungan_qs.filter(arrival_time__date=date_filter)
+        from ..validators import filter_by_local_date
+        kunjungan_qs = filter_by_local_date(kunjungan_qs, date_filter)
     
     # Search
     search_query = request.GET.get('search')
@@ -330,16 +345,22 @@ def pegawai_kunjungan_cetak_pdf_view(request, pegawai=None):
     """View to print individual performance report (visits)."""
     from django.utils import timezone
     from ..models import Kunjungan
+    from ..validators import get_month_range_aware
 
-    now = timezone.now()
+    now = timezone.localtime(timezone.now())
     month = request.GET.get('month', str(now.month))
     year = request.GET.get('year', str(now.year))
-    
-    kunjungan_qs = Kunjungan.objects.filter(
-        pegawai=pegawai,
-        arrival_time__year=year,
-        arrival_time__month=month
-    ).select_related('tamu', 'pegawai__department_rel').prefetch_related('notes_history').order_by('-arrival_time')
+    try:
+        month_start, next_month_start = get_month_range_aware(int(year), int(month))
+        kunjungan_qs = Kunjungan.objects.filter(
+            pegawai=pegawai,
+            arrival_time__gte=month_start,
+            arrival_time__lt=next_month_start,
+        )
+    except (ValueError, TypeError):
+        kunjungan_qs = Kunjungan.objects.none()
+
+    kunjungan_qs = kunjungan_qs.select_related('tamu', 'pegawai__department_rel').prefetch_related('notes_history').order_by('-arrival_time')
     
     # Map month number to indonesian name
     months_id = {
@@ -364,56 +385,50 @@ def pegawai_kunjungan_cetak_pdf_view(request, pegawai=None):
 @pegawai_login_required
 def pegawai_chat_view(request, pegawai=None):
     """Unified chat interface for Pegawai (to Admin and Tamu)."""
-    from ..models import ChatMessage, Kunjungan
+    from ..models import ChatMessage, ChatRoom, Kunjungan
     from ..permissions import PermissionManager
     from django.db.models import Q
-    
-    # Conversations list
-    conversations = []
-    
-    # 1. Chat with Admin
-    admin_session_id = f'pegawai_admin_{pegawai.id}'
-    admin_last_msg = ChatMessage.objects.filter(session_id=admin_session_id).order_by('-created_at').first()
-    admin_unread = ChatMessage.objects.filter(session_id=admin_session_id, is_read=False).exclude(sender_type='pegawai').count()
-    
-    conversations.append({
+
+    admin_session_id = ChatRoom.session_id_for_pegawai_admin(pegawai.id)
+
+    kunjungan_qs = list(Kunjungan.objects.filter(
+        pegawai=pegawai,
+        status__in=['disetujui_pegawai', 'disetujui', 'in_progress', 'completed']
+    ).select_related('tamu').order_by('-created_at'))
+
+    valid_kunjungan = [k for k in kunjungan_qs if PermissionManager.can_access_chat_pegawai_tamu(k)]
+    all_session_ids = [admin_session_id] + [ChatRoom.session_id_for_kunjungan(k.id) for k in valid_kunjungan]
+
+    # Batch query (bebas N+1 & memanfaatkan index komposit idx_chat_sess_read_sender / idx_chat_session_created)
+    unread_map = ChatMessage.unread_counts_by_session(all_session_ids, exclude_sender_type='pegawai')
+    latest_map = ChatMessage.latest_by_session(all_session_ids)
+
+    conversations = [{
         'id': admin_session_id,
         'type': 'admin',
         'name': 'Admin Diskominfosantik',
         'subtitle': 'Resepsionis / Admin',
         'session_id': admin_session_id,
-        'last_message': admin_last_msg,
-        'unread_count': admin_unread,
+        'last_message': latest_map.get(admin_session_id),
+        'unread_count': unread_map.get(admin_session_id, 0),
         'avatar_letters': 'AD',
         'is_admin': True,
-    })
-    
-    # 2. Chat with Tamu (from Kunjungan)
-    # Get all kunjungan that this pegawai can chat with
-    # For simplicity, let's get kunjungan where this pegawai is the assignee, and status >= disetujui
-    kunjungan_qs = Kunjungan.objects.filter(
-        pegawai=pegawai,
-        status__in=['disetujui_pegawai', 'disetujui', 'in_progress', 'completed']
-    ).select_related('tamu').order_by('-created_at')
-    
-    for k in kunjungan_qs:
-        if PermissionManager.can_access_chat_pegawai_tamu(k):
-            session_id = f'kunjungan_{k.id}'
-            last_msg = ChatMessage.objects.filter(session_id=session_id).order_by('-created_at').first()
-            unread = ChatMessage.objects.filter(session_id=session_id, is_read=False).exclude(sender_type='pegawai').count()
-            
-            conversations.append({
-                'id': str(k.id),
-                'type': 'tamu',
-                'name': k.tamu.name,
-                'subtitle': k.tamu.instansi or 'Tamu',
-                'session_id': session_id,
-                'last_message': last_msg,
-                'unread_count': unread,
-                'avatar_letters': k.tamu.name[:2].upper(),
-                'is_admin': False,
-                'kunjungan_id': str(k.id)
-            })
+    }]
+
+    for k in valid_kunjungan:
+        session_id = ChatRoom.session_id_for_kunjungan(k.id)
+        conversations.append({
+            'id': str(k.id),
+            'type': 'tamu',
+            'name': k.tamu.name,
+            'subtitle': k.tamu.instansi or 'Tamu',
+            'session_id': session_id,
+            'last_message': latest_map.get(session_id),
+            'unread_count': unread_map.get(session_id, 0),
+            'avatar_letters': k.tamu.name[:2].upper(),
+            'is_admin': False,
+            'kunjungan_id': str(k.id),
+        })
             
     # Sort conversations by last_message.created_at descending, putting admin on top if no messages
     def get_sort_key(c):
@@ -438,9 +453,12 @@ def pegawai_chat_view(request, pegawai=None):
         active_conversation = conversations[0]
         
     if active_conversation:
-        messages_list = ChatMessage.objects.filter(
-            session_id=active_conversation['session_id']
-        ).order_by('created_at')
+        messages_list = list(
+            ChatMessage.objects.filter(
+                session_id=active_conversation['session_id']
+            ).order_by('-created_at')[:50]
+        )
+        messages_list.reverse()
         
         # Mark as read
         ChatMessage.objects.filter(
@@ -471,34 +489,69 @@ def pegawai_chat_view(request, pegawai=None):
 
 @pegawai_login_required
 def pegawai_profile_view(request, pegawai=None):
-    """View untuk update profil pegawai"""
+    """View untuk update profil pegawai dengan verifikasi password lama & kebijakan sandi."""
     if request.method == 'POST':
         name = (request.POST.get('name') or '').strip()
         phone = (request.POST.get('phone') or '').strip()
-        
+
         if name and phone:
-            pegawai.name = name
-            pegawai.phone = phone
-            
-            # Update password jika diisi
             new_password = request.POST.get('new_password') or ''
+            current_password = request.POST.get('current_password') or ''
+            password_changed = False
+
             if new_password:
-                if len(new_password) < 8:
-                    messages.error(request, 'Password baru minimal 8 karakter.')
+                from django.contrib.auth.hashers import make_password
+                from django.contrib.auth.password_validation import validate_password
+                from django.core.exceptions import ValidationError as DjangoValidationError
+                from ..security_utils import revoke_user_sessions, verify_pegawai_password
+
+                if not current_password or not verify_pegawai_password(
+                    pegawai, current_password, auto_upgrade=False
+                ):
+                    messages.error(request, 'Password saat ini wajib diisi dan harus sesuai.')
                     return render(request, 'guest_book/pegawai_profile.html', {
                         'pegawai': pegawai,
-                        'active_page': 'profil'
+                        'active_page': 'profil',
                     })
-                from django.contrib.auth.hashers import make_password
+
+                if new_password == current_password:
+                    messages.error(request, 'Password baru tidak boleh sama dengan password saat ini.')
+                    return render(request, 'guest_book/pegawai_profile.html', {
+                        'pegawai': pegawai,
+                        'active_page': 'profil',
+                    })
+
+                try:
+                    validate_password(new_password)
+                except DjangoValidationError as exc:
+                    messages.error(request, ' '.join(exc.messages))
+                    return render(request, 'guest_book/pegawai_profile.html', {
+                        'pegawai': pegawai,
+                        'active_page': 'profil',
+                    })
+
                 pegawai.password = make_password(new_password)
-                
+                pegawai.must_change_password = False
+                password_changed = True
+
+            pegawai.name = name
+            pegawai.phone = phone
             pegawai.save()
+
+            if password_changed:
+                request.session.cycle_key()
+                revoke_user_sessions(
+                    'pegawai',
+                    str(pegawai.pk),
+                    exclude_session_key=request.session.session_key,
+                )
+
             request.session['pegawai_name'] = pegawai.name
             messages.success(request, 'Profil berhasil diperbarui.')
             return redirect('tamu:pegawai_profile')
         else:
             messages.error(request, 'Nama dan Nomor Telepon wajib diisi.')
-            
+
     return render(request, 'guest_book/pegawai_profile.html', {
         'pegawai': pegawai,
         'active_page': 'profil'

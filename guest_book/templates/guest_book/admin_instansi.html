@@ -197,7 +197,7 @@
                             </td>
                             <td>
                                 <div class="d-flex justify-content-end">
-                                    <form method="POST" onsubmit="return confirm('Hapus bidang {{ dept.nama }}?');">
+                                    <form method="POST" data-confirm="Hapus bidang {{ dept.nama }}?">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="delete_departemen">
                                         <input type="hidden" name="dept_id" value="{{ dept.id }}">

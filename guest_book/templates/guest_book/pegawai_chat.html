@@ -788,13 +788,13 @@
 
         <div class="chat-list" id="chatListContainer">
             {% for conv in conversations %}
-            <div class="chat-item {% if active_conversation and active_conversation.id == conv.id %}active{% endif %}"
+            <div class="chat-item {% if active_conversation and active_conversation.session_id == conv.session_id %}active{% endif %}"
                  data-id="{{ conv.id }}"
+                 data-session-id="{{ conv.session_id }}"
                  data-name="{{ conv.name|lower }}"
                  data-role="{% if conv.is_admin or conv.type == 'admin' %}admin{% else %}tamu{% endif %}"
                  data-dept="{{ conv.subtitle|default:''|lower }}"
-                 data-unread="{{ conv.unread_count|default:0 }}"
-                 onclick="loadChat('{{ conv.id }}')">
+                 data-unread="{{ conv.unread_count|default:0 }}">
                 <div class="avatar-squircle initials-avatar" data-name="{{ conv.name }}">
                     {{ conv.avatar_letters }}
                     <span class="avatar-live-dot"></span>
@@ -960,7 +960,7 @@
                     <button type="button" class="btn-attach" id="btnAttach" title="Lampirkan File">
                         <i class="fas fa-paperclip"></i>
                     </button>
-                    <input type="file" id="chatFileInput" style="display: none;" accept=".doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.svg">
+                    <input type="file" id="chatFileInput" style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
                     <input type="text" id="chatInput" placeholder="Ketik pesan..." autocomplete="off">
                     <button type="submit" class="btn-send-pill">
                         <i class="fas fa-paper-plane"></i>
@@ -983,7 +983,7 @@
 
 {% block extra_js %}
 <script src="{% static 'js/chat_client.js' %}"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
     let activeSession = "{% if active_conversation %}{{ active_conversation.session_id }}{% endif %}";
     let pegawaiId = "{{ pegawai.id }}";
     let chatSocket;
@@ -1008,12 +1008,12 @@
         // Filter Tabs & Search Filtering
         const filterButtons = document.querySelectorAll('.tab-pill-btn');
         const searchInput = document.getElementById('chatSearchInput');
-        const chatItems = document.querySelectorAll('.chat-item');
         const emptyFilterEl = document.getElementById('chatFilterEmpty');
         const emptyTitleEl = document.getElementById('chatFilterEmptyTitle');
         const emptySubEl = document.getElementById('chatFilterEmptySub');
 
         function applyFilters() {
+            const chatItems = document.querySelectorAll('#chatListContainer .chat-item');
             const activeTab = document.querySelector('.tab-pill-btn.active');
             const filter = activeTab ? activeTab.getAttribute('data-filter') : 'all';
             const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
@@ -1081,6 +1081,7 @@
                 filterButtons.forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 applyFilters();
+        window.__applyChatFilters = applyFilters;
             });
         });
 
@@ -1089,6 +1090,7 @@
         }
 
         applyFilters();
+        window.__applyChatFilters = applyFilters;
 
         // Scroll to bottom
         const msgArea = document.getElementById('messageArea');
@@ -1178,11 +1180,11 @@
                     const file = this.files[0];
                     if (!file) return;
 
-                    const allowedExtensions = ['doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'svg'];
+                    const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
                     const fileExt = file.name.split('.').pop().toLowerCase();
                     
                     if (!allowedExtensions.includes(fileExt)) {
-                        alert('Format file tidak didukung! Hanya file Word, Excel, PNG, JPG, dan SVG yang diperbolehkan.');
+                        alert('Format file tidak didukung! Hanya file PDF, Word, Excel, PNG, dan JPG yang diperbolehkan.');
                         this.value = '';
                         return;
                     }
@@ -1234,129 +1236,14 @@
     })();
 
     function escapeHtml(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function formatBlockLines(text) {
-        const lines = text.split('\n');
-        let out = [];
-        for (let line of lines) {
-            let trimLine = line.trim();
-            if (!trimLine) continue;
-
-            if (trimLine.startsWith('•') || trimLine.startsWith('-') || trimLine.startsWith('* ')) {
-                let content = trimLine.replace(/^[•\-\*]\s*/, '').trim();
-                out.push(`<div class="chat-list-row"><span class="chat-bullet-symbol">•</span><span class="chat-list-text">${content}</span></div>`);
-            } else if (/^\d+\.\s+/.test(trimLine)) {
-                let match = trimLine.match(/^(\d+\.)\s+(.*)$/);
-                if (match) {
-                    out.push(`<div class="chat-list-row"><span class="chat-num-symbol">${match[1]}</span><span class="chat-list-text">${match[2]}</span></div>`);
-                } else {
-                    out.push(`<div class="chat-text-row">${trimLine}</div>`);
-                }
-            } else {
-                out.push(`<div class="chat-text-row">${trimLine}</div>`);
-            }
-        }
-        return out.join('');
+        return window.SecurityUtils ? window.SecurityUtils.escapeHtml(str) : ChatMultiRoomHelper.escapeHtml(str);
     }
 
     function formatChatMessageHtml(rawText, isPureSent = false) {
-        if (!rawText) return '';
-        let cleaned = (rawText || '').trim();
-
-        let chips = [];
-        cleaned = cleaned.replace(/\[\[chip:([^|\]]+)(?:\|([^\]]+))?\]\]/g, function(match, action, label) {
-            chips.push({ action: action.trim(), label: (label || action).trim() });
-            return '';
-        });
-
-        cleaned = cleaned.replace(/👉\s*\**\s*(?:sentuh\s+)?pilihan\s+tindakan(?:\s+cepat)?:\s*\**\s*$/gim, '').trim();
-
-        const isAiMessage = /^🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/i.test(cleaned);
-        if (isAiMessage) {
-            cleaned = cleaned.replace(/^🤖\s*Asisten AI(?: Diskominfosantik)?:?\s*\n*/i, '').trim();
+        if (window.SecurityUtils && typeof window.SecurityUtils.formatRichChatMessage === 'function') {
+            return window.SecurityUtils.formatRichChatMessage(rawText, isPureSent);
         }
-
-        let safe = escapeHtml(cleaned);
-
-        safe = safe.replace(
-            /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-            function(match, text, url) {
-                const isMaps = url.indexOf('maps.google') !== -1 || url.indexOf('goo.gl') !== -1 || url.indexOf('/maps') !== -1;
-                if (isMaps) {
-                    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-maps-btn"><i class="fas fa-map-marked-alt"></i> <span>${text}</span> <i class="fas fa-external-link-alt chat-ext-icon"></i></a>`;
-                }
-                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${text} <i class="fas fa-external-link-alt chat-ext-icon"></i></a>`;
-            }
-        );
-
-        const strongColor = isPureSent ? 'color:#ffffff;' : '';
-        safe = safe.replace(/\*\*([^*]+)\*\*/g, `<strong class="chat-bold" style="${strongColor}">$1</strong>`);
-        safe = safe.replace(/(^|[^\*])\*([^\*\n]+)\*([^\*]|$)/g, '$1<em class="chat-italic">$2</em>$3');
-        safe = safe.replace(/`([^`\n]+)`/g, '<code class="chat-code">$1</code>');
-
-        if (isPureSent && !isAiMessage) {
-            return safe;
-        }
-
-        const blocks = safe.split(/\n{2,}/);
-        let renderedHtml = '';
-
-        if (isAiMessage) {
-            renderedHtml += `
-                <div class="ai-header-card">
-                    <div class="ai-header-badge">
-                        <i class="fas fa-robot"></i>
-                        <span>Asisten AI Diskominfosantik</span>
-                    </div>
-                    <span class="ai-header-live"><span class="ai-live-dot"></span> Aktif</span>
-                </div>
-            `;
-        }
-
-        for (let block of blocks) {
-            block = block.trim();
-            if (!block) continue;
-
-            if (block.startsWith('⚠️')) {
-                renderedHtml += `<div class="chat-callout callout-warning">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('⏱️')) {
-                renderedHtml += `<div class="chat-callout callout-sla">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('📌') || block.startsWith('📋') || block.startsWith('✅')) {
-                renderedHtml += `<div class="chat-callout callout-info">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('💡')) {
-                renderedHtml += `<div class="chat-callout callout-tip">${formatBlockLines(block)}</div>`;
-            } else if (block.startsWith('📍')) {
-                renderedHtml += `<div class="chat-callout callout-location">${formatBlockLines(block)}</div>`;
-            } else {
-                renderedHtml += `<div class="chat-block">${formatBlockLines(block)}</div>`;
-            }
-        }
-
-        if (chips.length > 0) {
-            let chipsHtml = chips.map(c => 
-                `<button type="button" class="chat-action-chip" data-action="${escapeHtml(c.action)}">
-                    ${escapeHtml(c.label)}
-                </button>`
-            ).join('');
-
-            renderedHtml += `
-                <div class="chat-action-panel">
-                    <div class="chat-action-title">
-                        <i class="fas fa-hand-pointer"></i> <span>Pilihan Tindakan Cepat:</span>
-                    </div>
-                    <div class="chat-action-chips">
-                        ${chipsHtml}
-                    </div>
-                </div>
-            `;
-        }
-
-        return renderedHtml || safe;
+        return escapeHtml(rawText || '');
     }
 
     // Format initial messages in DOM
@@ -1386,18 +1273,10 @@
         let bubbleContent = '';
         if (messageType === 'deleted') {
             bubbleContent = `<span style="font-style: italic; opacity: 0.7;">Pesan ini telah dihapus</span>`;
-        } else if (messageType === 'image') {
-            bubbleContent = `<img src="${encodeURI(fileUrl || '')}" style="max-width: 240px; max-height: 240px; object-fit: contain; border-radius: 10px;" alt="Gambar">`;
-        } else if (messageType === 'file') {
-            const rawFilename = (fileUrl || '').split('/').pop();
-            const filename = escapeHtml(rawFilename);
-            bubbleContent = `<a href="${encodeURI(fileUrl || '')}" target="_blank" rel="noopener noreferrer" class="file-card">
-                <i class="fas fa-file-alt"></i>
-                <div class="file-info">
-                    <span class="file-name">${filename}</span>
-                    <span class="file-size">Klik untuk mengunduh</span>
-                </div>
-            </a>`;
+        } else if (messageType === 'image' || messageType === 'file') {
+            bubbleContent = window.SecurityUtils
+                ? window.SecurityUtils.renderChatAttachmentHtml(messageType, fileUrl)
+                : `<span style="font-style: italic; opacity: 0.7;">Lampiran tidak valid</span>`;
         } else {
             bubbleContent = formatChatMessageHtml(content, type === 'sent' && !isAi);
         }
@@ -1423,7 +1302,7 @@
         msgGroup.innerHTML = `
             <div class="msg-bubble">${bubbleContent}</div>
             <div class="msg-meta-row">
-                <span class="msg-time">${time}</span>
+                <span class="msg-time">${escapeHtml(time || '')}</span>
                 ${ticks}
                 ${actionButtons}
             </div>
@@ -1517,8 +1396,98 @@
         }
     });
 
-    window.loadChat = function(convId) {
-        location.href = `?session=${convId}`; 
-    };
+    function createPegawaiSidebarItem(ev) {
+        const div = document.createElement('div');
+        div.className = 'chat-item';
+        div.setAttribute('data-id', ev.session_id);
+        div.setAttribute('data-session-id', ev.session_id);
+        div.setAttribute('data-name', (ev.room_name || '').toLowerCase());
+        div.setAttribute('data-role', ev.participant_type === 'admin' ? 'admin' : 'tamu');
+        div.setAttribute('data-dept', (ev.room_subtitle || '').toLowerCase());
+        div.setAttribute('data-unread', ev.sender_type !== 'pegawai' ? '1' : '0');
+        div.addEventListener('click', () => window.loadChat(ev.session_id));
+
+        const safeName = ChatMultiRoomHelper.escapeHtml(ev.room_name || 'Kontak');
+        const initials = ChatMultiRoomHelper.escapeHtml((ev.room_name || 'AD').slice(0, 2).toUpperCase());
+        const roleBadge = ev.participant_type === 'admin'
+            ? '<span class="badge-role badge-role-admin">Admin</span>'
+            : '<span class="badge-role badge-role-tamu">Tamu Resmi</span>';
+        const deptBadge = ev.room_subtitle
+            ? `<span class="badge-dept">${ChatMultiRoomHelper.escapeHtml(ev.room_subtitle).slice(0, 20)}</span>`
+            : '';
+        const unreadHtml = ev.sender_type !== 'pegawai' ? '<span class="badge-unread">1</span>' : '';
+
+        div.innerHTML = `
+            <div class="avatar-squircle initials-avatar" data-name="${safeName}">
+                ${initials}
+                <span class="avatar-live-dot"></span>
+            </div>
+            <div class="info">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="name">${safeName}</span>
+                    <span class="time">${ChatMultiRoomHelper.escapeHtml(ev.created_at || '')}</span>
+                </div>
+                <div class="d-flex align-items-center gap-1 mb-1">
+                    ${roleBadge}
+                    ${deptBadge}
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="last-msg">${ChatMultiRoomHelper.escapeHtml(ev.preview || 'Belum ada pesan')}</div>
+                    ${unreadHtml}
+                </div>
+            </div>
+        `;
+        return div;
+    }
+
+    window.loadChat = ChatMultiRoomHelper.initMultiRoomChat({
+        containerId: 'chatListContainer',
+        chatCardId: 'pegawaiChatCard',
+        backButtonId: 'btnPegawaiMobileBack',
+        mySenderType: 'pegawai',
+        getActiveSession: () => activeSession,
+        setActiveSession: (sid) => { activeSession = sid; },
+        getChatSocket: () => chatSocket,
+        formatMessageFn: formatChatMessageHtml,
+        applyFilters: () => window.__applyChatFilters && window.__applyChatFilters(),
+        getHeaderIconHtml: (meta) => {
+            if (meta.participant_type === 'admin') return '<i class="fas fa-users"></i>';
+            if (meta.participant_type === 'tamu') return '<i class="fas fa-user-tag"></i>';
+            return '<i class="fas fa-comments"></i>';
+        },
+        createSidebarItemFromEvent: createPegawaiSidebarItem,
+        onResetEditMode: () => {
+            editingMessageId = null;
+            const ind = document.getElementById('editModeIndicator');
+            if (ind) ind.style.display = 'none';
+            const inp = document.getElementById('chatInput');
+            if (inp) inp.placeholder = 'Ketik pesan...';
+        },
+        onSyncBellBadge: (count) => {
+            const badge = document.getElementById('pegawaiNotifBadge');
+            if (badge) {
+                if (count > 0) {
+                    badge.innerText = count;
+                    badge.style.display = 'inline-flex';
+                } else {
+                    badge.innerText = '0';
+                    badge.style.display = 'none';
+                }
+            }
+        },
+    });
+
+    const pegawaiSidebarListEl = document.getElementById('chatListContainer');
+    if (pegawaiSidebarListEl) {
+        pegawaiSidebarListEl.addEventListener('click', function(e) {
+            const chatItem = e.target.closest('.chat-item[data-session-id]');
+            if (chatItem && pegawaiSidebarListEl.contains(chatItem)) {
+                const sid = chatItem.getAttribute('data-session-id');
+                if (sid && typeof window.loadChat === 'function') {
+                    window.loadChat(sid);
+                }
+            }
+        });
+    }
 </script>
 {% endblock %}

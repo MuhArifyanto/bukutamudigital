@@ -173,6 +173,7 @@
             font-weight: 600;
             font-size: 0.85rem;
             text-decoration: none;
+            cursor: pointer;
             transition: var(--transition);
         }
         .logout-btn:hover {
@@ -421,10 +422,13 @@
         </nav>
 
         <div class="sidebar-footer">
-            <a href="{% url 'tamu:pegawai_logout' %}" class="logout-btn">
-                <i class="fas fa-power-off"></i>
-                <span>Keluar</span>
-            </a>
+            <form method="post" action="{% url 'tamu:pegawai_logout' %}" class="m-0">
+                {% csrf_token %}
+                <button type="submit" class="logout-btn">
+                    <i class="fas fa-power-off"></i>
+                    <span>Keluar</span>
+                </button>
+            </form>
         </div>
     </aside>
 
@@ -485,7 +489,14 @@
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="border-radius: var(--radius-md); min-width: 200px; margin-top: 0.5rem;">
                         <li><a class="dropdown-item py-2" href="{% url 'tamu:pegawai_profile' %}"><i class="far fa-user me-2 text-muted"></i> Profil Saya</a></li>
                         <li><hr class="dropdown-divider my-1"></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="{% url 'tamu:pegawai_logout' %}"><i class="fas fa-sign-out-alt me-2"></i> Keluar</a></li>
+                        <li>
+                            <form method="post" action="{% url 'tamu:pegawai_logout' %}" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item py-2 text-danger w-100 text-start">
+                                    <i class="fas fa-sign-out-alt me-2"></i> Keluar
+                                </button>
+                            </form>
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -524,8 +535,9 @@
     </div>
 
     <!-- Scripts -->
+    <script src="{% static 'js/security_utils.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         function initPegawaiApp() {
             const sidebar = document.getElementById('sidebar');
             let overlay = document.getElementById('sidebarOverlay');
@@ -562,7 +574,21 @@
             window.pegawaiNotifSocket.onmessage = function(e) {
                 try {
                     const data = JSON.parse(e.data);
-                    if (data.action === 'pong' || data.type === 'pong' || (!data.message && !data.title)) {
+                    if (data.action === 'pong' || data.type === 'pong') {
+                        return;
+                    }
+                    window.dispatchEvent(new CustomEvent('ws:notification', { detail: data }));
+                    if (data.event_type === 'chat_sidebar_update' || data.suppress_toast) {
+                        if (data.sender_type !== 'pegawai' && !window.location.pathname.includes('/chat')) {
+                            const chatBadge = document.getElementById('sidebarChatBadge');
+                            if (chatBadge) {
+                                chatBadge.innerText = (parseInt(chatBadge.innerText || '0', 10) || 0) + 1;
+                                chatBadge.style.display = 'inline-block';
+                            }
+                        }
+                        return;
+                    }
+                    if (!data.message && !data.title) {
                         return;
                     }
                     
@@ -638,11 +664,12 @@
                         .then(res => res.json())
                         .then(data => {
                             const notifList = document.getElementById('pegawaiNotifList');
+                            notifList.innerHTML = '';
                             if (data.notifications && data.notifications.length > 0) {
-                                notifList.innerHTML = data.notifications.map(n => {
-                                    let url = "#";
-                                    let onclickAttr = "";
-                                    const relId = n.related_object_id || "";
+                                const frag = document.createDocumentFragment();
+                                data.notifications.forEach(n => {
+                                    let targetUrl = null;
+                                    const relId = n.related_object_id ? String(n.related_object_id) : "";
                                     const isChatNotif = (
                                         n.notification_type === 'message_replied' ||
                                         n.notification_type === 'message_received' ||
@@ -651,26 +678,51 @@
                                     );
 
                                     if (isChatNotif) {
-                                        url = "{% url 'tamu:pegawai_chat' %}" + (relId ? ("?session=" + encodeURIComponent(relId)) : "");
-                                        onclickAttr = `onclick="window.location.href='${url}'"`;
+                                        targetUrl = "{% url 'tamu:pegawai_chat' %}" + (relId ? ("?session=" + encodeURIComponent(relId)) : "");
                                     } else if (relId) {
-                                        url = "/pegawai-portal/kunjungan/" + encodeURIComponent(relId) + "/";
-                                        onclickAttr = `onclick="window.location.href='${url}'"`;
+                                        targetUrl = "/pegawai-portal/kunjungan/" + encodeURIComponent(relId) + "/";
                                     }
-                                    
-                                    return `
-                                        <div class="pegawai-notif-item" style="padding: 0.9rem 1rem; border-bottom: 1px solid #f1f5f9; display: flex; gap: 0.75rem; cursor: pointer; ${n.status === 'unread' ? 'background: #f0fdf4;' : 'background: #ffffff;'}" ${onclickAttr}>
-                                            <div style="width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: ${isChatNotif ? '#eff6ff; color: #3b82f6;' : '#dcfce7; color: #10b981;'}">
-                                                <i class="fas ${isChatNotif ? 'fa-comment-dots' : 'fa-bell'}"></i>
-                                            </div>
-                                            <div style="flex: 1; min-width: 0;">
-                                                <div style="font-size: 0.84rem; font-weight: 700; color: #0f172a; margin-bottom: 0.15rem;">${n.title}</div>
-                                                <div style="font-size: 0.75rem; color: #475569; margin-bottom: 0.25rem; line-height: 1.4;">${n.message}</div>
-                                                <div style="font-size: 0.65rem; color: #94a3b8;"><i class="far fa-clock me-1"></i>${n.created_at}</div>
-                                            </div>
-                                        </div>
-                                    `;
-                                }).join('');
+                                    const safeUrl = targetUrl && window.SecurityUtils ? window.SecurityUtils.sanitizeSafeUrl(targetUrl) : null;
+
+                                    const item = document.createElement('div');
+                                    item.className = 'pegawai-notif-item';
+                                    item.style.cssText = `padding: 0.9rem 1rem; border-bottom: 1px solid #f1f5f9; display: flex; gap: 0.75rem; cursor: pointer; ${n.status === 'unread' ? 'background: #f0fdf4;' : 'background: #ffffff;'}`;
+                                    if (safeUrl) {
+                                        item.addEventListener('click', () => { window.location.href = safeUrl; });
+                                    }
+
+                                    const iconBox = document.createElement('div');
+                                    iconBox.style.cssText = `width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: ${isChatNotif ? '#eff6ff; color: #3b82f6;' : '#dcfce7; color: #10b981;'}`;
+                                    const iconEl = document.createElement('i');
+                                    iconEl.className = `fas ${isChatNotif ? 'fa-comment-dots' : 'fa-bell'}`;
+                                    iconBox.appendChild(iconEl);
+
+                                    const bodyDiv = document.createElement('div');
+                                    bodyDiv.style.cssText = 'flex: 1; min-width: 0;';
+
+                                    const titleDiv = document.createElement('div');
+                                    titleDiv.style.cssText = 'font-size: 0.84rem; font-weight: 700; color: #0f172a; margin-bottom: 0.15rem;';
+                                    titleDiv.textContent = n.title || '';
+
+                                    const msgDiv = document.createElement('div');
+                                    msgDiv.style.cssText = 'font-size: 0.75rem; color: #475569; margin-bottom: 0.25rem; line-height: 1.4;';
+                                    msgDiv.textContent = n.message || '';
+
+                                    const timeDiv = document.createElement('div');
+                                    timeDiv.style.cssText = 'font-size: 0.65rem; color: #94a3b8;';
+                                    const clockIcon = document.createElement('i');
+                                    clockIcon.className = 'far fa-clock me-1';
+                                    timeDiv.appendChild(clockIcon);
+                                    timeDiv.appendChild(document.createTextNode(n.created_at || ''));
+
+                                    bodyDiv.appendChild(titleDiv);
+                                    bodyDiv.appendChild(msgDiv);
+                                    bodyDiv.appendChild(timeDiv);
+                                    item.appendChild(iconBox);
+                                    item.appendChild(bodyDiv);
+                                    frag.appendChild(item);
+                                });
+                                notifList.appendChild(frag);
                             } else {
                                 notifList.innerHTML = `
                                     <div style="padding: 2rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">

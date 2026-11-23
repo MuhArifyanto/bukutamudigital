@@ -29,11 +29,17 @@ class TamuLoginForm(forms.Form):
             if kind == 'email':
                 qs = qs.filter(email__iexact=normalized)
             elif kind == 'nik':
-                qs = qs.filter(nik=normalized)
+                qs = qs.filter(Tamu.nik_lookup_q(normalized))
             else:
                 qs = qs.none()
             matches = list(qs[:2])
-            if len(matches) == 1 and check_password(password, matches[0].password):
+            if (
+                len(matches) == 1
+                and not matches[0].is_admin
+                and matches[0].nik != 'admin'
+                and matches[0].password
+                and check_password(password, matches[0].password)
+            ):
                 self.tamu = matches[0]
             else:
                 raise forms.ValidationError(self.GENERIC_ERROR)
@@ -93,6 +99,16 @@ class TamuRegisterForm(forms.Form):
             raise forms.ValidationError("Email ini sudah terdaftar.")
         return email
 
+    def clean_phone(self):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from .validators import normalize_and_validate_phone
+
+        raw_phone = self.cleaned_data.get('phone', '')
+        try:
+            return normalize_and_validate_phone(raw_phone, allow_placeholder=False)
+        except DjangoValidationError as exc:
+            raise forms.ValidationError(exc.messages)
+
     def clean(self):
         cleaned = super().clean()
         p1 = cleaned.get('password1')
@@ -125,10 +141,7 @@ class TamuPasswordResetForm(forms.Form):
     )
 
     def clean_email(self):
-        email = self.cleaned_data.get('email')
-        if not Tamu.objects.filter(email=email, account_status='active').exists():
-            raise forms.ValidationError("Email ini tidak terdaftar atau akun tidak aktif.")
-        return email
+        return (self.cleaned_data.get('email') or '').strip().lower()
 
 
 class TamuSetPasswordForm(forms.Form):
@@ -142,9 +155,17 @@ class TamuSetPasswordForm(forms.Form):
     )
 
     def clean(self):
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
         cleaned = super().clean()
         p1 = cleaned.get('password1')
         p2 = cleaned.get('password2')
+        if p1:
+            try:
+                validate_password(p1)
+            except DjangoValidationError as exc:
+                self.add_error('password1', exc)
         if p1 and p2 and p1 != p2:
             self.add_error('password2', "Password tidak cocok.")
         return cleaned

@@ -63,7 +63,7 @@
                 <div class="d-flex gap-2">
                     <a href="{% url 'tamu:admin_kunjungan_list' %}" class="btn-action btn-primary-action">Lihat Detail</a>
                     {% if n.status == 'unread' %}
-                    <button onclick="markAsRead('{{ n.id }}')" class="btn-action btn-secondary-action">Tandai Dibaca</button>
+                    <button type="button" data-notif-id="{{ n.id }}" class="btn-action btn-secondary-action js-mark-notif-read">Tandai Dibaca</button>
                     {% endif %}
                 </div>
             </div>
@@ -76,7 +76,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     function markAsRead(id) {
         const fd = new FormData();
         fd.append('notification_id', id);
@@ -84,5 +84,10 @@
         fetch("{% url 'tamu:api_mark_notification_read' %}", { method: 'POST', body: fd })
         .then(res => res.json()).then(data => { if(data.success) location.reload(); });
     }
+    document.querySelectorAll('.js-mark-notif-read').forEach(btn => {
+        btn.addEventListener('click', function() {
+            markAsRead(this.dataset.notifId);
+        });
+    });
 </script>
 {% endblock %}

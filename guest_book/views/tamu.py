@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db.models import Count, Q as _Q
+from django.views.decorators.csrf import ensure_csrf_cookie
 from .base import tamu_login_required, base_context
 from ..models import Kunjungan, KunjunganStatusHistory, Pegawai, Message, Departemen
 from ..forms import KunjunganForm, PesanForm
@@ -102,6 +103,7 @@ def _run_n8n_routing_bg(kunjungan_id, purpose, tamu_name, initial_pegawai_id=Non
         close_old_connections()
 
 
+@ensure_csrf_cookie
 def landing_view(request):
     """View untuk Landing Page utama"""
     tamu_id = request.session.get('tamu_id')
@@ -110,7 +112,7 @@ def landing_view(request):
     
     if tamu_id:
         from ..models import Tamu
-        tamu = Tamu.objects.filter(pk=tamu_id).first()
+        tamu = Tamu.objects.filter(pk=tamu_id, account_status='active').first()
         if tamu:
             user_logged_in = True
             user_name = tamu.name
@@ -129,7 +131,10 @@ def kebijakan_privasi_view(request):
 @tamu_login_required
 def dashboard_view(request, tamu):
     """View untuk Dashboard Tamu"""
-    now = timezone.now()
+    from ..validators import get_month_range_aware
+
+    now = timezone.localtime(timezone.now())
+    month_start, next_month_start = get_month_range_aware(now.year, now.month)
     base_qs = Kunjungan.objects.filter(tamu=tamu)
 
     # 1 query: semua status sekaligus via conditional Count
@@ -139,8 +144,8 @@ def dashboard_view(request, tamu):
         in_progress=Count('id', filter=_Q(status='in_progress')),
         completed=Count('id', filter=_Q(status='completed')),
         bulan_ini=Count('id', filter=_Q(
-            arrival_time__year=now.year,
-            arrival_time__month=now.month,
+            arrival_time__gte=month_start,
+            arrival_time__lt=next_month_start,
         )),
     )
     stats = agg  # aggregate() langsung kembalikan dict dengan key yang sama
@@ -302,7 +307,8 @@ def riwayat_view(request, tamu):
         
     date_filter = request.GET.get('date', '')
     if date_filter:
-        qs = qs.filter(arrival_time__date=date_filter)
+        from ..validators import filter_by_local_date
+        qs = filter_by_local_date(qs, date_filter)
 
     # Calculate stats for the current user (1 query, unfiltered)
     base_qs = Kunjungan.objects.filter(tamu=tamu)
@@ -474,28 +480,13 @@ def notifications_view(request, tamu):
 @tamu_login_required
 def user_chat_view(request, tamu):
     """View untuk Chat Tamu — Admin & Pegawai (multi-conversation, WA style)"""
-    from ..models import ChatMessage, Pegawai, Kunjungan
+    from ..models import ChatMessage, ChatRoom, Pegawai, Kunjungan
     from .base import _get_cached_admin_user
 
     admin_user = _get_cached_admin_user()
 
     # ── 1. Conversation dengan Admin ─────────────────────────────────────────
-    admin_session_id = str(tamu.pk)
-    admin_last_msg = ChatMessage.objects.filter(session_id=admin_session_id).order_by('-created_at').first()
-    admin_unread = ChatMessage.objects.filter(
-        session_id=admin_session_id, sender_type='admin', is_read=False
-    ).count()
-
-    conversations = [{
-        'id': 'admin',
-        'session_id': admin_session_id,
-        'type': 'admin',
-        'name': 'Admin Diskominfosantik',
-        'subtitle': 'Layanan Umum & Asisten AI',
-        'avatar_letters': 'AD',
-        'last_message': admin_last_msg,
-        'unread_count': admin_unread,
-    }]
+    admin_session_id = ChatRoom.session_id_for_tamu(tamu.pk)
 
     # ── 2. Conversations dengan Pegawai (dari kunjungan tamu) ─────────────────
     kunjungan_list = list(Kunjungan.objects.filter(
@@ -504,26 +495,25 @@ def user_chat_view(request, tamu):
         pegawai__isnull=False,
     ).select_related('pegawai', 'pegawai__department_rel').order_by('-created_at')[:20])
 
-    session_ids = [f'kunjungan_{k.id}' for k in kunjungan_list]
-    unread_counts = {}
-    last_messages = {}
+    kunjungan_session_ids = [ChatRoom.session_id_for_kunjungan(k.id) for k in kunjungan_list]
+    all_session_ids = [admin_session_id] + kunjungan_session_ids
 
-    if session_ids:
-        unread_qs = ChatMessage.objects.filter(
-            session_id__in=session_ids, is_read=False
-        ).exclude(sender_type='tamu').values('session_id').annotate(c=Count('id'))
-        unread_counts = {item['session_id']: item['c'] for item in unread_qs}
+    unread_counts = ChatMessage.unread_counts_by_session(all_session_ids, exclude_sender_type='tamu')
+    last_messages = ChatMessage.latest_by_session(all_session_ids)
 
-        # Ambil pesan terakhir per session secara batch
-        recent_msgs = ChatMessage.objects.filter(
-            session_id__in=session_ids
-        ).order_by('session_id', '-created_at')
-        for msg in recent_msgs:
-            if msg.session_id not in last_messages:
-                last_messages[msg.session_id] = msg
+    conversations = [{
+        'id': 'admin',
+        'session_id': admin_session_id,
+        'type': 'admin',
+        'name': 'Admin Diskominfosantik',
+        'subtitle': 'Layanan Umum & Asisten AI',
+        'avatar_letters': 'AD',
+        'last_message': last_messages.get(admin_session_id),
+        'unread_count': unread_counts.get(admin_session_id, 0),
+    }]
 
     for k in kunjungan_list:
-        session_id = f'kunjungan_{k.id}'
+        session_id = ChatRoom.session_id_for_kunjungan(k.id)
         peg_name = (k.pegawai.name if k.pegawai and k.pegawai.name else 'Pegawai')
         peg_dept = 'Pegawai'
         if k.pegawai:
@@ -603,7 +593,8 @@ def tamu_kunjungan_cetak_pdf(request, tamu):
         
     date_filter = request.GET.get('date', '')
     if date_filter:
-        qs = qs.filter(arrival_time__date=date_filter)
+        from ..validators import filter_by_local_date
+        qs = filter_by_local_date(qs, date_filter)
 
     ctx = base_context(tamu, 'riwayat')
     ctx.update({
@@ -616,7 +607,7 @@ def tamu_kunjungan_cetak_pdf(request, tamu):
 def tamu_chat_pegawai_view(request, tamu, kunjungan_id):
     """Chat interface antara Tamu dan Pegawai untuk kunjungan tertentu."""
     from django.core.exceptions import PermissionDenied
-    from ..models import ChatMessage
+    from ..models import ChatMessage, ChatRoom
     from ..permissions import PermissionManager
     
     kunjungan = get_object_or_404(Kunjungan, pk=kunjungan_id, tamu=tamu)
@@ -626,7 +617,7 @@ def tamu_chat_pegawai_view(request, tamu, kunjungan_id):
         messages.warning(request, "Chat hanya tersedia setelah kunjungan di-ACC oleh Admin")
         return redirect('tamu:kunjungan_detail', pk=kunjungan_id)
     
-    session_id = f'kunjungan_{kunjungan.id}'
+    session_id = ChatRoom.session_id_for_kunjungan(kunjungan.id)
     
     # Get chat history
     messages_list = ChatMessage.objects.filter(
@@ -675,6 +666,8 @@ def profil_view(request, tamu):
     days_since_change = (timezone.now() - last_change_date).days
     needs_password_change = days_since_change >= 90
 
+    from django.contrib.auth.hashers import is_password_usable
+
     ctx = base_context(tamu, 'profil')
     ctx.update({
         'tamu': tamu,
@@ -683,8 +676,277 @@ def profil_view(request, tamu):
         'recent_visits': recent_visits,
         'needs_password_change': needs_password_change,
         'days_since_change': days_since_change,
+        'has_local_password': is_password_usable(tamu.password),
     })
     return render(request, 'guest_book/tamu_profil.html', ctx)
+
+
+@tamu_login_required
+def tamu_export_personal_data(request, tamu):
+    """Hak Akses & Portabilitas Data UU PDP: ekspor seluruh data pribadi milik Tamu dalam format JSON."""
+    import json
+    from django.http import HttpResponse, JsonResponse
+    from ..models import ChatMessage, ChatRoom, IKMSurvey, Message, Notification
+    from .auth import check_rate_limit, get_client_ip, record_rate_limit_attempt
+    from .base import record_audit_log
+
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    if tamu.is_admin or tamu.nik == 'admin':
+        return JsonResponse({'success': False, 'error': 'Gunakan panel administrator untuk akun admin.'}, status=403)
+
+    rl_key = f"rl_pdp_export_{tamu.pk}"
+    if check_rate_limit(rl_key, max_attempts=5, fail_closed=False):
+        return JsonResponse(
+            {'success': False, 'error': 'Terlalu banyak permintaan ekspor data. Silakan coba lagi dalam 15 menit.'},
+            status=429,
+        )
+    record_rate_limit_attempt(rl_key, timeout_seconds=900)
+
+    visits = list(
+        Kunjungan.objects.filter(tamu=tamu)
+        .select_related('pegawai', 'pegawai__department_rel')
+        .order_by('-arrival_time')
+    )
+    visit_ids = [v.id for v in visits]
+
+    session_ids = [
+        ChatRoom.session_id_for_tamu(tamu.pk),
+        str(tamu.pk),
+    ] + [ChatRoom.session_id_for_kunjungan(vid) for vid in visit_ids]
+
+    chat_qs = ChatMessage.objects.filter(session_id__in=session_ids).order_by('created_at')
+    msg_qs = Message.objects.filter(sender_id=str(tamu.pk), sender_type='tamu').order_by('-created_at')
+    notif_qs = Notification.objects.filter(recipient_id=str(tamu.pk), recipient_type='tamu').order_by('-created_at')
+    ikm_qs = IKMSurvey.objects.filter(tamu=tamu).order_by('-created_at')
+
+    payload = {
+        'exported_at': timezone.localtime(timezone.now()).isoformat(),
+        'compliance': 'UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP)',
+        'profile': {
+            'id': str(tamu.pk),
+            'name': tamu.name,
+            'email': tamu.email,
+            'phone': tamu.phone,
+            'nik': tamu.nik,
+            'instansi': tamu.instansi,
+            'registration_type': tamu.registration_type,
+            'account_status': tamu.account_status,
+            'registration_date': timezone.localtime(tamu.registration_date).isoformat() if tamu.registration_date else None,
+            'last_login': timezone.localtime(tamu.last_login).isoformat() if tamu.last_login else None,
+        },
+        'kunjungan': [
+            {
+                'id': str(v.id),
+                'arrival_time': timezone.localtime(v.arrival_time).isoformat() if v.arrival_time else None,
+                'departure_time': timezone.localtime(v.departure_time).isoformat() if v.departure_time else None,
+                'purpose': v.purpose,
+                'status': v.status,
+                'status_display': v.get_status_display(),
+                'pegawai': v.pegawai.name if v.pegawai else None,
+                'departemen': (
+                    v.pegawai.department_rel.nama
+                    if v.pegawai and v.pegawai.department_rel
+                    else (v.pegawai.department if v.pegawai else None)
+                ),
+                'created_at': timezone.localtime(v.created_at).isoformat() if v.created_at else None,
+            }
+            for v in visits
+        ],
+        'ikm_surveys': [
+            {
+                'id': str(s.id),
+                'kunjungan_id': str(s.kunjungan_id),
+                'rating': s.rating,
+                'kesesuaian_persyaratan': s.kesesuaian_persyaratan,
+                'kemudahan_prosedur': s.kemudahan_prosedur,
+                'kecepatan_layanan': s.kecepatan_layanan,
+                'keramahan_petugas': s.keramahan_petugas,
+                'kualitas_sarana': s.kualitas_sarana,
+                'ulasan': s.ulasan,
+                'created_at': timezone.localtime(s.created_at).isoformat() if s.created_at else None,
+            }
+            for s in ikm_qs
+        ],
+        'messages': [
+            {
+                'id': str(m.id),
+                'subject': m.subject,
+                'content': m.content,
+                'status': m.status,
+                'created_at': timezone.localtime(m.created_at).isoformat() if m.created_at else None,
+            }
+            for m in msg_qs
+        ],
+        'chat_messages': [
+            {
+                'id': str(cm.id),
+                'session_id': cm.session_id,
+                'sender_type': cm.sender_type,
+                'message_type': cm.message_type,
+                'content': cm.content,
+                'created_at': timezone.localtime(cm.created_at).isoformat() if cm.created_at else None,
+            }
+            for cm in chat_qs
+        ],
+        'notifications': [
+            {
+                'id': str(n.id),
+                'notification_type': n.notification_type,
+                'title': n.title,
+                'message': n.message,
+                'status': n.status,
+                'created_at': timezone.localtime(n.created_at).isoformat() if n.created_at else None,
+            }
+            for n in notif_qs
+        ],
+    }
+
+    record_audit_log(
+        user_id=str(tamu.pk),
+        user_type='tamu',
+        action='create',
+        table_name='pdp_data_export',
+        record_id=str(tamu.pk),
+        new_value={'format': 'json', 'kunjungan_count': len(payload['kunjungan'])},
+        ip_address=get_client_ip(request),
+    )
+
+    filename = f"data_pribadi_tamu_{timezone.localtime(timezone.now()).strftime('%Y%m%d')}.json"
+    response = HttpResponse(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        content_type='application/json; charset=utf-8',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Cache-Control'] = 'no-store, private'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+@tamu_login_required
+def tamu_delete_account_view(request, tamu):
+    """Hak Penghapusan Data UU PDP: hapus/anonimkan data pribadi & tutup akun Tamu secara mandiri."""
+    from django.contrib.auth.hashers import check_password, is_password_usable, make_password
+    from django.core.files.storage import default_storage
+    from django.db import transaction
+    from django.http import HttpResponseNotAllowed
+    from ..models import ChatMessage, ChatRoom, KunjunganNote, Message, Notification
+    from ..security_utils import revoke_user_sessions
+    from .auth import get_client_ip
+    from .base import record_audit_log
+
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    if tamu.is_admin or tamu.nik == 'admin':
+        messages.error(request, 'Akun administrator tidak dapat dihapus melalui portal tamu.')
+        return redirect('tamu:profil')
+
+    confirm_text = (request.POST.get('confirm_text') or '').strip().upper()
+    if confirm_text != 'HAPUS':
+        messages.error(request, 'Konfirmasi tidak sesuai. Ketik HAPUS untuk menghapus akun Anda.')
+        return redirect('tamu:profil')
+
+    if is_password_usable(tamu.password):
+        current_password = request.POST.get('current_password') or ''
+        if not current_password or not check_password(current_password, tamu.password):
+            messages.error(request, 'Kata sandi saat ini wajib diisi dan harus sesuai untuk menghapus akun.')
+            return redirect('tamu:profil')
+
+    redacted_marker = '[Dihapus atas permintaan pemilik data (UU PDP)]'
+    tamu_id_str = str(tamu.pk)
+
+    visit_ids = list(Kunjungan.objects.filter(tamu=tamu).values_list('id', flat=True))
+    session_ids = [
+        ChatRoom.session_id_for_tamu(tamu.pk),
+        tamu_id_str,
+    ] + [ChatRoom.session_id_for_kunjungan(vid) for vid in visit_ids]
+
+    chat_qs = ChatMessage.objects.filter(session_id__in=session_ids)
+    legacy_msg_qs = Message.objects.filter(sender_id=tamu_id_str, sender_type='tamu')
+
+    files_to_delete = []
+    if tamu.profile_picture and getattr(tamu.profile_picture, 'name', None):
+        files_to_delete.append(tamu.profile_picture.name)
+    files_to_delete.extend(
+        m.attachment.name
+        for m in chat_qs.exclude(attachment='').exclude(attachment__isnull=True)
+        if getattr(m.attachment, 'name', None)
+    )
+    files_to_delete.extend(
+        m.attachment_path.name
+        for m in legacy_msg_qs.exclude(attachment_path='').exclude(attachment_path__isnull=True)
+        if getattr(m.attachment_path, 'name', None)
+    )
+
+    with transaction.atomic():
+        cancelable_visits = list(
+            Kunjungan.objects.filter(tamu=tamu, status__in=Kunjungan.Status.CANCELABLE)
+        )
+        for v in cancelable_visits:
+            old_status = v.status
+            v.status = Kunjungan.Status.CANCELLED
+            v.save(update_fields=['status', 'updated_at'])
+            KunjunganStatusHistory.objects.create(
+                kunjungan=v,
+                old_status=old_status,
+                new_status=Kunjungan.Status.CANCELLED,
+                changed_by_id=tamu_id_str,
+                changed_by_type='tamu',
+                notes='Dibatalkan otomatis karena penghapusan akun mandiri (UU PDP)',
+            )
+
+        Kunjungan.objects.filter(tamu=tamu).update(
+            notes=redacted_marker,
+            admin_notes=redacted_marker,
+            rejection_reason=redacted_marker,
+        )
+        KunjunganNote.objects.filter(kunjungan_id__in=visit_ids).delete()
+        chat_qs.delete()
+        ChatRoom.objects.filter(tamu=tamu).delete()
+        legacy_msg_qs.delete()
+        Notification.objects.filter(recipient_id=tamu_id_str, recipient_type='tamu').delete()
+
+        tamu.name = f"Tamu Anonim ({tamu_id_str[:8]})"
+        tamu.email = f"anonymized-{tamu.pk}@redacted.local"
+        tamu.phone = '-'
+        tamu.nik = None
+        tamu.nik_hash = None
+        tamu.instansi = None
+        tamu.google_id = None
+        tamu.password = make_password(None)
+        tamu.profile_picture = None
+        tamu.account_status = 'inactive'
+        tamu.save()
+
+        record_audit_log(
+            user_id=tamu_id_str,
+            user_type='tamu',
+            action='delete',
+            table_name='tamu',
+            record_id=tamu_id_str,
+            new_value={
+                'reason': 'self_service_pdp_erasure',
+                'cancelled_visits': len(cancelable_visits),
+            },
+            ip_address=get_client_ip(request),
+        )
+
+    for file_name in files_to_delete:
+        try:
+            if default_storage.exists(file_name):
+                default_storage.delete(file_name)
+        except Exception as exc:
+            logger.warning("Gagal menghapus berkas media saat hapus akun %s: %s", tamu_id_str, exc)
+
+    revoke_user_sessions('tamu', tamu_id_str)
+    request.session.flush()
+    messages.success(
+        request,
+        'Akun dan data pribadi Anda telah berhasil dihapus/dianonimkan sesuai ketentuan UU PDP.',
+    )
+    return redirect('tamu:login')
 
 
 @tamu_login_required

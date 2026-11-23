@@ -18,13 +18,14 @@ class TamuAdmin(admin.ModelAdmin):
     list_display = ('name', 'email', 'phone', 'registration_type', 'account_status', 'registration_date')
     list_filter = ('account_status', 'registration_type', 'registration_date')
     search_fields = ('name', 'email', 'phone')
+    exclude = ('password', 'nik_hash')
     readonly_fields = ('id', 'registration_date', 'last_login')
     fieldsets = (
         ('Personal Information', {
             'fields': ('id', 'name', 'email', 'phone', 'profile_picture')
         }),
         ('Account', {
-            'fields': ('password', 'account_status', 'registration_type')
+            'fields': ('account_status', 'registration_type')
         }),
         ('SSO Information', {
             'fields': ('google_id',),
@@ -42,13 +43,14 @@ class PegawaiAdmin(admin.ModelAdmin):
     list_display = ('name', 'email', 'department_rel', 'role', 'account_status', 'created_at')
     list_filter = ('account_status', 'role', 'department_rel', 'created_at')
     search_fields = ('name', 'email', 'nip', 'jabatan', 'department_rel__nama')
+    exclude = ('password',)
     readonly_fields = ('id', 'created_at', 'last_login')
     fieldsets = (
         ('Personal Information', {
             'fields': ('id', 'name', 'email', 'phone', 'nip', 'jabatan', 'department_rel')
         }),
         ('Account', {
-            'fields': ('password', 'role', 'account_status')
+            'fields': ('role', 'account_status')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'last_login'),
@@ -62,16 +64,21 @@ class AdminUserAdmin(admin.ModelAdmin):
     list_display = ('name', 'email', 'account_status', 'two_fa_enabled', 'created_at')
     list_filter = ('account_status', 'two_fa_enabled', 'created_at')
     search_fields = ('name', 'email')
-    readonly_fields = ('id', 'created_at', 'last_login')
+    exclude = ('password', 'two_fa_secret')
+    readonly_fields = ('id', 'two_fa_secret_status', 'created_at', 'last_login')
     fieldsets = (
         ('Personal Information', {
             'fields': ('id', 'name', 'email', 'phone')
         }),
         ('Account', {
-            'fields': ('password', 'account_status')
+            'fields': ('account_status',)
         }),
         ('Security', {
-            'fields': ('two_fa_enabled', 'two_fa_secret'),
+            'fields': ('two_fa_enabled', 'two_fa_secret_status'),
+            'classes': ('collapse',)
+        }),
+        ('Preferences', {
+            'fields': ('email_notif_enabled', 'push_notif_enabled'),
             'classes': ('collapse',)
         }),
         ('Timestamps', {
@@ -79,6 +86,10 @@ class AdminUserAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    @admin.display(description='Status Secret 2FA')
+    def two_fa_secret_status(self, obj):
+        return 'Tersimpan (terenkripsi)' if getattr(obj, 'two_fa_secret', None) else 'Belum diset'
 
 
 # ============================================================================
@@ -244,6 +255,7 @@ class SessionAdmin(admin.ModelAdmin):
     list_display = ('user_type', 'user_id', 'created_at', 'expires_at')
     list_filter = ('user_type', 'created_at', 'expires_at')
     search_fields = ('user_id', 'ip_address')
+    exclude = ('session_token',)
     readonly_fields = ('id', 'created_at')
 
 

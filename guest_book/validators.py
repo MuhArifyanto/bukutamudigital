@@ -9,6 +9,7 @@ Dipakai oleh:
 - api_import_excel_kunjungan (guest_book/views/api_admin.py)
 """
 
+import re
 from datetime import datetime, time, timedelta, date as dt_date
 import zoneinfo
 from django.core.exceptions import ValidationError
@@ -21,6 +22,24 @@ from .models import Instansi, CalendarSettings, Kunjungan, KunjunganStatus
 
 
 JAKARTA_TZ = zoneinfo.ZoneInfo('Asia/Jakarta')
+
+_PHONE_ALLOWED_CHARS_RE = re.compile(r'^[0-9+\-\s().]{1,20}$')
+
+
+def normalize_and_validate_phone(raw_phone, allow_placeholder: bool = False):
+    """
+    Validasi nomor telepon: hanya mengizinkan digit dan pemisah standar (+, -, spasi, tanda kurung)
+    dengan jumlah digit 7-15 agar bebas dari injeksi markup/XSS.
+    """
+    phone = '' if raw_phone is None else str(raw_phone).strip()
+    if allow_placeholder and (not phone or phone == '-'):
+        return '-'
+    if not phone or not _PHONE_ALLOWED_CHARS_RE.match(phone):
+        raise ValidationError('Format nomor telepon tidak valid. Gunakan angka 0-9 atau tanda + / -.')
+    digits = re.sub(r'\D', '', phone)
+    if len(digits) < 7 or len(digits) > 15:
+        raise ValidationError('Nomor telepon harus terdiri dari 7 hingga 15 digit.')
+    return phone
 
 # Status kunjungan yang aktif menggunakan kuota harian.
 # Kunjungan berstatus cancelled, ditolak_admin, dan ditolak_pegawai TIDAK dihitung.
@@ -48,6 +67,35 @@ def get_day_range_aware(visit_date):
     start_of_day = datetime.combine(visit_date, time.min, tzinfo=JAKARTA_TZ)
     start_of_next_day = start_of_day + timedelta(days=1)
     return start_of_day, start_of_next_day
+
+
+def get_month_range_aware(year, month):
+    """
+    Menghasilkan (start_of_month, start_of_next_month) aware di Asia/Jakarta
+    untuk kueri range bulanan yang ramah index dan bebas ketergantungan tabel TZ MySQL.
+    """
+    year_int = int(year)
+    month_int = int(month)
+    start_of_month = datetime(year_int, month_int, 1, 0, 0, 0, tzinfo=JAKARTA_TZ)
+    if month_int == 12:
+        start_of_next_month = datetime(year_int + 1, 1, 1, 0, 0, 0, tzinfo=JAKARTA_TZ)
+    else:
+        start_of_next_month = datetime(year_int, month_int + 1, 1, 0, 0, 0, tzinfo=JAKARTA_TZ)
+    return start_of_month, start_of_next_month
+
+
+def filter_by_local_date(qs, visit_date, field_name='arrival_time'):
+    """Filter queryset ke satu hari kalender lokal menggunakan batas setengah-terbuka [start, next)."""
+    if not visit_date:
+        return qs
+    try:
+        start_of_day, start_of_next_day = get_day_range_aware(visit_date)
+    except (ValueError, TypeError):
+        return qs.none()
+    return qs.filter(**{
+        f'{field_name}__gte': start_of_day,
+        f'{field_name}__lt': start_of_next_day,
+    })
 
 
 def get_default_holiday_status(visit_date):
@@ -157,11 +205,7 @@ def get_monthly_quota_usage(year, month):
 
     Returns: dict {day_number (int): booked_count (int)}
     """
-    start_of_month = datetime(year, month, 1, 0, 0, 0, tzinfo=JAKARTA_TZ)
-    if month == 12:
-        start_of_next_month = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=JAKARTA_TZ)
-    else:
-        start_of_next_month = datetime(year, month + 1, 1, 0, 0, 0, tzinfo=JAKARTA_TZ)
+    start_of_month, start_of_next_month = get_month_range_aware(year, month)
 
     # 1 kueri tunggal terindeks yang hanya mengambil kolom arrival_time
     arrival_times = (

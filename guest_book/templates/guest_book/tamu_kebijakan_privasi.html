@@ -651,21 +651,21 @@
             </div>
             <div class="hak-list">
                 <div class="hak-item">
-                    <h5>Hak untuk Mengakses</h5>
-                    <p>Anda berhak mengetahui data apa saja yang kami simpan mengenai kunjungan Anda.</p>
+                    <h5>Hak untuk Mengakses &amp; Mengunduh Data</h5>
+                    <p>Anda berhak mengetahui dan mengunduh salinan data pribadi serta riwayat kunjungan Anda dalam format JSON secara mandiri melalui halaman <a href="{% url 'tamu:profil' %}" style="color: var(--primary-light); font-weight: 600;">Profil Saya</a>.</p>
                 </div>
                 <div class="hak-item">
                     <h5>Hak untuk Perbaikan</h5>
-                    <p>Anda dapat meminta koreksi jika terdapat kesalahan pada data identitas yang tercatat.</p>
+                    <p>Anda dapat memperbarui informasi kontak, instansi, dan foto profil secara langsung pada halaman <a href="{% url 'tamu:profil' %}" style="color: var(--primary-light); font-weight: 600;">Profil Saya</a> atau menghubungi administrator untuk koreksi identitas.</p>
                 </div>
                 <div class="hak-item">
                     <h5>Hak untuk Menghapus</h5>
-                    <p>Sesuai ketentuan retensi data, Anda dapat mengajukan permohonan penghapusan data jika masa berlaku kepentingan administrasi telah berakhir.</p>
+                    <p>Sesuai ketentuan UU PDP, Anda dapat menghapus/menganonimkan akun dan data pribadi Anda secara mandiri melalui tombol <strong>Hapus Akun Saya</strong> di halaman <a href="{% url 'tamu:profil' %}" style="color: var(--primary-light); font-weight: 600;">Profil Saya</a>, selain penghapusan otomatis berdasarkan jadwal retensi data berkala.</p>
                 </div>
             </div>
 
             <div class="bottom-actions">
-                <a href="#" class="btn-print" onclick="window.print(); return false;">
+                <a href="#" class="btn-print" data-action="print">
                     <i class="fas fa-print"></i> Cetak Kebijakan
                 </a>
                 <a href="{% url 'tamu:landing' %}" class="btn-understand">
@@ -707,6 +707,7 @@
     </div>
 </footer>
 
+<script src="{% static 'js/security_utils.js' %}"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

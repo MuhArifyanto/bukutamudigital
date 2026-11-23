@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -288,21 +289,25 @@
             {% endif %}
             
             <!-- Logo Instansi -->
-            <img src="/static/images/logo-diskominfosantik.png" alt="Logo" class="logo-img" onerror="this.style.display='none'">
+            <img src="/static/images/logo-diskominfosantik.png" alt="Logo" class="logo-img" data-hide-on-error="1">
             
             <div class="watermark">{% if 'dinas' in kunjungan.purpose|lower or kunjungan.tamu.instansi %}DINAS{% else %}PRIBADI{% endif %}</div>
         </div>
     </div>
 
-    <button class="btn-print no-print" onclick="window.print()">
+    <button class="btn-print no-print" data-action="print">
         <i class="fas fa-print"></i> Cetak Kartu
     </button>
 
-    <script>
+    {{ kunjungan.tamu.name|json_script:"kartu-tamu-name" }}
+    {{ kunjungan.id|json_script:"kartu-kunjungan-id" }}
+    <script src="{% static 'js/security_utils.js' %}"></script>
+    <script nonce="{{ csp_nonce }}">
         // Generate random color for avatar background (jika tidak ada foto)
         const avatarElem = document.getElementById('avatar');
         if (avatarElem) {
-            const name = "{{ kunjungan.tamu.name }}";
+            const nameEl = document.getElementById('kartu-tamu-name');
+            const name = nameEl ? JSON.parse(nameEl.textContent) : '';
             let hash = 0;
             for (let i = 0; i < name.length; i++) {
                 hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -313,22 +318,24 @@
         }
 
         // Auto print on load
-        window.onload = function() {
+        window.addEventListener('load', function() {
             setTimeout(() => {
                 window.print();
             }, 500);
-        };
+        });
     </script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- QRCode.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.addEventListener('DOMContentLoaded', function() {
             const qrElem = document.getElementById("qrcodeCard");
+            const idEl = document.getElementById('kartu-kunjungan-id');
+            const kunjunganId = idEl ? JSON.parse(idEl.textContent) : '';
             if (qrElem && typeof QRCode !== 'undefined') {
                 new QRCode(qrElem, {
-                    text: "{{ kunjungan.id }}",
+                    text: String(kunjunganId),
                     width: 60,
                     height: 60,
                     colorDark: "#0f172a",

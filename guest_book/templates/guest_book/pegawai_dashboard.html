@@ -322,10 +322,10 @@
                     <td class="text-end">
                         <div class="d-flex gap-2 justify-content-end">
                             {% if k.status == 'menunggu_pegawai' %}
-                            <button onclick="updateStatus('{{ k.id }}', 'disetujui_pegawai')" class="action-btn btn-view" style="background: rgba(16,185,129,0.1); color: #10b981;" title="Setujui Kunjungan">
+                            <button type="button" data-visit-id="{{ k.id }}" data-status="disetujui_pegawai" class="action-btn btn-view js-pegawai-update-status" style="background: rgba(16,185,129,0.1); color: #10b981;" title="Setujui Kunjungan">
                                 <i class="fas fa-check"></i>
                             </button>
-                            <button onclick="updateStatus('{{ k.id }}', 'ditolak_pegawai')" class="action-btn btn-view" style="background: rgba(239,68,68,0.1); color: #ef4444;" title="Tolak Kunjungan">
+                            <button type="button" data-visit-id="{{ k.id }}" data-status="ditolak_pegawai" class="action-btn btn-view js-pegawai-update-status" style="background: rgba(239,68,68,0.1); color: #ef4444;" title="Tolak Kunjungan">
                                 <i class="fas fa-times"></i>
                             </button>
                             {% endif %}
@@ -355,7 +355,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     function updateStatus(kunjunganId, status) {
         let rejectionReason = '';
         if (status === 'ditolak_pegawai') {
@@ -395,5 +395,11 @@
             alert('Gagal menghubungi server.');
         });
     }
+
+    document.querySelectorAll('.js-pegawai-update-status').forEach(btn => {
+        btn.addEventListener('click', function() {
+            updateStatus(this.dataset.visitId, this.dataset.status);
+        });
+    });
 </script>
 {% endblock %}

@@ -5,19 +5,48 @@ from guest_book.consumers import ChatConsumer, NotificationConsumer
 
 
 class MockScopeApp:
-    """Helper ASGI wrapper untuk menyuntikkan scope session dan url_route pada consumer."""
-    def __init__(self, consumer_cls, session_id=None, session_data=None):
+    """Helper ASGI wrapper untuk menyuntikkan scope user, session dan url_route pada consumer."""
+    def __init__(self, consumer_cls, session_id=None, session_data=None, user=None):
         self.consumer_cls = consumer_cls
         self.session_id = session_id
         self.session_data = session_data or {}
+        self.user = user
 
     async def __call__(self, scope, receive, send):
         scope = dict(scope)
         if self.session_id:
             scope['url_route'] = {'kwargs': {'session_id': self.session_id}}
         scope['session'] = self.session_data
+        if self.user is not None:
+            scope['user'] = self.user
         consumer = self.consumer_cls()
         return await consumer(scope, receive, send)
+
+
+async def _create_active_chat_actors():
+    from channels.db import database_sync_to_async
+    from django.contrib.auth.models import User
+    from guest_book.models import Tamu
+
+    admin_user = await database_sync_to_async(User.objects.create_user)(
+        username='wsadmin',
+        email='wsadmin@example.com',
+        password='StrongWsAdmin!Password2026',
+        is_staff=True,
+    )
+    tamu_a = await database_sync_to_async(Tamu.objects.create)(
+        name='Tamu A',
+        email='tamu.a.ws@example.com',
+        phone='08120000111',
+        account_status='active',
+    )
+    tamu_b = await database_sync_to_async(Tamu.objects.create)(
+        name='Tamu B',
+        email='tamu.b.ws@example.com',
+        phone='08120000222',
+        account_status='active',
+    )
+    return admin_user, tamu_a, tamu_b
 
 
 class WebSocketConsumerTests(TransactionTestCase):
@@ -42,8 +71,13 @@ class WebSocketConsumerTests(TransactionTestCase):
 
     async def test_unauthorized_tamu_connection_rejected(self):
         """Memastikan Tamu A tidak dapat terhubung ke sesi chat Tamu B."""
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userB', session_data={'tamu_id': 'userA'})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userB/')
+        _, tamu_a, tamu_b = await _create_active_chat_actors()
+        app = MockScopeApp(
+            ChatConsumer,
+            session_id=f'tamu_{tamu_b.id}',
+            session_data={'tamu_id': str(tamu_a.id)},
+        )
+        comm = WebsocketCommunicator(app, f'/ws/chat/tamu_{tamu_b.id}/')
         connected, code = await comm.connect()
         self.assertFalse(connected)
         self.assertEqual(code, 4003)
@@ -51,8 +85,14 @@ class WebSocketConsumerTests(TransactionTestCase):
 
     async def test_authenticated_admin_connection_accepted(self):
         """Memastikan admin terautentikasi dapat terhubung ke sesi chat."""
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'is_admin': True})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userA/')
+        admin_user, tamu_a, _ = await _create_active_chat_actors()
+        app = MockScopeApp(
+            ChatConsumer,
+            session_id=f'tamu_{tamu_a.id}',
+            session_data={},
+            user=admin_user,
+        )
+        comm = WebsocketCommunicator(app, f'/ws/chat/tamu_{tamu_a.id}/')
         connected, code = await comm.connect()
         self.assertTrue(connected)
         self.assertIsNone(code)
@@ -60,8 +100,13 @@ class WebSocketConsumerTests(TransactionTestCase):
 
     async def test_authenticated_tamu_connection_accepted(self):
         """Memastikan tamu terautentikasi dapat terhubung ke sesi chat miliknya."""
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'tamu_id': 'userA'})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userA/')
+        _, tamu_a, _ = await _create_active_chat_actors()
+        app = MockScopeApp(
+            ChatConsumer,
+            session_id=f'tamu_{tamu_a.id}',
+            session_data={'tamu_id': str(tamu_a.id)},
+        )
+        comm = WebsocketCommunicator(app, f'/ws/chat/tamu_{tamu_a.id}/')
         connected, code = await comm.connect()
         self.assertTrue(connected)
         self.assertIsNone(code)
@@ -69,19 +114,20 @@ class WebSocketConsumerTests(TransactionTestCase):
 
     async def test_chat_message_delivered_to_correct_recipients(self):
         """Memastikan pesan chat hanya terkirim ke partisipan di room yang sama."""
-        # Dua user di room 'tamu_userA'
+        admin_user, tamu_a, tamu_b = await _create_active_chat_actors()
+        room_a = f'tamu_{tamu_a.id}'
+        room_b = f'tamu_{tamu_b.id}'
         admin_comm = WebsocketCommunicator(
-            MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'is_admin': True}),
-            '/ws/chat/tamu_userA/'
+            MockScopeApp(ChatConsumer, session_id=room_a, session_data={}, user=admin_user),
+            f'/ws/chat/{room_a}/'
         )
         tamu_comm = WebsocketCommunicator(
-            MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'tamu_id': 'userA'}),
-            '/ws/chat/tamu_userA/'
+            MockScopeApp(ChatConsumer, session_id=room_a, session_data={'tamu_id': str(tamu_a.id)}),
+            f'/ws/chat/{room_a}/'
         )
-        # Satu user di room berbeda 'tamu_userB'
         other_comm = WebsocketCommunicator(
-            MockScopeApp(ChatConsumer, session_id='tamu_userB', session_data={'tamu_id': 'userB'}),
-            '/ws/chat/tamu_userB/'
+            MockScopeApp(ChatConsumer, session_id=room_b, session_data={'tamu_id': str(tamu_b.id)}),
+            f'/ws/chat/{room_b}/'
         )
 
         a_conn, _ = await admin_comm.connect()
@@ -89,21 +135,21 @@ class WebSocketConsumerTests(TransactionTestCase):
         o_conn, _ = await other_comm.connect()
         self.assertTrue(a_conn and t_conn and o_conn)
 
-        # Tamu mengirim pesan ke room 'tamu_userA'
+        # Tamu mengirim pesan ke room A
         await tamu_comm.send_json_to({
             'action': 'create',
             'message': 'Halo Admin, saya butuh informasi.',
-            'sender_id': 'userA',
+            'sender_id': str(tamu_a.id),
             'sender_type': 'tamu'
         })
 
-        # Partisipan di room 'tamu_userA' menerima pesan
+        # Partisipan di room A menerima pesan
         t_recv = await tamu_comm.receive_json_from()
         a_recv = await admin_comm.receive_json_from()
         self.assertEqual(t_recv['message'], 'Halo Admin, saya butuh informasi.')
         self.assertEqual(a_recv['message'], 'Halo Admin, saya butuh informasi.')
 
-        # User di room 'tamu_userB' tidak boleh menerima pesan tersebut
+        # User di room B tidak boleh menerima pesan tersebut
         other_received_nothing = await other_comm.receive_nothing()
         self.assertTrue(other_received_nothing)
 
@@ -113,8 +159,9 @@ class WebSocketConsumerTests(TransactionTestCase):
 
     async def test_chat_consumer_ping_pong(self):
         """Memastikan ChatConsumer merespons pesan ping dengan pong."""
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'tamu_id': 'userA'})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userA/')
+        _, tamu_a, _ = await _create_active_chat_actors()
+        app = MockScopeApp(ChatConsumer, session_id=f'tamu_{tamu_a.id}', session_data={'tamu_id': str(tamu_a.id)})
+        comm = WebsocketCommunicator(app, f'/ws/chat/tamu_{tamu_a.id}/')
         connected, _ = await comm.connect()
         self.assertTrue(connected)
 
@@ -126,7 +173,8 @@ class WebSocketConsumerTests(TransactionTestCase):
 
     async def test_notification_consumer_ping_pong(self):
         """Memastikan NotificationConsumer merespons pesan ping dengan pong."""
-        app = MockScopeApp(NotificationConsumer, session_data={'tamu_id': 'userA'})
+        _, tamu_a, _ = await _create_active_chat_actors()
+        app = MockScopeApp(NotificationConsumer, session_data={'tamu_id': str(tamu_a.id)})
         comm = WebsocketCommunicator(app, '/ws/notifications/')
         connected, _ = await comm.connect()
         self.assertTrue(connected)
@@ -146,8 +194,10 @@ class WebSocketConsumerTests(TransactionTestCase):
         from guest_book.models import ChatMessage
         from channels.db import database_sync_to_async
 
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'tamu_id': 'userA'})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userA/')
+        _, tamu_a, _ = await _create_active_chat_actors()
+        room_a = f'tamu_{tamu_a.id}'
+        app = MockScopeApp(ChatConsumer, session_id=room_a, session_data={'tamu_id': str(tamu_a.id)})
+        comm = WebsocketCommunicator(app, f'/ws/chat/{room_a}/')
         connected, _ = await comm.connect()
         self.assertTrue(connected)
 
@@ -161,23 +211,25 @@ class WebSocketConsumerTests(TransactionTestCase):
 
         recv = await comm.receive_json_from()
         # Broadcast harus tetap memuat identitas asli tamu
-        self.assertEqual(recv['sender_id'], 'userA')
+        self.assertEqual(recv['sender_id'], str(tamu_a.id))
         self.assertEqual(recv['sender_type'], 'tamu')
 
         # Di database, pesan tersimpan sebagai tamu
         msg = await database_sync_to_async(
-            ChatMessage.objects.filter(session_id='tamu_userA').order_by('-created_at').first
+            ChatMessage.objects.filter(session_id=room_a).order_by('-created_at').first
         )()
         self.assertIsNotNone(msg)
-        self.assertEqual(msg.sender_id, 'userA')
+        self.assertEqual(msg.sender_id, str(tamu_a.id))
         self.assertEqual(msg.sender_type, 'tamu')
 
         await comm.disconnect()
 
     async def test_authenticated_admin_sends_as_admin(self):
         """Memastikan admin yang sah terautentikasi mengirim pesan sebagai admin."""
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'is_admin': True})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userA/')
+        admin_user, tamu_a, _ = await _create_active_chat_actors()
+        room_a = f'tamu_{tamu_a.id}'
+        app = MockScopeApp(ChatConsumer, session_id=room_a, session_data={}, user=admin_user)
+        comm = WebsocketCommunicator(app, f'/ws/chat/{room_a}/')
         connected, _ = await comm.connect()
         self.assertTrue(connected)
 
@@ -194,8 +246,10 @@ class WebSocketConsumerTests(TransactionTestCase):
 
     async def test_unknown_action_rejected(self):
         """Memastikan action di luar create/edit/delete ditolak tanpa membuat crash."""
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'tamu_id': 'userA'})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userA/')
+        _, tamu_a, _ = await _create_active_chat_actors()
+        room_a = f'tamu_{tamu_a.id}'
+        app = MockScopeApp(ChatConsumer, session_id=room_a, session_data={'tamu_id': str(tamu_a.id)})
+        comm = WebsocketCommunicator(app, f'/ws/chat/{room_a}/')
         connected, _ = await comm.connect()
         self.assertTrue(connected)
 
@@ -212,8 +266,10 @@ class WebSocketConsumerTests(TransactionTestCase):
 
     async def test_message_validation_empty_and_too_long(self):
         """Memastikan pesan kosong dan pesan > 2000 karakter ditolak oleh server."""
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'tamu_id': 'userA'})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userA/')
+        _, tamu_a, _ = await _create_active_chat_actors()
+        room_a = f'tamu_{tamu_a.id}'
+        app = MockScopeApp(ChatConsumer, session_id=room_a, session_data={'tamu_id': str(tamu_a.id)})
+        comm = WebsocketCommunicator(app, f'/ws/chat/{room_a}/')
         connected, _ = await comm.connect()
         self.assertTrue(connected)
 
@@ -243,16 +299,19 @@ class WebSocketConsumerTests(TransactionTestCase):
         from guest_book.models import ChatMessage
         from channels.db import database_sync_to_async
 
+        _, tamu_a, _ = await _create_active_chat_actors()
+        room_a = f'tamu_{tamu_a.id}'
+
         # Buat pesan asli milik admin di database
         admin_msg = await database_sync_to_async(ChatMessage.objects.create)(
-            session_id='tamu_userA',
+            session_id=room_a,
             sender_id='admin',
             sender_type='admin',
             content='Instruksi resmi admin.'
         )
 
-        app = MockScopeApp(ChatConsumer, session_id='tamu_userA', session_data={'tamu_id': 'userA'})
-        comm = WebsocketCommunicator(app, '/ws/chat/tamu_userA/')
+        app = MockScopeApp(ChatConsumer, session_id=room_a, session_data={'tamu_id': str(tamu_a.id)})
+        comm = WebsocketCommunicator(app, f'/ws/chat/{room_a}/')
         connected, _ = await comm.connect()
         self.assertTrue(connected)
 
@@ -377,3 +436,99 @@ class WebSocketConsumerTests(TransactionTestCase):
         self.assertIsNotNone(tamu_notif)
         self.assertIn('lantai 2', tamu_notif.message)
         await pegawai_comm.disconnect()
+
+    async def test_suspended_users_and_forged_session_flags_rejected_on_ws(self):
+        """Akun suspended/inactive maupun session flag palsu wajib ditolak (4003) di kedua consumer."""
+        from channels.db import database_sync_to_async
+        from guest_book.models import Tamu, Pegawai
+
+        suspended_tamu = await database_sync_to_async(Tamu.objects.create)(
+            name='Suspended Tamu',
+            email='suspended.ws@example.com',
+            phone='08120000999',
+            account_status='suspended',
+        )
+        inactive_pegawai = await database_sync_to_async(Pegawai.objects.create)(
+            name='Inactive Pegawai',
+            username='inactive.pegawai.ws',
+            email='inactive.pegawai@example.com',
+            phone='08120000998',
+            password='hashed_password',
+            account_status='inactive',
+        )
+
+        cases = [
+            (ChatConsumer, f'/ws/chat/tamu_{suspended_tamu.id}/', f'tamu_{suspended_tamu.id}', {'tamu_id': str(suspended_tamu.id)}),
+            (ChatConsumer, f'/ws/chat/pegawai_admin_{inactive_pegawai.id}/', f'pegawai_admin_{inactive_pegawai.id}', {'pegawai_id': str(inactive_pegawai.id)}),
+            (ChatConsumer, '/ws/chat/tamu_fake/', 'tamu_fake', {'is_admin': True}),
+            (ChatConsumer, '/ws/chat/tamu_fake/', 'tamu_fake', {'role': 'super_admin'}),
+            (NotificationConsumer, '/ws/notifications/', None, {'tamu_id': str(suspended_tamu.id)}),
+            (NotificationConsumer, '/ws/notifications/', None, {'pegawai_id': str(inactive_pegawai.id)}),
+            (NotificationConsumer, '/ws/notifications/', None, {'is_admin': True}),
+        ]
+        for consumer_cls, path, sid, sess in cases:
+            comm = WebsocketCommunicator(
+                MockScopeApp(consumer_cls, session_id=sid, session_data=sess),
+                path,
+            )
+            connected, code = await comm.connect()
+            self.assertFalse(connected, f'Seharusnya ditolak untuk {path} sess={sess}')
+            self.assertEqual(code, 4003)
+            await comm.disconnect()
+
+    async def test_ws_rejects_svg_and_ignores_client_spoofed_file_url(self):
+        """ChatConsumer menolak .svg / path traversal dan mengabaikan file_url palsu kiriman klien."""
+        _, tamu_a, _ = await _create_active_chat_actors()
+        room = f'tamu_{tamu_a.id}'
+        comm = WebsocketCommunicator(
+            MockScopeApp(ChatConsumer, session_id=room, session_data={'tamu_id': str(tamu_a.id)}),
+            f'/ws/chat/{room}/',
+        )
+        connected, _ = await comm.connect()
+        self.assertTrue(connected)
+
+        # 1. File .svg ditolak
+        await comm.send_json_to({
+            'action': 'create',
+            'message': 'xss.svg',
+            'message_type': 'image',
+            'file_path': 'chat_attachments/xss.svg',
+            'file_url': 'javascript:alert(1)',
+        })
+        err_svg = await comm.receive_json_from()
+        self.assertEqual(err_svg.get('action'), 'error')
+
+        # 2. Path di luar chat_attachments/ dengan file_url XSS ditolak
+        await comm.send_json_to({
+            'action': 'create',
+            'message': 'evil.png',
+            'message_type': 'image',
+            'file_path': '../evil.png',
+            'file_url': 'javascript:alert(document.cookie)',
+        })
+        err_path = await comm.receive_json_from()
+        self.assertEqual(err_path.get('action'), 'error')
+
+        # 3. Pesan text dengan file_url javascript: tidak boleh menyiarkan file_url
+        await comm.send_json_to({
+            'action': 'create',
+            'message': 'Pesan teks biasa',
+            'message_type': 'text',
+            'file_url': 'javascript:alert(1)',
+        })
+        ok_msg = await comm.receive_json_from()
+        self.assertIsNone(ok_msg.get('file_url'))
+
+        # 4. Jika akun disuspend saat koneksi WebSocket masih terbuka, pengiriman pesan berikutnya langsung memutus koneksi (4003)
+        from channels.db import database_sync_to_async
+        tamu_a.account_status = 'suspended'
+        await database_sync_to_async(tamu_a.save)(update_fields=['account_status'])
+        await comm.send_json_to({
+            'action': 'create',
+            'message': 'Pesan setelah akun disuspend',
+        })
+        close_event = await comm.receive_output()
+        self.assertEqual(close_event.get('type'), 'websocket.close')
+        self.assertEqual(close_event.get('code'), 4003)
+
+        await comm.disconnect()

@@ -141,35 +141,35 @@
                 <!-- Action Buttons for Admin -->
                 <div class="detail-action-bar">
                     {% if kunjungan.status == 'menunggu_admin' %}
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'menunggu_pegawai')" style="background: #dbeafe; color: #1d4ed8; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="js-detail-update-status" data-visit-id="{{ kunjungan.id }}" data-status="menunggu_pegawai" style="background: #dbeafe; color: #1d4ed8; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-share"></i> Forward ke Pegawai
                     </button>
-                    <button onclick="showTolakAdminModal('{{ kunjungan.id }}')" style="background: #fce7f3; color: #9d174d; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" id="btnShowTolakAdmin" data-visit-id="{{ kunjungan.id }}" style="background: #fce7f3; color: #9d174d; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-calendar-times"></i> Tolak (Jadwal Bentrok)
                     </button>
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'cancelled')" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="js-detail-update-status" data-visit-id="{{ kunjungan.id }}" data-status="cancelled" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-times-circle"></i> Batalkan
                     </button>
                     {% elif kunjungan.status == 'disetujui_pegawai' %}
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'disetujui')" style="background: #dcfce7; color: #15803d; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="js-detail-update-status" data-visit-id="{{ kunjungan.id }}" data-status="disetujui" style="background: #dcfce7; color: #15803d; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-check-double"></i> ACC (Setujui)
                     </button>
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'cancelled')" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="js-detail-update-status" data-visit-id="{{ kunjungan.id }}" data-status="cancelled" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-times-circle"></i> Batalkan
                     </button>
                     {% elif kunjungan.status == 'disetujui' %}
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'in_progress')" style="background: #fef9c3; color: #854d0e; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="js-detail-update-status" data-visit-id="{{ kunjungan.id }}" data-status="in_progress" style="background: #fef9c3; color: #854d0e; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-play"></i> Mulai Kunjungan
                     </button>
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'cancelled')" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="js-detail-update-status" data-visit-id="{{ kunjungan.id }}" data-status="cancelled" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-times-circle"></i> Batalkan
                     </button>
                     {% elif kunjungan.status == 'in_progress' %}
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'completed')" style="background: #e0f2fe; color: #0369a1; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="js-detail-update-status" data-visit-id="{{ kunjungan.id }}" data-status="completed" style="background: #e0f2fe; color: #0369a1; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-sign-out-alt"></i> Selesaikan Kunjungan
                     </button>
                     {% elif kunjungan.status == 'menunggu_pegawai' %}
-                    <button onclick="updateStatus('{{ kunjungan.id }}', 'cancelled')" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" class="js-detail-update-status" data-visit-id="{{ kunjungan.id }}" data-status="cancelled" style="background: #fee2e2; color: #ef4444; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0.6rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-times-circle"></i> Batalkan
                     </button>
                     {% endif %}
@@ -241,12 +241,12 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     (function() {
         "use strict";
 
         // Global Update Status Function
-        window.updateStatus = function(id, status) {
+        window.updateStatus = function(id, status, triggerBtn) {
             const statusLabels = {
                 'menunggu_pegawai': 'Forward ke Pegawai',
                 'disetujui': 'ACC (Disetujui)',
@@ -257,10 +257,12 @@
             const label = statusLabels[status] || status;
             if (!confirm(`Apakah Anda yakin ingin mengubah status kunjungan ini menjadi ${label}?`)) return;
             
-            const btn = event.currentTarget;
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
+            const btn = triggerBtn || null;
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                btn.disabled = true;
+            }
 
             fetch('{% url "tamu:api_update_kunjungan_status" %}', {
                 method: 'POST',
@@ -276,15 +278,19 @@
                     window.location.reload(); 
                 } else {
                     alert('Gagal memperbarui status: ' + (data.error || 'Terjadi kesalahan'));
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
+                    if (btn) {
+                        btn.innerHTML = originalHtml;
+                        btn.disabled = false;
+                    }
                 }
             })
             .catch(err => {
                 console.error(err);
                 alert('Terjadi kesalahan koneksi.');
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
             });
         };
 
@@ -343,9 +349,35 @@
         };
 
         // Tutup modal saat klik di luar
-        document.getElementById('modalTolakAdmin').addEventListener('click', function(e) {
-            if (e.target === this) closeTolakAdminModal();
+        const modalTolak = document.getElementById('modalTolakAdmin');
+        if (modalTolak) {
+            modalTolak.addEventListener('click', function(e) {
+                if (e.target === this) closeTolakAdminModal();
+            });
+        }
+
+        document.querySelectorAll('.js-detail-update-status').forEach(btn => {
+            btn.addEventListener('click', function() {
+                window.updateStatus(this.dataset.visitId, this.dataset.status, this);
+            });
         });
+
+        const btnShowTolak = document.getElementById('btnShowTolakAdmin');
+        if (btnShowTolak) {
+            btnShowTolak.addEventListener('click', function() {
+                window.showTolakAdminModal(this.dataset.visitId);
+            });
+        }
+
+        const btnCloseTolak = document.getElementById('btnCloseTolakAdmin');
+        if (btnCloseTolak) {
+            btnCloseTolak.addEventListener('click', closeTolakAdminModal);
+        }
+
+        const btnSubmitTolak = document.getElementById('btnSubmitTolakAdmin');
+        if (btnSubmitTolak) {
+            btnSubmitTolak.addEventListener('click', submitTolakAdmin);
+        }
 
     })();
 </script>
@@ -362,8 +394,8 @@
             placeholder="Contoh: Jadwal tanggal tersebut sudah penuh. Silakan ajukan kunjungan di hari lain."
             style="width:100%; border:1px solid #e2e8f0; border-radius:8px; padding:0.75rem; font-size:0.9rem; outline:none; resize:vertical; box-sizing:border-box; font-family:inherit;"></textarea>
         <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.25rem;">
-            <button onclick="closeTolakAdminModal()" style="background:#f1f5f9; color:#475569; border:none; border-radius:8px; padding:0.6rem 1.25rem; font-size:0.85rem; font-weight:600; cursor:pointer;">Batal</button>
-            <button onclick="submitTolakAdmin()" style="background:#9d174d; color:#fff; border:none; border-radius:8px; padding:0.6rem 1.25rem; font-size:0.85rem; font-weight:600; cursor:pointer;">
+            <button type="button" id="btnCloseTolakAdmin" style="background:#f1f5f9; color:#475569; border:none; border-radius:8px; padding:0.6rem 1.25rem; font-size:0.85rem; font-weight:600; cursor:pointer;">Batal</button>
+            <button type="button" id="btnSubmitTolakAdmin" style="background:#9d174d; color:#fff; border:none; border-radius:8px; padding:0.6rem 1.25rem; font-size:0.85rem; font-weight:600; cursor:pointer;">
                 <i class="fas fa-times-circle"></i> Konfirmasi Tolak
             </button>
         </div>

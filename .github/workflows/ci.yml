@@ -1,0 +1,176 @@
+name: CI/CD Security & Test Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-and-tests:
+    name: Security Checks, Migrations & Django Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: "pip"
+
+      - name: Install system dependencies for mysqlclient
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-deps -r requirements.lock
+          pip install pip-audit bandit
+
+      - name: Check for accidental committed secrets
+        run: |
+          python - << 'EOF'
+          import pathlib, re, sys
+          patterns = [
+              re.compile(r'cloudinary://[0-9]{10,}:[A-Za-z0-9_\-]{15,}@'),
+              re.compile(r'-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'),
+          ]
+          bad = []
+          for p in pathlib.Path('.').rglob('*'):
+              if any(part in {'.git', '.venv', 'node_modules', '__pycache__'} for part in p.parts):
+                  continue
+              if p.is_file() and p.suffix in {'.py', '.yml', '.yaml', '.env', '.sh', '.txt', '.md', '.json'}:
+                  text = p.read_text(encoding='utf-8', errors='ignore')
+                  for pat in patterns:
+                      if pat.search(text):
+                          bad.append(str(p))
+          if bad:
+              print("ERROR: Potential secret detected in files:", bad)
+              sys.exit(1)
+          print("Secret scan clean.")
+          EOF
+
+      - name: Audit dependency vulnerabilities (pip-audit)
+        run: |
+          pip-audit -r requirements.lock --strict
+
+      - name: Static security scan (Bandit)
+        run: |
+          bandit -r guest_book bukudigital -ll -ii -x guest_book/tests
+
+      - name: Run Django system checks, deploy checks & verify migrations are up-to-date
+        env:
+          APP_ENV: "local"
+          DEBUG: "True"
+          SECRET_KEY: "ci-ephemeral-test-secret-key-not-used-in-production"
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+
+      - name: Run Django production deployment security checks
+        env:
+          APP_ENV: "production"
+          DJANGO_DEBUG: "False"
+          SECRET_KEY: "ci-ephemeral-prod-check-secret-key-at-least-fifty-characters-long-123456"
+          ALLOWED_HOSTS: "example.com"
+          CSRF_TRUSTED_ORIGINS: "https://example.com"
+          SECURE_HSTS_SECONDS: "31536000"
+          SECURE_HSTS_INCLUDE_SUBDOMAINS: "True"
+          SECURE_HSTS_PRELOAD: "True"
+          USE_PROXY_SSL_HEADER: "True"
+          USE_REDIS_CACHE: "False"
+          USE_REDIS_CHANNEL_LAYER: "False"
+        run: |
+          python manage.py check --deploy --fail-level WARNING
+
+      - name: Run Django unit & security test suite (SQLite :memory:)
+        env:
+          APP_ENV: "local"
+          DEBUG: "True"
+          SECRET_KEY: "ci-ephemeral-test-secret-key-not-used-in-production"
+          TEST_DB_ENGINE: "sqlite"
+        run: |
+          python manage.py test guest_book --verbosity=2
+
+  mysql-tests:
+    name: MySQL 8.0 Migrations & Django Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_mysql_root_password
+          MYSQL_DATABASE: bukudigital
+        ports:
+          - 3306:3306
+        options: >-
+          --character-set-server=utf8mb4
+          --collation-server=utf8mb4_unicode_ci
+          --health-cmd="mysqladmin ping -h localhost -uroot -pci_mysql_root_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install system dependencies for mysqlclient
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-deps -r requirements.lock
+
+      - name: Verify Django migrations & test suite on MySQL 8.0 (utf8mb4)
+        env:
+          APP_ENV: "local"
+          DEBUG: "True"
+          SECRET_KEY: "ci-ephemeral-test-secret-key-not-used-in-production"
+          TEST_DB_ENGINE: 'mysql'
+          DB_HOST: "127.0.0.1"
+          DB_PORT: "3306"
+          DB_NAME: "bukudigital"
+          DB_USER: "root"
+          DB_PASSWORD: "ci_mysql_root_password"
+          DB_SSL_DISABLED: "True"
+        run: |
+          python manage.py check
+          python manage.py migrate --noinput
+          python manage.py test guest_book --verbosity=2
+
+  deploy-production:
+    name: Trigger Render Deploy Hook
+    needs: [security-and-tests, mysql-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy if webhook secret is configured
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+            echo "Deploy hook triggered."
+          else
+            echo "RENDER_DEPLOY_HOOK_URL not configured; skipping webhook deploy."
+          fi

@@ -4,6 +4,7 @@ Jalankan: python manage.py shell < scripts/buat_akun_pegawai.py
 atau: python manage.py runscript buat_akun_pegawai
 """
 
+import argparse
 import os
 import sys
 import django
@@ -15,6 +16,8 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bukudigital.settings')
 django.setup()
 
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from guest_book.models import Departemen, Pegawai
 
 # ── Data Bidang & Pegawai ────────────────────────────────────────────────────
@@ -205,7 +208,20 @@ DATA_PEGAWAI = [
     },
 ]
 
-DEFAULT_PASSWORD = 'Diskominfo@2025'
+parser = argparse.ArgumentParser(description='Buat akun awal Pegawai Diskominfosantik')
+parser.add_argument('--password', dest='password', default='', help='Password awal pegawai (wajib diganti saat login pertama)')
+args, _ = parser.parse_known_args()
+
+initial_password = (args.password or os.environ.get('PEGAWAI_DEFAULT_PASSWORD') or '').strip()
+if initial_password:
+    try:
+        validate_password(initial_password)
+    except ValidationError as exc:
+        print("ERROR: Password awal tidak memenuhi kebijakan keamanan:", " ".join(exc.messages))
+        sys.exit(1)
+    initial_password_hash = make_password(initial_password)
+else:
+    initial_password_hash = make_password(None)
 
 print("=" * 60)
 print("BUAT AKUN PEGAWAI DISKOMINFOSANTIK")
@@ -243,7 +259,8 @@ for dept_data in DATA_PEGAWAI:
             role=p_data['role'],
             department_rel=dept,
             department=dept_nama,
-            password=make_password(DEFAULT_PASSWORD),
+            password=initial_password_hash,
+            must_change_password=True,
             account_status='active',
         )
         print(f"   ✅ Dibuat: {p_data['name']} ({p_data['email']}) | {p_data['jabatan']}")
@@ -251,7 +268,10 @@ for dept_data in DATA_PEGAWAI:
 
 print("\n" + "=" * 60)
 print(f"SELESAI: {created_count} akun dibuat, {skipped_count} akun dilewati.")
-print(f"Password default: {DEFAULT_PASSWORD}")
+if initial_password:
+    print("Akun baru menggunakan password awal dari parameter/env (wajib diganti saat login pertama).")
+else:
+    print("Akun baru dibuat tanpa password bawaan (unusable password); atur password secara eksplisit sebelum login.")
 print("=" * 60)
 print("\nDaftar Akun:")
 print(f"{'Nama':<45} {'Email':<45} {'Bidang'}")

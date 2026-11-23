@@ -800,7 +800,29 @@ class IDORAndWorkflowTestCase(BaseSecurityTestCase):
         self.assertEqual(res_invalid.status_code, 404)
         self.assertFalse(res_invalid.json()['success'])
 
-        # 4. Pindai tiket valid (UUID) -> Check-in sukses menjadi in_progress
+        # 4a. Pindai tiket berstatus belum disetujui (menunggu_admin) -> Ditolak 400
+        res_pending = admin_client.post(
+            reverse('tamu:api_scan_tiket'),
+            data=json.dumps({'code': str(self.kunjungan_a.id)}),
+            content_type='application/json'
+        )
+        self.assertEqual(res_pending.status_code, 400)
+        self.assertFalse(res_pending.json()['success'])
+
+        # 4b. Pindai tiket berstatus ditolak (ditolak_admin) -> Ditolak 400
+        self.kunjungan_b.status = 'ditolak_admin'
+        self.kunjungan_b.save(update_fields=['status'])
+        res_rejected = admin_client.post(
+            reverse('tamu:api_scan_tiket'),
+            data=json.dumps({'code': str(self.kunjungan_b.id)}),
+            content_type='application/json'
+        )
+        self.assertEqual(res_rejected.status_code, 400)
+        self.assertFalse(res_rejected.json()['success'])
+
+        # 4c. Setujui kunjungan_a lalu pindai tiket valid (UUID) -> Check-in sukses menjadi in_progress
+        self.kunjungan_a.status = 'disetujui'
+        self.kunjungan_a.save(update_fields=['status'])
         res_scan_uuid = admin_client.post(
             reverse('tamu:api_scan_tiket'),
             data=json.dumps({'code': str(self.kunjungan_a.id)}),

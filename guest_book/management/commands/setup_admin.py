@@ -12,8 +12,14 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--username', type=str, default=None, help='Username untuk admin')
-        parser.add_argument('--password', type=str, default=None, help='Password untuk admin')
+        parser.add_argument('--password', type=str, default=None, help='Password untuk admin (wajib untuk pembuatan akun baru)')
         parser.add_argument('--email', type=str, default=None, help='Email untuk admin')
+        parser.add_argument(
+            '--reset-password',
+            action='store_true',
+            default=False,
+            help='Reset password akun admin yang sudah ada jika --password / ADMIN_PASSWORD diberikan',
+        )
 
     def handle(self, *args, **options):
         # 0. Cek koneksi database terlebih dahulu
@@ -28,11 +34,41 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("============================================================"))
             return
 
-        admin_user_env = options['username'] or os.getenv('ADMIN_USERNAME', 'admin').strip()
-        admin_pass_env = options['password'] or os.getenv('ADMIN_PASSWORD', 'AdminBekasi2026!').strip()
-        admin_email_env = options['email'] or os.getenv('ADMIN_EMAIL', 'admin@diskominfosantik.bekasikab.go.id').strip()
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError
+        from django.core.management.base import CommandError
 
-        # Daftar akun admin yang selalu dipastikan tersedia
+        admin_user_env = (options['username'] or os.getenv('ADMIN_USERNAME', 'admin')).strip()
+        admin_pass_env = (
+            options['password']
+            or os.getenv('ADMIN_PASSWORD')
+            or os.getenv('ADMIN_INITIAL_PASSWORD')
+            or ''
+        ).strip()
+        admin_email_env = (
+            options['email']
+            or os.getenv('ADMIN_EMAIL', 'admin@diskominfosantik.bekasikab.go.id')
+        ).strip()
+        reset_password = bool(options.get('reset_password'))
+
+        if reset_password and not admin_pass_env:
+            raise CommandError(
+                'Opsi --reset-password mewajibkan --password atau environment variable ADMIN_PASSWORD.'
+            )
+
+        existing_user = User.objects.filter(username__iexact=admin_user_env).first()
+        existing_admin_row = Admin.objects.filter(email__iexact=admin_email_env).first()
+        needs_password = reset_password or (existing_user is None) or (existing_admin_row is None)
+
+        if admin_pass_env and needs_password:
+            try:
+                validate_password(admin_pass_env, user=existing_user)
+            except ValidationError as exc:
+                raise CommandError(
+                    f"Password admin tidak memenuhi syarat keamanan: {'; '.join(exc.messages)}"
+                )
+
+        # Hanya siapkan satu akun administrator utama (tanpa akun bersama 'superadmin')
         admin_accounts = [
             {
                 'username': admin_user_env,
@@ -41,13 +77,6 @@ class Command(BaseCommand):
                 'name': 'Administrator',
                 'phone': '081234567890',
             },
-            {
-                'username': 'superadmin',
-                'email': 'superadmin@diskominfosantik.bekasikab.go.id',
-                'password': admin_pass_env,
-                'name': 'Super Administrator',
-                'phone': '081234567891',
-            }
         ]
 
         has_errors = False
@@ -69,10 +98,19 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"Peringatan saat periksa Instansi: {e}"))
 
         # 2. Buat / Perbarui Akun Django User (auth_user)
+        password_action = 'dipertahankan'
         for acc in admin_accounts:
             try:
                 user = User.objects.filter(username__iexact=acc['username']).first()
                 if not user:
+                    if not acc['password']:
+                        self.stderr.write(
+                            self.style.WARNING(
+                                f"ADMIN_PASSWORD / --password tidak disetel; user Django '{acc['username']}' belum dibuat."
+                            )
+                        )
+                        password_action = 'belum_dibuat_tanpa_password'
+                        continue
                     user = User.objects.create_user(
                         username=acc['username'],
                         email=acc['email'],
@@ -81,15 +119,31 @@ class Command(BaseCommand):
                         is_superuser=True,
                         is_active=True,
                     )
+                    password_action = 'dibuat'
                     self.stdout.write(self.style.SUCCESS(f"User Django '{acc['username']}' berhasil dibuat."))
                 else:
-                    user.set_password(acc['password'])
-                    user.email = acc['email']
-                    user.is_staff = True
-                    user.is_superuser = True
-                    user.is_active = True
-                    user.save()
-                    self.stdout.write(self.style.SUCCESS(f"User Django '{acc['username']}' berhasil diperbarui (password disinkronkan)."))
+                    changed_fields = []
+                    if not user.is_staff:
+                        user.is_staff = True
+                        changed_fields.append('is_staff')
+                    if not user.is_superuser:
+                        user.is_superuser = True
+                        changed_fields.append('is_superuser')
+                    if not user.is_active:
+                        user.is_active = True
+                        changed_fields.append('is_active')
+                    if reset_password:
+                        user.set_password(acc['password'])
+                        changed_fields.append('password')
+                        password_action = 'direset'
+                    if changed_fields:
+                        user.save(update_fields=changed_fields)
+                    msg = (
+                        f"User Django '{acc['username']}' direset passwordnya."
+                        if reset_password
+                        else f"User Django '{acc['username']}' sudah ada (password lama dipertahankan)."
+                    )
+                    self.stdout.write(self.style.SUCCESS(msg))
             except Exception as e:
                 has_errors = True
                 self.stdout.write(self.style.ERROR(f"Gagal memproses User Django '{acc['username']}': {e}"))
@@ -100,6 +154,13 @@ class Command(BaseCommand):
             try:
                 admin_obj = Admin.objects.filter(email__iexact=acc['email']).first()
                 if not admin_obj:
+                    if not acc['password']:
+                        self.stderr.write(
+                            self.style.WARNING(
+                                f"ADMIN_PASSWORD / --password tidak disetel; tabel admin '{acc['name']}' belum dibuat."
+                            )
+                        )
+                        continue
                     admin_obj = Admin.objects.create(
                         name=acc['name'],
                         email=acc['email'],
@@ -109,19 +170,28 @@ class Command(BaseCommand):
                     )
                     self.stdout.write(self.style.SUCCESS(f"Tabel admin '{acc['name']}' berhasil dibuat."))
                 else:
-                    admin_obj.password = make_password(acc['password'])
-                    admin_obj.account_status = 'active'
-                    admin_obj.name = acc['name']
-                    admin_obj.phone = acc['phone']
-                    admin_obj.save(update_fields=['password', 'account_status', 'name', 'phone'])
-                    self.stdout.write(self.style.SUCCESS(f"Tabel admin '{acc['name']}' berhasil diperbarui."))
+                    changed_fields = []
+                    if admin_obj.account_status != 'active':
+                        admin_obj.account_status = 'active'
+                        changed_fields.append('account_status')
+                    if reset_password and acc['password']:
+                        admin_obj.password = make_password(acc['password'])
+                        changed_fields.append('password')
+                    if changed_fields:
+                        admin_obj.save(update_fields=changed_fields)
+                    msg = (
+                        f"Tabel admin '{acc['name']}' direset passwordnya."
+                        if reset_password
+                        else f"Tabel admin '{acc['name']}' sudah ada (password lama dipertahankan)."
+                    )
+                    self.stdout.write(self.style.SUCCESS(msg))
             except Exception as e:
                 has_errors = True
                 self.stdout.write(self.style.WARNING(f"Peringatan saat sinkronisasi tabel admin: {e}"))
 
-        # 4. Pastikan Tamu Admin ada (untuk context portal, foto profil, dan instansi)
+        # 4. Pastikan profil Tamu Admin ada (hanya untuk metadata UI/instansi; tanpa password login Tamu)
         try:
-            tamu_admin = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(nik='admin').first()
+            tamu_admin = Tamu.objects.filter(is_admin=True).first() or Tamu.objects.filter(Tamu.nik_lookup_q('admin')).first()
             if not tamu_admin:
                 tamu_admin = Tamu.objects.create(
                     name="Administrator",
@@ -129,18 +199,30 @@ class Command(BaseCommand):
                     phone="081234567890",
                     nik="admin",
                     instansi="Diskominfosantik Kabupaten Bekasi",
-                    password=make_password(admin_pass_env),
+                    password=None,
                     is_admin=True,
+                    admin_role="super_admin",
                     account_status="active",
                     registration_type="manual"
                 )
-                self.stdout.write(self.style.SUCCESS("Data Tamu Administrator berhasil dibuat."))
+                self.stdout.write(self.style.SUCCESS("Data profil Tamu Administrator berhasil dibuat (tanpa kredensial portal tamu)."))
             else:
-                tamu_admin.is_admin = True
-                tamu_admin.account_status = "active"
-                tamu_admin.password = make_password(admin_pass_env)
-                tamu_admin.save(update_fields=['is_admin', 'account_status', 'password'])
-                self.stdout.write(self.style.SUCCESS("Data Tamu Administrator berhasil diperbarui."))
+                changed_fields = []
+                if not tamu_admin.is_admin:
+                    tamu_admin.is_admin = True
+                    changed_fields.append('is_admin')
+                if tamu_admin.admin_role != "super_admin":
+                    tamu_admin.admin_role = "super_admin"
+                    changed_fields.append('admin_role')
+                if tamu_admin.account_status != "active":
+                    tamu_admin.account_status = "active"
+                    changed_fields.append('account_status')
+                if tamu_admin.password is not None:
+                    tamu_admin.password = None
+                    changed_fields.append('password')
+                if changed_fields:
+                    tamu_admin.save(update_fields=changed_fields)
+                self.stdout.write(self.style.SUCCESS("Data profil Tamu Administrator diperbarui (kredensial portal tamu dinonaktifkan)."))
         except Exception as e:
             has_errors = True
             self.stdout.write(self.style.WARNING(f"Peringatan saat sinkronisasi Tamu Admin: {e}"))
@@ -191,8 +273,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("================================================"))
         else:
             self.stdout.write(self.style.SUCCESS("================================================"))
-            self.stdout.write(self.style.SUCCESS("SETUP ADMIN BERHASIL TERSIMPAN KE DATABASE!"))
-            self.stdout.write(self.style.SUCCESS(f"Username / Akun 1 : {admin_user_env} (Email: {admin_email_env})"))
-            self.stdout.write(self.style.SUCCESS("Username / Akun 2 : superadmin (Email: superadmin@diskominfosantik.bekasikab.go.id)"))
-            self.stdout.write(self.style.SUCCESS(f"Password          : {admin_pass_env}"))
+            self.stdout.write(self.style.SUCCESS("SETUP ADMIN SELESAI!"))
+            self.stdout.write(self.style.SUCCESS(f"Akun Admin Utama  : {admin_user_env} (Email: {admin_email_env})"))
+            self.stdout.write(self.style.SUCCESS(f"Status Password   : {password_action} (tidak dicetak demi keamanan)"))
             self.stdout.write(self.style.SUCCESS("================================================"))

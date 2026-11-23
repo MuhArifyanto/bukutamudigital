@@ -40,14 +40,14 @@
     
     <div class="chat-messages" id="chatMessages">
         {% for msg in messages_list %}
-        <div class="message {% if msg.sender_type == 'tamu' %}sent{% else %}received{% endif %}">
+        <div class="message {% if msg.sender_type == 'tamu' %}sent{% else %}received{% endif %}" data-message-id="{{ msg.id }}">
             <div>
                 <div class="message-bubble">{{ msg.content }}</div>
                 <div class="message-time">{{ msg.created_at|date:"H:i" }}</div>
             </div>
         </div>
         {% empty %}
-        <div class="text-center text-muted py-5">
+        <div class="text-center text-muted py-5" id="emptyChatPlaceholder">
             <i class="fas fa-comments fa-3x mb-3"></i>
             <p>Belum ada pesan. Mulai percakapan!</p>
         </div>
@@ -64,9 +64,11 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    const sessionId = "{{ session_id }}";
-    const tamuId = "{{ tamu.id }}";
+{{ session_id|json_script:"chat-pegawai-session-id" }}
+{{ tamu.id|json_script:"chat-pegawai-tamu-id" }}
+<script nonce="{{ csp_nonce }}">
+    const sessionId = JSON.parse(document.getElementById('chat-pegawai-session-id').textContent);
+    const tamuId = JSON.parse(document.getElementById('chat-pegawai-tamu-id').textContent);
     let chatSocket = null;
 
     function connectWebSocket() {
@@ -76,10 +78,48 @@
         
         chatSocket.onopen = () => console.log('Connected');
         chatSocket.onmessage = (e) => {
-            const data = JSON.parse(e.data);
-            if (data.action === 'create') appendMessage(data);
+            let data;
+            try {
+                data = JSON.parse(e.data);
+            } catch (_) {
+                return;
+            }
+            if (!data || typeof data !== 'object') return;
+            if (data.action === 'pong' || data.type === 'pong') return;
+            if (data.action === 'error') {
+                if (data.message) alert(data.message);
+                return;
+            }
+            if (data.action === 'edit' || data.action === 'delete') {
+                if (data.message_id) {
+                    const selector = `.message[data-message-id="${CSS.escape(String(data.message_id))}"] .message-bubble`;
+                    const existingBubble = document.querySelector(selector);
+                    if (existingBubble) {
+                        existingBubble.textContent = data.action === 'delete'
+                            ? 'Pesan ini telah dihapus'
+                            : String(data.message || '');
+                    }
+                }
+                return;
+            }
+            if (typeof data.message === 'string' && data.sender_type) {
+                appendMessage(data);
+            }
         };
-        chatSocket.onclose = () => setTimeout(connectWebSocket, 5000);
+        chatSocket.onclose = (ev) => {
+            if (ev && ev.code === 4003) return;
+            setTimeout(connectWebSocket, 5000);
+        };
+    }
+
+    const messageInputEl = document.getElementById('messageInput');
+    if (messageInputEl) {
+        messageInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('chatForm').dispatchEvent(new Event('submit', { cancelable: true }));
+            }
+        });
     }
     
     document.getElementById('chatForm').addEventListener('submit', (e) => {
@@ -101,22 +141,37 @@
     });
     
     function escapeHtml(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        if (window.SecurityUtils) return window.SecurityUtils.escapeHtml(str);
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/`/g, '&#96;');
     }
 
     function appendMessage(data) {
         const messagesDiv = document.getElementById('chatMessages');
+        if (data.message_id) {
+            const dup = messagesDiv.querySelector(`.message[data-message-id="${CSS.escape(String(data.message_id))}"]`);
+            if (dup) return;
+        }
+        const placeholder = document.getElementById('emptyChatPlaceholder');
+        if (placeholder) placeholder.remove();
+
         const isSent = data.sender_type === 'tamu';
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+        if (data.message_id) {
+            messageDiv.dataset.messageId = String(data.message_id);
+        }
         const safeMessage = escapeHtml(data.message);
+        const safeTime = escapeHtml(data.created_at || new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}));
         messageDiv.innerHTML = `
             <div>
                 <div class="message-bubble">${safeMessage}</div>
-                <div class="message-time">${data.created_at || new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</div>
+                <div class="message-time">${safeTime}</div>
             </div>
         `;
         messagesDiv.appendChild(messageDiv);

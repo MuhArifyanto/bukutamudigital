@@ -246,7 +246,7 @@
                     </label>
                     <input type="file" id="qrFileInput" accept="image/*" class="d-none">
 
-                    <button type="button" class="btn btn-light btn-sm px-2.5 py-2 border ms-auto text-secondary d-inline-flex align-items-center gap-1" style="border-radius: 8px; font-size: 0.78rem;" onclick="testBeepSound()" title="Tes Suara Beep">
+                    <button type="button" id="btnTestBeep" class="btn btn-light btn-sm px-2.5 py-2 border ms-auto text-secondary d-inline-flex align-items-center gap-1" style="border-radius: 8px; font-size: 0.78rem;" title="Tes Suara Beep">
                         <i class="fas fa-volume-up"></i> Tes Beep
                     </button>
                 </div>
@@ -332,7 +332,7 @@
                     <a href="#" target="_blank" class="btn btn-outline-dark flex-grow-1 py-2 rounded-2 fw-bold" id="resBtnPrint" style="font-size: 0.82rem;">
                         <i class="fas fa-print me-1"></i> Cetak Kartu Tamu
                     </a>
-                    <button type="button" class="btn btn-dark flex-grow-1 py-2 rounded-2 fw-bold" onclick="resetScannerUI()" style="font-size: 0.82rem; background: #0f172a;">
+                    <button type="button" class="btn btn-dark flex-grow-1 py-2 rounded-2 fw-bold js-reset-scanner" style="font-size: 0.82rem; background: #0f172a;">
                         <i class="fas fa-qrcode me-1"></i> Scan Tiket Lain
                     </button>
                 </div>
@@ -345,7 +345,7 @@
                 </div>
                 <h6 class="fw-bold text-danger mb-2">Verifikasi Gagal</h6>
                 <p class="text-muted small mb-3 px-3" id="resErrorMessage">Tiket tidak ditemukan atau sudah tidak berlaku.</p>
-                <button type="button" class="btn btn-outline-secondary rounded-2 px-3 py-1.5 btn-sm fw-semibold" onclick="resetScannerUI()">
+                <button type="button" class="btn btn-outline-secondary rounded-2 px-3 py-1.5 btn-sm fw-semibold js-reset-scanner">
                     <i class="fas fa-redo me-1"></i> Coba Lagi
                 </button>
             </div>
@@ -355,13 +355,15 @@
 
 <!-- Library HTML5-QRCode (dengan CDN Fallback) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 if (typeof Html5Qrcode === 'undefined') {
-    document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');
+    const fallbackQrScript = document.createElement('script');
+    fallbackQrScript.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    document.head.appendChild(fallbackQrScript);
 }
 </script>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 let html5QrCode = null;
 let isScannerRunning = false;
 let isScannerStarting = false;
@@ -539,8 +541,17 @@ function setUIStopped(errorMessage) {
         }
         if (idleTitle) idleTitle.innerText = 'Tidak Dapat Mengakses Kamera';
         if (idleSubtitle) {
-            idleSubtitle.innerHTML = '<span class="text-warning d-block mb-1">' + errorMessage + '</span>' +
-                'Pastikan izin kamera (Allow Camera) telah diaktifkan di browser Anda, atau gunakan tombol <strong class="text-white">Scan File / Foto QR</strong> di bawah.';
+            idleSubtitle.innerHTML = '';
+            const warnSpan = document.createElement('span');
+            warnSpan.className = 'text-warning d-block mb-1';
+            warnSpan.textContent = errorMessage;
+            idleSubtitle.appendChild(warnSpan);
+            idleSubtitle.appendChild(document.createTextNode('Pastikan izin kamera (Allow Camera) telah diaktifkan di browser Anda, atau gunakan tombol '));
+            const strongEl = document.createElement('strong');
+            strongEl.className = 'text-white';
+            strongEl.textContent = 'Scan File / Foto QR';
+            idleSubtitle.appendChild(strongEl);
+            idleSubtitle.appendChild(document.createTextNode(' di bawah.'));
         }
     } else {
         if (badge) {
@@ -781,11 +792,16 @@ function processTicketCode(code) {
             document.getElementById('resCheckinTime').innerText = 'Check-in: ' + (d.checkin_time || 'Baru saja');
             document.getElementById('resTamuName').innerText = d.tamu_name;
             document.getElementById('resTamuInstansi').innerText = d.tamu_instansi;
-            document.getElementById('resTamuPhone').innerHTML = '<i class="fas fa-phone-alt me-1"></i> ' + d.tamu_phone;
+            const phoneEl = document.getElementById('resTamuPhone');
+            phoneEl.innerHTML = '';
+            const phoneIcon = document.createElement('i');
+            phoneIcon.className = 'fas fa-phone-alt me-1';
+            phoneEl.appendChild(phoneIcon);
+            phoneEl.appendChild(document.createTextNode(' ' + (d.tamu_phone || '-')));
             document.getElementById('resPegawaiName').innerText = d.pegawai_name + ' (' + d.pegawai_jabatan + ')';
             document.getElementById('resDeptName').innerText = d.department;
             document.getElementById('resPurpose').innerText = d.purpose;
-            document.getElementById('resBtnPrint').href = '/admin-portal/kunjungan/' + d.id + '/cetak-kartu/';
+            document.getElementById('resBtnPrint').href = '/admin-portal/kunjungan/' + encodeURIComponent(String(d.id)) + '/cetak-kartu/';
 
             const badge = document.getElementById('resStatusBadge');
             const badgeText = document.getElementById('resStatusText');
@@ -799,8 +815,9 @@ function processTicketCode(code) {
 
             const avatarImg = document.getElementById('resTamuAvatar');
             const avatarInitial = document.getElementById('resTamuInitial');
-            if (d.tamu_photo) {
-                avatarImg.src = d.tamu_photo;
+            const safePhotoUrl = d.tamu_photo && window.SecurityUtils ? window.SecurityUtils.sanitizeSafeUrl(d.tamu_photo) : null;
+            if (safePhotoUrl) {
+                avatarImg.src = safePhotoUrl;
                 avatarImg.style.display = 'block';
                 avatarInitial.style.display = 'none';
             } else {
@@ -828,5 +845,13 @@ function resetScannerUI() {
     document.getElementById('manualTicketInput').value = '';
     document.getElementById('manualTicketInput').focus();
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const beepBtn = document.getElementById('btnTestBeep');
+    if (beepBtn) beepBtn.addEventListener('click', testBeepSound);
+    document.querySelectorAll('.js-reset-scanner').forEach(btn => {
+        btn.addEventListener('click', resetScannerUI);
+    });
+});
 </script>
 {% endblock %}

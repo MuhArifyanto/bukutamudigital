@@ -91,7 +91,7 @@
         {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
         <div class="col-md-4">
             <label style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">Status Akun</label>
-            <select name="status" class="select-prem" onchange="this.form.submit()">
+            <select name="status" class="select-prem" data-auto-submit="1">
                 <option value="">Semua Status</option>
                 <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Aktif</option>
                 <option value="suspended" {% if status_filter == 'suspended' %}selected{% endif %}>Diblokir</option>
@@ -138,11 +138,11 @@
                 </td>
                 <td>
                     {% if u.account_status == 'active' %}
-                    <button type="button" class="action-btn btn-suspend" onclick="toggleUserStatus('{{ u.id }}', 'suspended')">
+                    <button type="button" class="action-btn btn-suspend js-toggle-user-status" data-user-id="{{ u.id }}" data-status="suspended">
                         <i class="fas fa-ban me-1"></i> Blokir
                     </button>
                     {% else %}
-                    <button type="button" class="action-btn btn-activate" onclick="toggleUserStatus('{{ u.id }}', 'active')">
+                    <button type="button" class="action-btn btn-activate js-toggle-user-status" data-user-id="{{ u.id }}" data-status="active">
                         <i class="fas fa-check-circle me-1"></i> Aktifkan
                     </button>
                     {% endif %}
@@ -200,7 +200,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 function toggleUserStatus(userId, newStatus) {
     const actionText = newStatus === 'suspended' ? 'memblokir' : 'mengaktifkan kembali';
     if (!confirm(`Apakah Anda yakin ingin ${actionText} pengguna ini?`)) return;
@@ -226,5 +226,11 @@ function toggleUserStatus(userId, newStatus) {
         alert('Terjadi kesalahan koneksi.');
     });
 }
+
+document.querySelectorAll('.js-toggle-user-status').forEach(btn => {
+    btn.addEventListener('click', function() {
+        toggleUserStatus(this.dataset.userId, this.dataset.status);
+    });
+});
 </script>
 {% endblock %}

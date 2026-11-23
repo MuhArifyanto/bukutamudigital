@@ -1,11 +1,13 @@
 # Package for guest_book views
-from .auth import login_view, register_view, logout_view, api_firebase_login, api_validate_register, api_tamu_login, admin_login_view, tamu_password_reset_request, tamu_password_reset_confirm, pegawai_login_view, pegawai_logout_view, api_refresh_captcha
+from .auth import login_view, register_view, logout_view, api_firebase_login, api_validate_register, api_tamu_login, admin_login_view, admin_verify_2fa_view, tamu_password_reset_request, tamu_password_reset_confirm, pegawai_login_view, pegawai_logout_view, api_refresh_captcha
+from .base import healthz_view
 from .tamu import (
     landing_view, tentang_kami_view, kebijakan_privasi_view,
     dashboard_view, kunjungan_baru_view, riwayat_view,
     kunjungan_detail_view, kunjungan_batal_view, pesan_baru_view,
     notifications_view, user_chat_view, tamu_kunjungan_cetak_pdf,
-    profil_view, tamu_cetak_kartu_view, tamu_chat_pegawai_view,
+    profil_view, tamu_export_personal_data, tamu_delete_account_view,
+    tamu_cetak_kartu_view, tamu_chat_pegawai_view,
     api_submit_ikm_rating
 )
 from .admin import (
@@ -38,7 +40,10 @@ from .api import (
     api_debug_calendar_settings,
     api_update_notification_settings,
     api_debug_counts,
-    api_webhook_delete_user
+    api_webhook_delete_user,
+    api_admin_2fa_setup,
+    api_admin_2fa_enable,
+    api_admin_2fa_disable
 )
 from .pegawai import (
     pegawai_dashboard_view,

@@ -83,3 +83,39 @@ class AdminInstansiViewTests(BaseSecurityTestCase):
         dep = Departemen.objects.filter(kode='IKP').first()
         self.assertIsNotNone(dep)
         self.assertEqual(dep.nama, 'Bidang Informasi dan Komunikasi Publik')
+
+    def test_admin_delete_departemen_works_and_protects_active_pegawai(self):
+        """Super admin dapat menghapus bidang tanpa pegawai aktif, namun ditolak jika masih ada pegawai aktif."""
+        from ..models import AuditLog
+        admin_client = self.get_client('admin')
+
+        # 1. Buat bidang kosong lalu hapus -> harus terhapus & tercatat di AuditLog
+        unused_dept = Departemen.objects.create(nama='Bidang Sementara', kode='TMP')
+        res_del = admin_client.post(self.url, {
+            'action': 'delete_departemen',
+            'dept_id': str(unused_dept.id),
+        })
+        self.assertEqual(res_del.status_code, 302)
+        self.assertFalse(Departemen.objects.filter(pk=unused_dept.pk).exists())
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action='delete',
+                table_name='departemen',
+                record_id=str(unused_dept.id),
+            ).exists()
+        )
+
+        # 2. Bidang yang masih memiliki self.pegawai (active) tidak boleh dihapus
+        res_blocked = admin_client.post(self.url, {
+            'action': 'delete_departemen',
+            'dept_id': str(self.departemen.id),
+        })
+        self.assertEqual(res_blocked.status_code, 302)
+        self.assertTrue(Departemen.objects.filter(pk=self.departemen.pk).exists())
+
+        # 3. ID tidak valid tidak menyebabkan server error 500
+        res_invalid = admin_client.post(self.url, {
+            'action': 'delete_departemen',
+            'dept_id': 'bukan-uuid',
+        })
+        self.assertEqual(res_invalid.status_code, 302)

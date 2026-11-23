@@ -62,13 +62,19 @@ if IS_PRODUCTION:
         raise ImproperlyConfigured("CSRF_TRUSTED_ORIGINS wajib diset di environment variable saat mode production!")
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_origins_raw.split(',') if o.strip()]
 
+    # Pastikan loopback container (127.0.0.1 / localhost) selalu diizinkan untuk probe HEALTHCHECK internal
+    for _loopback_host in ('127.0.0.1', 'localhost'):
+        if _loopback_host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(_loopback_host)
+
     # Security Headers & Cookies (Wajib HTTPS)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '3600'))
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() in ('true', '1')
-    SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'False').lower() in ('true', '1')
+    SECURE_REDIRECT_EXEMPT = [r'^healthz/?$']
+    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'True').lower() in ('true', '1')
+    SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'True').lower() in ('true', '1')
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
 
@@ -136,6 +142,12 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
+TRUST_X_FORWARDED_FOR = os.getenv('TRUST_X_FORWARDED_FOR', 'True').lower() in ('true', '1')
+TRUST_CF_CONNECTING_IP = os.getenv('TRUST_CF_CONNECTING_IP', 'False').lower() in ('true', '1')
+TRUSTED_PROXY_CIDRS = [
+    c.strip() for c in os.getenv('TRUSTED_PROXY_CIDRS', '').split(',') if c.strip()
+]
+RATE_LIMIT_FAIL_CLOSED = os.getenv('RATE_LIMIT_FAIL_CLOSED', 'True').lower() in ('true', '1')
 
 
 
@@ -165,7 +177,11 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'guest_book.middleware.Admin2FAEnforcementMiddleware',
+    'guest_book.middleware.AdminIdleTimeoutMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'guest_book.middleware.SecurityHeadersMiddleware',
+    'guest_book.monitoring.ErrorAlertMiddleware',
 ]
 
 ROOT_URLCONF = 'bukudigital.urls'
@@ -181,6 +197,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'guest_book.context_processors.csp_nonce',
                 'guest_book.context_processors.notifications_context',
                 'guest_book.context_processors.pegawai_notifications_context',
             ],
@@ -204,7 +221,8 @@ DB_OPTIONS = {
     'charset': 'utf8mb4',
 }
 
-if DB_HOST not in ('127.0.0.1', 'localhost'):
+DB_SSL_DISABLED = os.getenv('DB_SSL_DISABLED', 'False').lower() in ('true', '1')
+if DB_HOST not in ('127.0.0.1', 'localhost') and not DB_SSL_DISABLED:
     ca_path = '/etc/ssl/certs/ca-certificates.crt'
     ssl_config = {}
     if os.path.exists(ca_path):
@@ -224,20 +242,43 @@ DATABASES = {
     }
 }
 
+TEST_DB_ENGINE = os.getenv('TEST_DB_ENGINE', '').strip().lower()
+if not TEST_DB_ENGINE and os.getenv('USE_MYSQL_TEST', 'False').lower() in ('true', '1'):
+    TEST_DB_ENGINE = 'mysql'
+
 if 'test' in sys.argv:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
+    if TEST_DB_ENGINE == 'mysql':
+        DATABASES['default']['TEST'] = {
+            'NAME': os.getenv('TEST_DB_NAME', f"test_{DB_NAME}"),
+            'CHARSET': 'utf8mb4',
+            'COLLATION': 'utf8mb4_unicode_ci',
         }
-    }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:',
+            }
+        }
 
 # Channel Layers:
 # InMemoryChannelLayer digunakan untuk single-instance (lokal maupun single container PaaS) & testing.
 # RedisChannelLayer digunakan jika USE_REDIS_CHANNEL_LAYER=true dan REDIS_URL diset (untuk multi-instance).
-USE_REDIS_CHANNEL_LAYER = os.getenv('USE_REDIS_CHANNEL_LAYER', 'False').lower() in ('true', '1') and bool(os.getenv('REDIS_URL'))
+REDIS_URL = os.getenv('REDIS_URL', '').strip()
+FORCE_REDIS_TEST = os.getenv('FORCE_REDIS_TEST', 'False').lower() in ('true', '1')
+USE_REDIS_CACHE = os.getenv('USE_REDIS_CACHE', 'True').lower() in ('true', '1') and bool(REDIS_URL)
+USE_REDIS_CHANNEL_LAYER = os.getenv('USE_REDIS_CHANNEL_LAYER', 'True').lower() in ('true', '1') and bool(REDIS_URL)
 
-if 'test' in sys.argv or not USE_REDIS_CHANNEL_LAYER:
+if USE_REDIS_CACHE and ('test' not in sys.argv or FORCE_REDIS_TEST):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+            'TIMEOUT': 86400,
+        }
+    }
+
+if ('test' in sys.argv and not FORCE_REDIS_TEST) or not USE_REDIS_CHANNEL_LAYER:
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels.layers.InMemoryChannelLayer',
@@ -248,7 +289,7 @@ else:
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                "hosts": [os.getenv('REDIS_URL')],
+                "hosts": [REDIS_URL],
             },
         },
     }
@@ -300,26 +341,136 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_SIGNED_URL_TTL = int(os.getenv('MEDIA_SIGNED_URL_TTL', '3600'))
+
+# Enkripsi NIK & Kebijakan Retensi UU PDP
+NIK_ENCRYPTION_KEY = os.getenv('NIK_ENCRYPTION_KEY', '').strip()
+NIK_HMAC_KEY = os.getenv('NIK_HMAC_KEY', '').strip()
+PDP_RETENTION_DAYS = int(os.getenv('PDP_RETENTION_DAYS', '365'))
+PDP_CHAT_RETENTION_DAYS = int(os.getenv('PDP_CHAT_RETENTION_DAYS', '180'))
+PDP_LOG_RETENTION_DAYS = int(os.getenv('PDP_LOG_RETENTION_DAYS', '90'))
+PDP_ANONYMIZE_INACTIVE_DAYS = int(os.getenv('PDP_ANONYMIZE_INACTIVE_DAYS', '730'))
 
 # Gunakan Cloudinary jika ada URL-nya (untuk production / PaaS)
-CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', 'cloudinary://672274521828876:qY107Z6jl16WSR1uODivlW0aJrc@mst31frx').strip()
-if CLOUDINARY_URL:
+# JANGAN hardcode credential Cloudinary di kode sumber; wajib diisi lewat environment variable CLOUDINARY_URL.
+_STATICFILES_BACKEND = (
+    'django.contrib.staticfiles.storage.StaticFilesStorage'
+    if (DEBUG or 'test' in sys.argv)
+    else 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+)
+
+CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', '').strip()
+FORCE_CLOUDINARY_TEST = os.getenv('FORCE_CLOUDINARY_TEST', 'False').lower() in ('true', '1')
+if CLOUDINARY_URL and ('test' not in sys.argv or FORCE_CLOUDINARY_TEST):
     DEFAULT_FILE_STORAGE = 'guest_book.storage.DynamicMediaCloudinaryStorage'
     CLOUDINARY_STORAGE = {
         'SECURE': True,
     }
+    STORAGES = {
+        'default': {'BACKEND': 'guest_book.storage.DynamicMediaCloudinaryStorage'},
+        'staticfiles': {'BACKEND': _STATICFILES_BACKEND},
+    }
 else:
-    if IS_PRODUCTION:
-        import logging
-        logging.getLogger(__name__).warning(
-            "PERINGATAN PRODUKSI: CLOUDINARY_URL belum diset. File media (foto profil dan lampiran chat) "
-            "akan disimpan sementara di disk lokal container dan akan hilang saat server restart/redeploy di PaaS!"
+    STORAGES = {
+        'default': {'BACKEND': 'guest_book.storage.SignedLocalMediaStorage'},
+        'staticfiles': {'BACKEND': _STATICFILES_BACKEND},
+    }
+
+# Structured Logging (stdout untuk Docker / PaaS / systemd)
+# Gunakan LOG_FORMAT=json di container/PaaS agar log mudah diparsing agregator log.
+DJANGO_LOG_LEVEL = os.getenv('DJANGO_LOG_LEVEL', 'INFO').upper()
+LOG_FORMAT = os.getenv('LOG_FORMAT', 'json' if IS_PRODUCTION else 'structured').lower()
+if LOG_FORMAT not in ('json', 'structured'):
+    LOG_FORMAT = 'structured'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'structured': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s %(module)s:%(lineno)d - %(message)s',
+        },
+        'json': {
+            '()': 'guest_book.monitoring.StructuredJsonFormatter',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': LOG_FORMAT,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': os.getenv('ROOT_LOG_LEVEL', 'WARNING').upper(),
+    },
+    'loggers': {
+        'django': {
+            'handlers': [],
+            'level': DJANGO_LOG_LEVEL,
+            'propagate': True,
+        },
+        'django.security': {
+            'handlers': [],
+            'level': 'WARNING',
+            'propagate': True,
+        },
+        'guest_book': {
+            'handlers': [],
+            'level': DJANGO_LOG_LEVEL,
+            'propagate': True,
+        },
+        'guest_book.security': {
+            'handlers': [],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
+
+# Alerting Lonjakan Login Gagal & Error 500
+SECURITY_ALERT_WEBHOOK_URL = os.getenv('SECURITY_ALERT_WEBHOOK_URL', '').strip()
+LOGIN_SPIKE_WINDOW_SECONDS = int(os.getenv('LOGIN_SPIKE_WINDOW_SECONDS', '300'))
+LOGIN_SPIKE_IP_THRESHOLD = int(os.getenv('LOGIN_SPIKE_IP_THRESHOLD', '10'))
+LOGIN_SPIKE_GLOBAL_THRESHOLD = int(os.getenv('LOGIN_SPIKE_GLOBAL_THRESHOLD', '25'))
+LOGIN_ALERT_COOLDOWN_SECONDS = int(os.getenv('LOGIN_ALERT_COOLDOWN_SECONDS', '600'))
+SERVER_ERROR_SPIKE_WINDOW_SECONDS = int(os.getenv('SERVER_ERROR_SPIKE_WINDOW_SECONDS', '300'))
+SERVER_ERROR_SPIKE_THRESHOLD = int(os.getenv('SERVER_ERROR_SPIKE_THRESHOLD', '3'))
+SERVER_ERROR_ALERT_COOLDOWN_SECONDS = int(os.getenv('SERVER_ERROR_ALERT_COOLDOWN_SECONDS', '300'))
+
+# Opsional: Monitoring Error Sentry tanpa mengirim PII pengguna
+SENTRY_DSN = os.getenv('SENTRY_DSN', '').strip()
+if SENTRY_DSN:
+    import importlib
+    try:
+        sentry_sdk = importlib.import_module('sentry_sdk')
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
+            send_default_pii=False,
+            environment='production' if IS_PRODUCTION else 'development',
         )
+    except ImportError:
+        pass
+
+if IS_PRODUCTION and not CLOUDINARY_URL:
+    import logging
+    logging.getLogger(__name__).warning(
+        "PERINGATAN PRODUKSI: CLOUDINARY_URL belum diset. File media (foto profil dan lampiran chat) "
+        "akan disimpan sementara di disk lokal container dan akan hilang saat server restart/redeploy di PaaS!"
+    )
 
 # Session (stored in DB)
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 1 hari
 SESSION_SAVE_EVERY_REQUEST = False
+# Idle timeout khusus sesi Administrator (default 30 menit = 1800 detik; 0 untuk menonaktifkan)
+ADMIN_SESSION_IDLE_TIMEOUT = int(os.getenv('ADMIN_SESSION_IDLE_TIMEOUT', '1800'))
+
+# Integrasi n8n Webhook & Rate Limit Chatbot AI
+N8N_WEBHOOK_SECRET = os.getenv('N8N_WEBHOOK_SECRET', '').strip()
+AI_CHAT_RATE_LIMIT_MAX = int(os.getenv('AI_CHAT_RATE_LIMIT_MAX', '20'))
+AI_CHAT_RATE_LIMIT_WINDOW = int(os.getenv('AI_CHAT_RATE_LIMIT_WINDOW', '300'))
 
 # Default primary key
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

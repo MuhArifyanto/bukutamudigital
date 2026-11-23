@@ -109,7 +109,7 @@
                     <div class="position-relative d-inline-block mb-3">
                         <img src="{% if admin_profile_picture %}{{ admin_profile_picture }}{% else %}https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff{% endif %}" 
                              class="rounded-circle border border-4 border-primary" style="width: 100px; height: 100px; object-fit: cover;" alt="Avatar"
-                             onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff';">
+                             data-fallback-src="https://ui-avatars.com/api/?name={{ admin_name|urlencode }}&background=3b82f6&color=fff">
                     </div>
                     <h5 class="fw-bold mb-1">{{ admin_name }}</h5>
                     <p class="text-secondary-light small mb-3">NIP: 19880421 201503 1 002</p>
@@ -125,7 +125,7 @@
             </div>
 
             <!-- Notifications Card -->
-            <div class="card border-0 shadow-sm rounded-4">
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
                 <div class="card-body p-4">
                     <h6 class="fw-bold mb-4 d-flex align-items-center"><i class="fas fa-bell me-2 text-primary"></i>Notifikasi</h6>
                     
@@ -148,6 +148,30 @@
                             <input class="form-check-input" type="checkbox" role="switch" id="switchPushNotif" {% if push_notif_enabled %}checked{% endif %}>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- 2FA Security Card -->
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold mb-0 d-flex align-items-center"><i class="fas fa-shield-alt me-2 text-primary"></i>Keamanan 2FA (TOTP)</h6>
+                        <span id="badge2FAStatus" class="badge {% if admin_2fa_enabled %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %} rounded-pill px-3 py-1">
+                            {% if admin_2fa_enabled %}AKTIF{% else %}NONAKTIF{% endif %}
+                        </span>
+                    </div>
+                    <p class="text-secondary small mb-3">
+                        Lindungi login Portal Admin dengan kode 6 digit dari aplikasi Authenticator.
+                    </p>
+                    {% if admin_2fa_enabled %}
+                    <button type="button" class="btn btn-outline-danger w-100 rounded-pill fw-bold" id="btnOpenDisable2FA" data-bs-toggle="modal" data-bs-target="#modalDisable2FA">
+                        <i class="fas fa-shield-alt me-2"></i>Nonaktifkan 2FA
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold" id="btnStartSetup2FA">
+                        <i class="fas fa-qrcode me-2"></i>Aktifkan 2FA Sekarang
+                    </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -299,17 +323,73 @@
                 <div class="modal-body p-4">
                     <form id="formGantiSandi">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">PASSWORD BARU</label>
-                            <input type="password" id="inputNewPassword" class="form-control" style="border-radius: 0.75rem; padding: 12px;" placeholder="Minimal 6 karakter" required>
+                            <label class="form-label small fw-bold text-muted" for="inputOldPassword">PASSWORD LAMA</label>
+                            <input type="password" id="inputOldPassword" class="form-control" style="border-radius: 0.75rem; padding: 12px;" placeholder="Masukkan password saat ini" autocomplete="current-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted" for="inputNewPassword">PASSWORD BARU</label>
+                            <input type="password" id="inputNewPassword" class="form-control" style="border-radius: 0.75rem; padding: 12px;" placeholder="Minimal 8 karakter kombinasi huruf &amp; angka" autocomplete="new-password" required>
                         </div>
                         <div class="mb-4">
-                            <label class="form-label small fw-bold text-muted">KONFIRMASI PASSWORD BARU</label>
-                            <input type="password" id="inputConfirmPassword" class="form-control" style="border-radius: 0.75rem; padding: 12px;" placeholder="Ulangi password baru" required>
+                            <label class="form-label small fw-bold text-muted" for="inputConfirmPassword">KONFIRMASI PASSWORD BARU</label>
+                            <input type="password" id="inputConfirmPassword" class="form-control" style="border-radius: 0.75rem; padding: 12px;" placeholder="Ulangi password baru" autocomplete="new-password" required>
                         </div>
-                        <button type="button" class="btn btn-primary w-100 fw-bold py-3" style="border-radius: 0.75rem; background: #1e56a0;" onclick="submitGantiSandi()">
+                        <button type="button" id="btnSubmitGantiSandi" class="btn btn-primary w-100 fw-bold py-3" style="border-radius: 0.75rem; background: #1e56a0;">
                             <i class="fas fa-check-circle me-2"></i>Simpan Password
                         </button>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Setup 2FA -->
+    <div class="modal fade" id="modalSetup2FA" tabindex="-1" aria-labelledby="modalSetup2FALabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 1rem; border: none;">
+                <div class="modal-header border-0 p-4 pb-0">
+                    <h5 class="fw-bold" id="modalSetup2FALabel"><i class="fas fa-shield-alt me-2 text-primary"></i>Aktifkan 2FA TOTP</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <p class="text-secondary small mb-3">Scan QR Code berikut di Google Authenticator / Authy, atau salin kunci manual di bawah ini:</p>
+                    <div id="qr2faContainer" class="d-inline-flex justify-content-center p-3 bg-white border rounded-3 mb-3"></div>
+                    <div class="bg-light rounded-3 p-2 mb-3">
+                        <small class="text-secondary d-block">Kunci Setup Manual:</small>
+                        <code id="text2faSecret" class="fw-bold text-dark fs-6"></code>
+                    </div>
+                    <div class="text-start mb-3">
+                        <label class="form-label small fw-bold text-muted" for="inputVerifyOtp2FA">MASUKKAN KODE OTP 6 DIGIT</label>
+                        <input type="text" id="inputVerifyOtp2FA" class="form-control text-center fw-bold" maxlength="6" inputmode="numeric" placeholder="000000" style="letter-spacing: 0.35rem;">
+                    </div>
+                    <div class="text-start mb-3">
+                        <label class="form-label small fw-bold text-muted" for="inputEnable2FAPassword">KONFIRMASI PASSWORD SAAT INI</label>
+                        <input type="password" id="inputEnable2FAPassword" class="form-control" autocomplete="current-password" placeholder="Masukkan password administrator">
+                    </div>
+                    <button type="button" class="btn btn-primary w-100 fw-bold py-2" id="btnConfirmEnable2FA" style="border-radius: 0.75rem; background: #1e56a0;">
+                        <i class="fas fa-check-circle me-2"></i>Verifikasi &amp; Aktifkan 2FA
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Disable 2FA -->
+    <div class="modal fade" id="modalDisable2FA" tabindex="-1" aria-labelledby="modalDisable2FALabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 1rem; border: none;">
+                <div class="modal-header border-0 p-4 pb-0">
+                    <h5 class="fw-bold" id="modalDisable2FALabel"><i class="fas fa-exclamation-triangle me-2 text-danger"></i>Nonaktifkan 2FA</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-secondary small mb-3">Masukkan password akun administrator Anda saat ini untuk menonaktifkan 2FA.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted" for="inputDisable2FAPassword">PASSWORD SAAT INI</label>
+                        <input type="password" id="inputDisable2FAPassword" class="form-control" autocomplete="current-password" placeholder="Masukkan password">
+                    </div>
+                    <button type="button" class="btn btn-danger w-100 fw-bold py-2" id="btnConfirmDisable2FA" style="border-radius: 0.75rem;">
+                        <i class="fas fa-times-circle me-2"></i>Konfirmasi Nonaktifkan 2FA
+                    </button>
                 </div>
             </div>
         </div>
@@ -318,7 +398,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script nonce="{{ csp_nonce }}">
     document.addEventListener('DOMContentLoaded', function() {
         const btnUbahFoto = document.getElementById('btnUbahFoto');
         const fileInput = document.getElementById('profilePictureInput');
@@ -358,7 +439,7 @@
                     if (data.success) {
                         // Update avatar image
                         if (avatarImg) {
-                            avatarImg.src = data.file_url + '?v=' + new Date().getTime();
+                            avatarImg.src = data.file_url + (data.file_url.includes('?') ? '&' : '?') + 'v=' + new Date().getTime();
                         }
                         alert('Foto profil berhasil diperbarui!');
                     } else {
@@ -501,6 +582,13 @@
                 updateNotifSetting(null, this.checked);
             });
         }
+
+        const btnSubmitGantiSandi = document.getElementById('btnSubmitGantiSandi');
+        if (btnSubmitGantiSandi) {
+            btnSubmitGantiSandi.addEventListener('click', function() {
+                window.submitGantiSandi();
+            });
+        }
     });
 
     window.submitGantiSandi = function() {
@@ -511,8 +599,19 @@
             alert('Password baru tidak boleh kosong!');
             return;
         }
-        if (newPw.length < 6) {
-            alert('Password minimal 6 karakter!');
+        const oldPwEl = document.getElementById('inputOldPassword');
+        const oldPw = oldPwEl ? oldPwEl.value : '';
+        if (!oldPw) {
+            alert('Password lama wajib diisi!');
+            if (oldPwEl) oldPwEl.focus();
+            return;
+        }
+        if (newPw.length < 8) {
+            alert('Password baru minimal 8 karakter!');
+            return;
+        }
+        if (oldPw === newPw) {
+            alert('Password baru tidak boleh sama dengan password lama!');
             return;
         }
         if (newPw !== confirmPw) {
@@ -521,7 +620,9 @@
         }
         
         const formData = new FormData();
+        formData.append('old_password', oldPw);
         formData.append('new_password', newPw);
+        formData.append('confirm_password', confirmPw);
         
         fetch("{% url 'tamu:api_change_password' %}", {
             method: 'POST',
@@ -545,5 +646,87 @@
             alert('Terjadi kesalahan saat menghubungi server.');
         });
     };
+
+    (function initAdmin2FA() {
+        const btnStartSetup = document.getElementById('btnStartSetup2FA');
+        const btnConfirmEnable = document.getElementById('btnConfirmEnable2FA');
+        const btnConfirmDisable = document.getElementById('btnConfirmDisable2FA');
+
+        if (btnStartSetup) {
+            btnStartSetup.addEventListener('click', function() {
+                fetch("{% url 'tamu:api_admin_2fa_setup' %}", {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert(data.error || 'Gagal memulai setup 2FA.');
+                        return;
+                    }
+                    document.getElementById('text2faSecret').textContent = data.secret_formatted || data.secret;
+                    const qrContainer = document.getElementById('qr2faContainer');
+                    qrContainer.innerHTML = '';
+                    if (typeof QRCode !== 'undefined' && data.otpauth_uri) {
+                        new QRCode(qrContainer, { text: data.otpauth_uri, width: 168, height: 168 });
+                    }
+                    document.getElementById('inputVerifyOtp2FA').value = '';
+                    const pwdInput = document.getElementById('inputEnable2FAPassword');
+                    if (pwdInput) pwdInput.value = '';
+                    new bootstrap.Modal(document.getElementById('modalSetup2FA')).show();
+                })
+                .catch(() => alert('Terjadi kesalahan saat memulai setup 2FA.'));
+            });
+        }
+
+        if (btnConfirmEnable) {
+            btnConfirmEnable.addEventListener('click', function() {
+                const otpCode = (document.getElementById('inputVerifyOtp2FA').value || '').trim();
+                const password = document.getElementById('inputEnable2FAPassword')?.value || '';
+                fetch("{% url 'tamu:api_admin_2fa_enable' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ otp_code: otpCode, password: password })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('2FA berhasil diaktifkan!');
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Kode OTP tidak valid.');
+                    }
+                })
+                .catch(() => alert('Gagal mengaktifkan 2FA.'));
+            });
+        }
+
+        if (btnConfirmDisable) {
+            btnConfirmDisable.addEventListener('click', function() {
+                const password = document.getElementById('inputDisable2FAPassword').value || '';
+                fetch("{% url 'tamu:api_admin_2fa_disable' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ password: password })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('2FA berhasil dinonaktifkan.');
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Gagal menonaktifkan 2FA.');
+                    }
+                })
+                .catch(() => alert('Gagal menonaktifkan 2FA.'));
+            });
+        }
+    })();
 </script>
 {% endblock %}
