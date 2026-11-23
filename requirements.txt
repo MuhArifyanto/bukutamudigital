@@ -14,5 +14,5 @@ cloudinary==1.46.1
 django-cloudinary-storage==0.3.0
 channels-redis==4.3.0
 redis==8.1.0
-cryptography==50.0.1
+cryptography==50.0.2
 Pillow==13.0.0
