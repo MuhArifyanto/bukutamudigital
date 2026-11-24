@@ -528,7 +528,7 @@ def call_n8n_routing(kunjungan_id, purpose, department=None, arrival_time=None, 
         logger.warning("N8N_WEBHOOK_URL ditolak karena skema URL tidak valid.")
         return None
 
-    timeout_seconds = int(os.getenv('N8N_WEBHOOK_TIMEOUT', '5'))
+    timeout_seconds = int(os.getenv('N8N_WEBHOOK_TIMEOUT', '12'))
 
     arrival_str = (
         arrival_time.isoformat()
@@ -562,7 +562,10 @@ def call_n8n_routing(kunjungan_id, purpose, department=None, arrival_time=None, 
             resp_body = resp.read().decode('utf-8')
             logger.info("N8N Webhook responded HTTP %s for kunjungan %s", resp.status, kunjungan_id)
             try:
-                return json.loads(resp_body)
+                parsed = json.loads(resp_body)
+                if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+                    parsed = parsed[0]
+                return parsed
             except json.JSONDecodeError:
                 return {'raw': resp_body}
 
@@ -3122,7 +3125,8 @@ def build_n8n_chat_response(tamu_id, message_text, session_id=None):
         pass
 
     n8n_chat_url = (os.getenv('N8N_CHAT_WEBHOOK_URL') or '').strip()
-    if not n8n_res and n8n_chat_url and _is_valid_webhook_url(n8n_chat_url):
+    n8n_routing_url = (os.getenv('N8N_WEBHOOK_URL') or '').strip()
+    if not n8n_res and n8n_chat_url and n8n_chat_url != n8n_routing_url and _is_valid_webhook_url(n8n_chat_url):
         try:
             import urllib.request
             payload = json.dumps({
@@ -3137,10 +3141,13 @@ def build_n8n_chat_response(tamu_id, message_text, session_id=None):
                 headers=_build_n8n_headers('BukuDigital-ChatAI/1.0'),
                 method='POST'
             )
-            timeout = int(os.getenv('N8N_WEBHOOK_TIMEOUT', '5'))
+            timeout = int(os.getenv('N8N_WEBHOOK_TIMEOUT', '12'))
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 resp_data = resp.read().decode('utf-8')
-                n8n_res = json.loads(resp_data)
+                parsed = json.loads(resp_data)
+                if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+                    parsed = parsed[0]
+                n8n_res = parsed
         except Exception as e:
             logger.warning("Panggilan N8N Chat Webhook gagal atau timeout: %s", e)
             n8n_res = None
