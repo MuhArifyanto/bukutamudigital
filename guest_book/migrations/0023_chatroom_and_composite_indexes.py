@@ -6,6 +6,112 @@ from django.db import migrations, models
 from django.db.models import Max
 
 
+CHAT_MESSAGE_INDEXES = [
+    models.Index(fields=['session_id', 'is_read', 'sender_type'], name='idx_chat_sess_read_sender'),
+    models.Index(fields=['room', 'created_at'], name='idx_chat_room_created'),
+    models.Index(fields=['room', 'is_read', 'sender_type'], name='idx_chat_room_read_sender'),
+]
+
+CHAT_ROOM_INDEXES = [
+    models.Index(fields=['room_type', 'last_message_at'], name='idx_chatroom_type_lastmsg'),
+    models.Index(fields=['tamu', 'room_type'], name='idx_chatroom_tamu_type'),
+    models.Index(fields=['pegawai', 'room_type'], name='idx_chatroom_pegawai_type'),
+]
+
+
+def safe_apply_0023_schema(apps, schema_editor):
+    """
+    Terapkan skema ChatRoom, kolom room_id pada ChatMessage, dan composite indexes
+    secara idempoten dan kompatibel dengan TiDB Cloud / MySQL 8.0 / SQLite.
+    Menghindari TiDB Error 8200 (multi-schema change: ADD COLUMN + inline ADD CONSTRAINT FK).
+    """
+    connection = schema_editor.connection
+    ChatRoom = apps.get_model('guest_book', 'ChatRoom')
+    ChatMessage = apps.get_model('guest_book', 'ChatMessage')
+
+    if connection.vendor == 'mysql':
+        with connection.cursor() as cursor:
+            # 1. Buat tabel chat_room jika belum ada
+            cursor.execute("SHOW TABLES LIKE 'chat_room'")
+            if not cursor.fetchall():
+                cursor.execute(
+                    """
+                    CREATE TABLE `chat_room` (
+                        `id` char(32) NOT NULL PRIMARY KEY,
+                        `session_id` varchar(255) NOT NULL,
+                        `room_type` varchar(20) NOT NULL,
+                        `last_message_at` datetime(6) NULL,
+                        `created_at` datetime(6) NOT NULL,
+                        `updated_at` datetime(6) NOT NULL,
+                        `kunjungan_id` char(32) NULL,
+                        `pegawai_id` char(32) NULL,
+                        `tamu_id` char(32) NULL,
+                        UNIQUE KEY `session_id` (`session_id`)
+                    )
+                    """
+                )
+
+            # 2. Tambahkan kolom room_id ke chat_message tanpa inline FK (mencegah TiDB Error 8200)
+            cursor.execute("SHOW COLUMNS FROM `chat_message` LIKE 'room_id'")
+            if not cursor.fetchall():
+                cursor.execute("ALTER TABLE `chat_message` ADD COLUMN `room_id` char(32) NULL")
+
+            # 3. Tambahkan index pada chat_message satu per satu jika belum ada
+            cursor.execute("SHOW INDEX FROM `chat_message`")
+            cm_indexes = {row[2] for row in cursor.fetchall()}
+            mysql_cm_indexes = [
+                ('idx_chat_sess_read_sender', '(`session_id`, `is_read`, `sender_type`)'),
+                ('idx_chat_room_created', '(`room_id`, `created_at`)'),
+                ('idx_chat_room_read_sender', '(`room_id`, `is_read`, `sender_type`)'),
+            ]
+            for idx_name, cols_sql in mysql_cm_indexes:
+                if idx_name not in cm_indexes:
+                    try:
+                        cursor.execute(f"CREATE INDEX `{idx_name}` ON `chat_message` {cols_sql}")
+                    except Exception:
+                        pass
+
+            # 4. Tambahkan index pada chat_room satu per satu jika belum ada
+            cursor.execute("SHOW INDEX FROM `chat_room`")
+            cr_indexes = {row[2] for row in cursor.fetchall()}
+            mysql_cr_indexes = [
+                ('idx_chatroom_type_lastmsg', '(`room_type`, `last_message_at`)'),
+                ('idx_chatroom_tamu_type', '(`tamu_id`, `room_type`)'),
+                ('idx_chatroom_pegawai_type', '(`pegawai_id`, `room_type`)'),
+            ]
+            for idx_name, cols_sql in mysql_cr_indexes:
+                if idx_name not in cr_indexes:
+                    try:
+                        cursor.execute(f"CREATE INDEX `{idx_name}` ON `chat_room` {cols_sql}")
+                    except Exception:
+                        pass
+    else:
+        with connection.cursor() as cursor:
+            existing_tables = set(connection.introspection.table_names(cursor))
+
+        if 'chat_room' not in existing_tables:
+            schema_editor.create_model(ChatRoom)
+
+        with connection.cursor() as cursor:
+            existing_cols = {
+                col.name for col in connection.introspection.get_table_description(cursor, 'chat_message')
+            }
+
+        if 'room_id' not in existing_cols:
+            room_field = ChatMessage._meta.get_field('room')
+            schema_editor.add_field(ChatMessage, room_field)
+
+        with connection.cursor() as cursor:
+            cm_constraints = set(connection.introspection.get_constraints(cursor, 'chat_message').keys())
+
+        for idx in CHAT_MESSAGE_INDEXES:
+            if idx.name not in cm_constraints:
+                try:
+                    schema_editor.add_index(ChatMessage, idx)
+                except Exception:
+                    pass
+
+
 def backfill_chat_rooms(apps, schema_editor):
     """Backfill ChatRoom terstruktur dari session_id ChatMessage yang sudah ada."""
     from guest_book.models import parse_chat_session_id
@@ -92,52 +198,58 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='ChatRoom',
-            fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('session_id', models.CharField(max_length=255, unique=True)),
-                ('room_type', models.CharField(choices=[('tamu_admin', 'Tamu - Admin'), ('pegawai_admin', 'Pegawai - Admin'), ('kunjungan', 'Tamu - Pegawai (Kunjungan)'), ('custom', 'Lainnya')], default='custom', max_length=20)),
-                ('last_message_at', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('kunjungan', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='chat_rooms', to='guest_book.kunjungan')),
-                ('pegawai', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='chat_rooms', to='guest_book.pegawai')),
-                ('tamu', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='chat_rooms', to='guest_book.tamu')),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.CreateModel(
+                    name='ChatRoom',
+                    fields=[
+                        ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                        ('session_id', models.CharField(max_length=255, unique=True)),
+                        ('room_type', models.CharField(choices=[('tamu_admin', 'Tamu - Admin'), ('pegawai_admin', 'Pegawai - Admin'), ('kunjungan', 'Tamu - Pegawai (Kunjungan)'), ('custom', 'Lainnya')], default='custom', max_length=20)),
+                        ('last_message_at', models.DateTimeField(blank=True, null=True)),
+                        ('created_at', models.DateTimeField(auto_now_add=True)),
+                        ('updated_at', models.DateTimeField(auto_now=True)),
+                        ('kunjungan', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='chat_rooms', to='guest_book.kunjungan')),
+                        ('pegawai', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='chat_rooms', to='guest_book.pegawai')),
+                        ('tamu', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='chat_rooms', to='guest_book.tamu')),
+                    ],
+                    options={
+                        'db_table': 'chat_room',
+                        'ordering': ['-last_message_at', '-created_at'],
+                    },
+                ),
+                migrations.AddField(
+                    model_name='chatmessage',
+                    name='room',
+                    field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='guest_book.chatroom'),
+                ),
+                migrations.AddIndex(
+                    model_name='chatmessage',
+                    index=models.Index(fields=['session_id', 'is_read', 'sender_type'], name='idx_chat_sess_read_sender'),
+                ),
+                migrations.AddIndex(
+                    model_name='chatmessage',
+                    index=models.Index(fields=['room', 'created_at'], name='idx_chat_room_created'),
+                ),
+                migrations.AddIndex(
+                    model_name='chatmessage',
+                    index=models.Index(fields=['room', 'is_read', 'sender_type'], name='idx_chat_room_read_sender'),
+                ),
+                migrations.AddIndex(
+                    model_name='chatroom',
+                    index=models.Index(fields=['room_type', 'last_message_at'], name='idx_chatroom_type_lastmsg'),
+                ),
+                migrations.AddIndex(
+                    model_name='chatroom',
+                    index=models.Index(fields=['tamu', 'room_type'], name='idx_chatroom_tamu_type'),
+                ),
+                migrations.AddIndex(
+                    model_name='chatroom',
+                    index=models.Index(fields=['pegawai', 'room_type'], name='idx_chatroom_pegawai_type'),
+                ),
             ],
-            options={
-                'db_table': 'chat_room',
-                'ordering': ['-last_message_at', '-created_at'],
-            },
+            database_operations=[],
         ),
-        migrations.AddField(
-            model_name='chatmessage',
-            name='room',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='guest_book.chatroom'),
-        ),
-        migrations.AddIndex(
-            model_name='chatmessage',
-            index=models.Index(fields=['session_id', 'is_read', 'sender_type'], name='idx_chat_sess_read_sender'),
-        ),
-        migrations.AddIndex(
-            model_name='chatmessage',
-            index=models.Index(fields=['room', 'created_at'], name='idx_chat_room_created'),
-        ),
-        migrations.AddIndex(
-            model_name='chatmessage',
-            index=models.Index(fields=['room', 'is_read', 'sender_type'], name='idx_chat_room_read_sender'),
-        ),
-        migrations.AddIndex(
-            model_name='chatroom',
-            index=models.Index(fields=['room_type', 'last_message_at'], name='idx_chatroom_type_lastmsg'),
-        ),
-        migrations.AddIndex(
-            model_name='chatroom',
-            index=models.Index(fields=['tamu', 'room_type'], name='idx_chatroom_tamu_type'),
-        ),
-        migrations.AddIndex(
-            model_name='chatroom',
-            index=models.Index(fields=['pegawai', 'room_type'], name='idx_chatroom_pegawai_type'),
-        ),
+        migrations.RunPython(safe_apply_0023_schema, migrations.RunPython.noop),
         migrations.RunPython(backfill_chat_rooms, migrations.RunPython.noop),
     ]
