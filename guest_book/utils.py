@@ -3151,6 +3151,14 @@ def build_n8n_chat_response(tamu_id, message_text, session_id=None):
         # Cek apakah memori konteks sesi lokal mengenali pertanyaan lanjutan ini
         local_res = _detect_user_intent_locally(message_text, session_id=sess_key)
         if local_res and local_res.get('intent') != 'di_luar_konteks':
+            n8n_custom_reply = str(n8n_res.get('reply') or n8n_res.get('replay') or '').lstrip('=').strip()
+            if (
+                local_res.get('intent') == 'sapaan'
+                and n8n_custom_reply
+                and not n8n_custom_reply.startswith('Maaf, saya Asisten Buku Tamu')
+                and not n8n_custom_reply.startswith('"Maaf, saya Asisten Buku Tamu')
+            ):
+                local_res = dict(local_res, reply=n8n_custom_reply)
             n8n_res = local_res
 
     # 3. Gabungkan respon N8N dengan data sistem & rule 3-Strike Handoff
