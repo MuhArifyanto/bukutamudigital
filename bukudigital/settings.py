@@ -360,12 +360,36 @@ _STATICFILES_BACKEND = (
 )
 
 CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', '').strip()
+CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', '').strip()
+CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY', '').strip()
+CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET', '').strip()
+_HAS_CLOUDINARY_CREDENTIALS = bool(
+    CLOUDINARY_URL
+    or (CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
+)
 FORCE_CLOUDINARY_TEST = os.getenv('FORCE_CLOUDINARY_TEST', 'False').lower() in ('true', '1')
-if CLOUDINARY_URL and ('test' not in sys.argv or FORCE_CLOUDINARY_TEST):
-    DEFAULT_FILE_STORAGE = 'guest_book.storage.DynamicMediaCloudinaryStorage'
+if _HAS_CLOUDINARY_CREDENTIALS:
     CLOUDINARY_STORAGE = {
         'SECURE': True,
     }
+    if not CLOUDINARY_URL:
+        CLOUDINARY_STORAGE.update({
+            'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
+            'API_KEY': CLOUDINARY_API_KEY,
+            'API_SECRET': CLOUDINARY_API_SECRET,
+        })
+else:
+    # Placeholder agar import cloudinary_storage di guest_book/storage.py tidak
+    # melempar ImproperlyConfigured saat CLOUDINARY_URL belum diset di Render/CI.
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': 'local-fallback-disabled',
+        'API_KEY': '',
+        'API_SECRET': '',
+        'SECURE': True,
+    }
+
+if _HAS_CLOUDINARY_CREDENTIALS and ('test' not in sys.argv or FORCE_CLOUDINARY_TEST):
+    DEFAULT_FILE_STORAGE = 'guest_book.storage.DynamicMediaCloudinaryStorage'
     STORAGES = {
         'default': {'BACKEND': 'guest_book.storage.DynamicMediaCloudinaryStorage'},
         'staticfiles': {'BACKEND': _STATICFILES_BACKEND},
@@ -453,7 +477,7 @@ if SENTRY_DSN:
     except ImportError:
         pass
 
-if IS_PRODUCTION and not CLOUDINARY_URL:
+if IS_PRODUCTION and not _HAS_CLOUDINARY_CREDENTIALS:
     import logging
     logging.getLogger(__name__).warning(
         "PERINGATAN PRODUKSI: CLOUDINARY_URL belum diset. File media (foto profil dan lampiran chat) "
