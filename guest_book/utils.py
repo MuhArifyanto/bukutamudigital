@@ -539,6 +539,7 @@ def call_n8n_routing(kunjungan_id, purpose, department=None, arrival_time=None, 
     payload = {
         'kunjungan_id': str(kunjungan_id or ''),
         'purpose': str(purpose or '')[:500],
+        'message': str(purpose or '')[:2000],
         'department': str(department or '')[:255],
         'arrival_time': arrival_str,
         'timestamp': timezone.now().isoformat(),
@@ -3184,7 +3185,7 @@ def _enrich_n8n_chat_assistant_response(tamu_id, message_text, n8n_res, sess_key
     from .validators import get_daily_quota_info
 
     intent = str(n8n_res.get('intent') or 'di_luar_konteks').lower()
-    ai_reply = n8n_res.get('reply') or n8n_res.get('replay') or ''
+    ai_reply = str(n8n_res.get('reply') or n8n_res.get('replay') or '').lstrip('=').strip()
     n8n_wants_handoff = bool(n8n_res.get('handoff'))
 
     tamu = None
