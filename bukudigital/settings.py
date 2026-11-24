@@ -85,14 +85,28 @@ if IS_PRODUCTION:
     else:
         SECURE_PROXY_SSL_HEADER = None
 
-    # DatabaseCache di production: konsisten antar-worker Gunicorn tanpa perlu Redis
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-            'LOCATION': CACHE_TABLE_NAME,
-            'TIMEOUT': 86400,
+    # Gunakan LocMemCache secara default pada single-container PaaS (Render) jika Redis tidak diset,
+    # agar setiap cache.get/set tidak berubah menjadi query SQL jarak jauh ke TiDB Cloud.
+    use_locmem_prod = os.getenv(
+        'USE_LOCMEM_CACHE',
+        'True' if os.getenv('RENDER') == 'true' else 'False',
+    ).lower() in ('true', '1')
+    if use_locmem_prod:
+        CACHES = {
+            'default': {
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'LOCATION': 'bukudigital-prod-mem',
+                'TIMEOUT': 86400,
+            }
         }
-    }
+    else:
+        CACHES = {
+            'default': {
+                'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+                'LOCATION': CACHE_TABLE_NAME,
+                'TIMEOUT': 86400,
+            }
+        }
 
 else:
     # ── MODE LOCAL (Pengembangan HTTP Lokal) ───────────────────────────────────
@@ -238,7 +252,8 @@ DATABASES = {
         'HOST': DB_HOST,
         'PORT': DB_PORT,
         'OPTIONS': DB_OPTIONS,
-        'CONN_MAX_AGE': 60,  # Mempertahankan koneksi DB selama 60 detik (persistent connections)
+        'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '300')),  # Pertahankan koneksi SSL TiDB/MySQL selama 5 menit
+        'CONN_HEALTH_CHECKS': True,  # Reconnect otomatis jika koneksi idle ditutup server DB
     }
 }
 
