@@ -307,6 +307,46 @@ class QueryPerformanceAndBoundsTests(TestCase):
         self.assertEqual(msgs[0].content, 'Pesan ke-16')
         self.assertEqual(msgs[-1].content, 'Pesan ke-65')
 
+    def test_api_summarize_chat_conversation_returns_structured_summary(self):
+        tamu = Tamu.objects.create(
+            name='Tamu Ringkasan AI',
+            email='tamu.ringkasan@example.com',
+            phone='081277778888',
+            instansi='Universitas Pelita Bangsa',
+            account_status='active',
+        )
+        sid = str(tamu.id)
+        room = ChatRoom.resolve_or_create_for_session(sid)
+        ChatMessage.objects.create(
+            room=room,
+            session_id=sid,
+            sender_type='tamu',
+            sender_id=sid,
+            content='Halo, saya mau menanyakan syarat pengajuan magang mahasiswa di Diskominfosantik.',
+        )
+        ChatMessage.objects.create(
+            room=room,
+            session_id=sid,
+            sender_type='admin',
+            sender_id='admin',
+            content='🤖 Asisten AI Diskominfosantik:\nBerikut persyaratan pendaftaran magang mahasiswa...',
+        )
+
+        resp = self.client.post(
+            reverse('tamu:api_summarize_chat'),
+            data=json.dumps({'session_id': sid}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['participant_name'], 'Tamu Ringkasan AI')
+        self.assertEqual(data['message_count'], 2)
+        self.assertTrue(data['summary'])
+        self.assertTrue(data['dominant_intent'])
+        self.assertTrue(data['recommended_action'])
+
+
 
 class AdminNotificationPreferencesDBTests(TestCase):
     """C-4: Preferensi notifikasi admin disimpan di database (Admin model), bukan disk."""

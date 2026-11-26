@@ -63,6 +63,7 @@ urlpatterns = [
     path('admin-portal/kalender/download-template/', views.admin_kalender_download_template, name='admin_kalender_download_template'),
     path('admin-portal/api/chat/send/', views.api_send_chat_message, name='api_send_chat_send'),
     path('admin-portal/api/chat/messages/', views.api_get_chat_messages, name='api_get_chat_messages'),
+    path('admin-portal/api/chat/summarize/', views.api_summarize_chat_conversation, name='api_summarize_chat'),
     path('api/chat/messages/', views.api_get_chat_messages, name='api_chat_messages'),
     path('admin-portal/api/chat/delete/<uuid:message_id>/', views.api_delete_chat_message, name='api_delete_chat_message'),
     path('api/chat/upload/', views.api_upload_chat_file, name='api_upload_chat_file'),

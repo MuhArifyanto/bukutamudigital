@@ -22,6 +22,7 @@ from .api_chat import (  # noqa: F401
     api_search_users,
     api_get_chat_messages,
     api_delete_chat_message,
+    api_summarize_chat_conversation,
 )
 
 from .api_admin import (  # noqa: F401

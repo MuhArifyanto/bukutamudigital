@@ -519,3 +519,43 @@ def api_delete_chat_message(request, message_id):
     except Exception:
         logger.exception("Gagal menghapus pesan chat %s", message_id)
         return JsonResponse({'success': False, 'error': 'Gagal menghapus pesan.'}, status=500)
+
+
+@admin_login_required
+def api_summarize_chat_conversation(request):
+    """
+    Endpoint Ringkasan & Analisis Percakapan AI (Groq LLM) pada halaman Chat Admin.
+    Mendukung metode POST (JSON payload {'session_id': '...'}) maupun GET (?session_id=...).
+    """
+    if request.method not in ('POST', 'GET'):
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    is_admin, _ = check_is_admin(request)
+    if not is_admin:
+        return JsonResponse({'success': False, 'error': 'Akses khusus Administrator.'}, status=403)
+
+    session_id = ''
+    if request.method == 'POST':
+        try:
+            body_data = json.loads(request.body or b'{}')
+            if isinstance(body_data, dict):
+                session_id = str(body_data.get('session_id') or '').strip()
+        except (ValueError, TypeError, json.JSONDecodeError):
+            session_id = ''
+        if not session_id:
+            session_id = str(request.POST.get('session_id') or '').strip()
+    else:
+        session_id = str(request.GET.get('session_id') or '').strip()
+
+    if not session_id:
+        return JsonResponse({'success': False, 'error': 'Parameter session_id wajib diisi.'}, status=400)
+
+    try:
+        from ..utils import summarize_chat_conversation_with_groq
+        result = summarize_chat_conversation_with_groq(session_id)
+        status_code = 200 if result.get('success') else 400
+        return JsonResponse(result, status=status_code)
+    except Exception:
+        logger.exception("Gagal membuat ringkasan percakapan AI untuk sesi %s", session_id)
+        return JsonResponse({'success': False, 'error': 'Gagal membuat ringkasan percakapan AI.'}, status=500)
+

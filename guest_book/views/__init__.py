@@ -27,7 +27,7 @@ from .api import (
     api_get_unread_count, api_update_quota, api_toggle_holiday,
     api_import_calendar_csv, api_send_chat_message,
     api_get_chat_messages, api_upload_chat_file, api_search_users,
-    api_delete_chat_message, api_toggle_user_status,
+    api_delete_chat_message, api_summarize_chat_conversation, api_toggle_user_status,
     api_google_holidays, api_change_password,
     api_quick_checkin, api_update_profile_picture, api_update_profile_data,
     api_tamu_update_profile_picture, api_tamu_update_profile_data,

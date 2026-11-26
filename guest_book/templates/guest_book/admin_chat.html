@@ -377,6 +377,38 @@
         text-overflow: ellipsis !important;
         max-width: 100% !important;
     }
+    .chat-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+    .btn-summarize-ai {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+        color: #6d28d9;
+        border: 1.5px solid #ddd6fe;
+        border-radius: 9999px;
+        padding: 0.35rem 0.85rem;
+        font-size: 0.76rem;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+        transition: all 0.15s ease;
+    }
+    .btn-summarize-ai:hover {
+        background: #7c3aed;
+        color: #ffffff;
+        border-color: #7c3aed;
+        box-shadow: 0 2px 6px rgba(124, 58, 237, 0.28);
+    }
+    .btn-summarize-ai:disabled {
+        opacity: 0.7;
+        cursor: wait;
+    }
     .btn-return-ai-mode {
         display: inline-flex;
         align-items: center;
@@ -403,6 +435,89 @@
         background: #ecfdf5;
         color: #059669;
         border-color: #a7f3d0;
+    }
+    .ai-summary-panel {
+        background: linear-gradient(135deg, #faf5ff 0%, #eff6ff 100%);
+        border-bottom: 1.5px solid #ddd6fe;
+        padding: 0.85rem 1.25rem;
+        font-size: 0.83rem;
+        color: #1e293b;
+        box-shadow: inset 0 -2px 6px rgba(124, 58, 237, 0.04);
+    }
+    .ai-summary-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-bottom: 0.55rem;
+    }
+    .ai-summary-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-weight: 800;
+        font-size: 0.82rem;
+        color: #5b21b6;
+    }
+    .ai-summary-model-pill {
+        background: #ede9fe;
+        color: #6d28d9;
+        border: 1px solid #c4b5fd;
+        border-radius: 9999px;
+        padding: 0.1rem 0.55rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+    }
+    .btn-close-ai-summary {
+        background: transparent;
+        border: none;
+        color: #64748b;
+        font-size: 0.9rem;
+        cursor: pointer;
+        padding: 0.15rem 0.4rem;
+        border-radius: 6px;
+    }
+    .btn-close-ai-summary:hover {
+        background: rgba(100, 116, 139, 0.12);
+        color: #0f172a;
+    }
+    .ai-summary-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-bottom: 0.55rem;
+    }
+    .ai-summary-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.73rem;
+        font-weight: 600;
+        color: #334155;
+    }
+    .ai-summary-body {
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.6rem 0.85rem;
+        line-height: 1.5;
+        margin-bottom: 0.45rem;
+    }
+    .ai-summary-rec {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.45rem;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.78rem;
+        color: #166534;
+        line-height: 1.45;
     }
 
     /* ── Message Area ── */
@@ -904,10 +1019,50 @@
                     </div>
                 </div>
             </div>
-            <button type="button" id="btnAdminReturnToAi" class="btn-return-ai-mode{% if first_conv and first_conv.participant_type == 'pegawai' %} chat-is-hidden{% endif %}" title="Kembalikan sesi tamu ini agar dijawab otomatis oleh Chatbot AI (Gemini & Groq)">
-                <i class="fas fa-robot"></i>
-                <span class="d-none d-sm-inline">Kembalikan ke Chatbot AI</span>
-            </button>
+            <div class="chat-header-actions">
+                <button type="button" id="btnAdminSummarizeChat" class="btn-summarize-ai" title="Ringkas & analisis riwayat percakapan ini secara otomatis menggunakan Groq AI">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <span class="d-none d-sm-inline">Ringkas Percakapan (AI)</span>
+                </button>
+                <button type="button" id="btnAdminReturnToAi" class="btn-return-ai-mode{% if first_conv and first_conv.participant_type == 'pegawai' %} chat-is-hidden{% endif %}" title="Kembalikan sesi tamu ini agar dijawab otomatis oleh Chatbot AI (Gemini & Groq)">
+                    <i class="fas fa-robot"></i>
+                    <span class="d-none d-sm-inline">Kembalikan ke Chatbot AI</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="aiSummaryPanel" class="ai-summary-panel chat-is-hidden">
+            <div class="ai-summary-header">
+                <div class="ai-summary-title">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <span>Ringkasan & Analisis Percakapan AI</span>
+                    <span class="ai-summary-model-pill" id="aiSummaryModelPill">Groq LLM</span>
+                </div>
+                <button type="button" class="btn-close-ai-summary" id="btnCloseAiSummary" title="Tutup Ringkasan">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="ai-summary-badges">
+                <span class="ai-summary-tag">
+                    <i class="fas fa-bullseye text-primary"></i>
+                    <span>Intent: <strong id="aiSummaryIntent">-</strong></span>
+                </span>
+                <span class="ai-summary-tag">
+                    <i class="fas fa-heart-pulse text-danger"></i>
+                    <span>Status/Sentimen: <strong id="aiSummarySentiment">-</strong></span>
+                </span>
+                <span class="ai-summary-tag">
+                    <i class="fas fa-comments text-secondary"></i>
+                    <span>Total Pesan: <strong id="aiSummaryCount">0</strong></span>
+                </span>
+            </div>
+            <div class="ai-summary-body" id="aiSummaryText">
+                Memuat ringkasan dan analisis percakapan...
+            </div>
+            <div class="ai-summary-rec">
+                <i class="fas fa-lightbulb mt-1"></i>
+                <div><strong>Rekomendasi Tindak Lanjut Admin:</strong> <span id="aiSummaryRec">-</span></div>
+            </div>
         </div>
 
         <div class="message-area" id="messageArea">
@@ -1273,6 +1428,69 @@
             });
         }
 
+        const btnSummarize = document.getElementById('btnAdminSummarizeChat');
+        const summaryPanel = document.getElementById('aiSummaryPanel');
+        const btnCloseSummary = document.getElementById('btnCloseAiSummary');
+
+        if (btnCloseSummary && summaryPanel) {
+            btnCloseSummary.addEventListener('click', function() {
+                summaryPanel.classList.add('chat-is-hidden');
+            });
+        }
+
+        if (btnSummarize && summaryPanel) {
+            btnSummarize.addEventListener('click', function() {
+                if (!activeSession) return;
+                const labelEl = btnSummarize.querySelector('span');
+                const iconEl = btnSummarize.querySelector('i');
+                const oldLabel = labelEl ? labelEl.textContent : 'Ringkas Percakapan (AI)';
+                btnSummarize.disabled = true;
+                if (labelEl) labelEl.textContent = 'Merangkum...';
+                if (iconEl) iconEl.className = 'fas fa-spinner fa-spin';
+
+                summaryPanel.classList.remove('chat-is-hidden');
+                const txtEl = document.getElementById('aiSummaryText');
+                const intentEl = document.getElementById('aiSummaryIntent');
+                const sentEl = document.getElementById('aiSummarySentiment');
+                const countEl = document.getElementById('aiSummaryCount');
+                const recEl = document.getElementById('aiSummaryRec');
+                const modelEl = document.getElementById('aiSummaryModelPill');
+
+                if (txtEl) txtEl.textContent = 'Sedang menganalisis riwayat percakapan menggunakan Groq LLM...';
+
+                const csrfEl = document.querySelector('#chatForm [name=csrfmiddlewaretoken]') || document.querySelector('[name=csrfmiddlewaretoken]');
+                fetch('/admin-portal/api/chat/summarize/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(csrfEl ? { 'X-CSRFToken': csrfEl.value } : {})
+                    },
+                    body: JSON.stringify({ session_id: activeSession })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (txtEl) txtEl.textContent = data.summary || '-';
+                        if (intentEl) intentEl.textContent = data.dominant_intent || '-';
+                        if (sentEl) sentEl.textContent = data.sentiment || '-';
+                        if (countEl) countEl.textContent = String(data.message_count ?? 0);
+                        if (recEl) recEl.textContent = data.recommended_action || '-';
+                        if (modelEl && data.model) modelEl.textContent = data.model;
+                    } else {
+                        if (txtEl) txtEl.textContent = data.error || 'Gagal membuat ringkasan percakapan.';
+                    }
+                })
+                .catch(() => {
+                    if (txtEl) txtEl.textContent = 'Terjadi kesalahan jaringan saat menghubungi layanan ringkasan AI.';
+                })
+                .finally(() => {
+                    btnSummarize.disabled = false;
+                    if (labelEl) labelEl.textContent = oldLabel;
+                    if (iconEl) iconEl.className = 'fas fa-wand-magic-sparkles';
+                });
+            });
+        }
+
         if (activeSession) {
             window.__initAdminChatSocket(activeSession, lastMsgId);
         } else {
@@ -1547,6 +1765,8 @@
             if (ind) ind.style.display = 'none';
             const inp = document.getElementById('chatInput');
             if (inp) inp.placeholder = 'Ketik pesan...';
+            const sumPanel = document.getElementById('aiSummaryPanel');
+            if (sumPanel) sumPanel.classList.add('chat-is-hidden');
         },
         onSyncBellBadge: (count) => {
             const badge = document.getElementById('globalNotifBadge');

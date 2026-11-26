@@ -681,6 +681,205 @@ def _call_direct_3agent_ai(message_text: str) -> dict | None:
         return None
 
 
+def summarize_chat_conversation_with_groq(session_id: str) -> dict:
+    """
+    Agent 3 (Summarization & Conversation Analysis Agent - Groq):
+    Merangkum dan menganalisis riwayat percakapan pada halaman Chat Admin
+    untuk membantu petugas memahami konteks pembicaraan secara cepat
+    (mendukung mekanisme Contextual Handover & evaluasi layanan).
+    """
+    import sys
+    from .models import ChatMessage, ChatRoom, Tamu, Pegawai, Kunjungan
+
+    clean_sid = str(session_id or '').strip()
+    if not clean_sid:
+        return {
+            'success': False,
+            'error': 'ID sesi percakapan tidak valid.',
+        }
+
+    parsed = ChatRoom.parse_session_id(clean_sid)
+    room_type = parsed['room_type']
+    entity_uuid = parsed['entity_uuid']
+
+    participant_name = 'Pengguna'
+    participant_role = 'Tamu Resmi'
+    instansi_label = '-'
+
+    if room_type == ChatRoom.RoomType.PEGAWAI_ADMIN and entity_uuid:
+        peg = Pegawai.objects.select_related('department_rel').filter(id=entity_uuid).first()
+        if peg:
+            participant_name = peg.name
+            participant_role = 'Pegawai Dinas'
+            instansi_label = peg.department_rel.nama if peg.department_rel else (peg.department or 'Diskominfosantik')
+    elif entity_uuid:
+        guest = Tamu.objects.filter(id=entity_uuid).first()
+        if guest:
+            participant_name = guest.name
+            participant_role = 'Tamu Resmi'
+            instansi_label = guest.instansi if (guest.instansi and guest.instansi.strip() != '-') else 'Tamu Umum'
+
+    recent_msgs = list(
+        ChatMessage.objects.filter(session_id=clean_sid)
+        .exclude(message_type='deleted')
+        .order_by('-created_at')[:25]
+    )
+    recent_msgs.reverse()
+
+    if not recent_msgs:
+        return {
+            'success': True,
+            'session_id': clean_sid,
+            'participant_name': participant_name,
+            'participant_role': participant_role,
+            'instansi': instansi_label,
+            'message_count': 0,
+            'model': 'Groq LLM (openai/gpt-oss-20b)',
+            'dominant_intent': 'Belum Ada Pesan',
+            'sentiment': 'Netral',
+            'summary': 'Belum terdapat riwayat pesan pada ruang percakapan ini.',
+            'recommended_action': 'Menunggu pesan pertama dari pengguna.',
+            'handoff_active': is_session_handed_off_to_admin(clean_sid),
+        }
+
+    transcript_lines = []
+    user_messages = []
+    for m in recent_msgs:
+        if m.sender_type == 'admin':
+            is_ai = ('🤖' in (m.content or '')) or ('Asisten AI' in (m.content or ''))
+            speaker = 'Asisten AI' if is_ai else 'Petugas Admin'
+        elif m.sender_type == 'pegawai':
+            speaker = f'Pegawai ({participant_name})'
+            if m.content:
+                user_messages.append(m.content.strip())
+        else:
+            speaker = f'Tamu ({participant_name})'
+            if m.content:
+                user_messages.append(m.content.strip())
+        clean_text = (m.content or '').replace('🤖 Asisten AI Diskominfosantik:', '').strip()
+        if len(clean_text) > 320:
+            clean_text = clean_text[:320] + '...'
+        time_str = timezone.localtime(m.created_at).strftime('%H:%M') if m.created_at else ''
+        transcript_lines.append(f"[{time_str}] {speaker}: {clean_text}")
+
+    transcript_text = "\n".join(transcript_lines)
+    combined_user_text = " ".join(user_messages)
+    local_intent_info = _detect_user_intent_locally(user_messages[-1] if user_messages else '', session_id=clean_sid)
+    raw_intent_code = (local_intent_info.get('intent') if isinstance(local_intent_info, dict) else '') or 'sapaan'
+
+    intent_label_map = {
+        'sapaan': 'Sapaan & Pembuka Percakapan',
+        'buat_kunjungan': 'Pengajuan / Pendaftaran Jadwal Kunjungan',
+        'cek_status_kunjungan': 'Pengecekan Status Tiket Kunjungan',
+        'jadwal_kuota': 'Informasi Jam Operasional & Kuota Kunjungan',
+        'info_layanan_dan_pegawai': 'Informasi Layanan Dinas & Pegawai Tujuan',
+        'info_layanan_prosedur': 'Informasi Layanan & Prosedur Standar (SOP)',
+        'sop_dan_layanan_teknis': 'Konsultasi SOP & Layanan Teknis Kedinasan',
+        'pejabat_dan_struktur': 'Informasi Pejabat & Struktur Organisasi',
+        'ubah_jadwal_dan_batal': 'Perubahan Jadwal (Reschedule) / Pembatalan',
+        'keluhan_dan_masukan': 'Keluhan, Masukan & Permintaan Bantuan Petugas',
+        'keluhan_masukan': 'Keluhan, Masukan & Permintaan Bantuan Petugas',
+        'di_luar_konteks': 'Pertanyaan Umum / Di Luar Konteks Buku Tamu',
+    }
+    dominant_intent_label = intent_label_map.get(raw_intent_code, 'Konsultasi Layanan Buku Tamu')
+
+    handoff_active = is_session_handed_off_to_admin(clean_sid)
+    low_combined = combined_user_text.lower()
+    if any(k in low_combined for k in ('keluhan', 'komplain', 'kendala', 'lambat', 'error', 'kecewa', 'bantuan admin', 'petugas')):
+        sentiment_label = 'Perlu Perhatian / Eskalasi Petugas'
+    elif handoff_active:
+        sentiment_label = 'Menunggu Respons Petugas Admin (Handover Aktif)'
+    else:
+        sentiment_label = 'Kondusif / Informatif'
+
+    ai_summary_text = ''
+    ai_recommendation = ''
+    used_live_groq = False
+
+    if 'test' not in sys.argv or os.getenv('FORCE_DIRECT_AI_TEST', '').lower() in ('1', 'true'):
+        try:
+            sys_prompt = (
+                "Anda adalah Agent Ringkasan & Analisis Percakapan Admin pada Sistem Buku Tamu Digital "
+                "Diskominfosantik Kabupaten Bekasi (ditenagai layanan inferensi Groq). "
+                "Tugas Anda adalah membantu Petugas Admin/Resepsionis memahami isi riwayat chat secara cepat, akurat, dan objektif. "
+                "Buat output dalam format JSON valid dengan 4 key: "
+                "\"summary\" (ringkasan pokok permasalahan/keperluan dalam 2-3 kalimat Bahasa Indonesia yang jelas), "
+                "\"dominant_intent\" (kategori maksud utama pengguna dalam 3-6 kata), "
+                "\"sentiment\" (kondisi/urgensi pesan, misal: Kondusif, Butuh Tindak Lanjut Admin, atau Keluhan Layanan), "
+                "\"recommended_action\" (1-2 kalimat saran tindakan konkret bagi Admin)."
+            )
+            user_prompt = (
+                f"Nama Pengguna: {participant_name} ({participant_role} - {instansi_label})\n"
+                f"Status Handover ke Admin: {'Aktif (Dijawab Admin)' if handoff_active else 'Mode Otomatis Chatbot AI'}\n"
+                f"Riwayat Percakapan ({len(recent_msgs)} pesan terakhir):\n{transcript_text}"
+            )
+            raw_groq = _call_groq_chat_completion(
+                user_prompt,
+                sys_prompt,
+                model='openai/gpt-oss-20b',
+                timeout=8,
+            )
+            if raw_groq:
+                import re
+                json_match = re.search(r'\{.*\}', raw_groq, flags=re.DOTALL)
+                if json_match:
+                    parsed_json = json.loads(json_match.group(0))
+                    ai_summary_text = str(parsed_json.get('summary') or '').strip()
+                    ai_recommendation = str(parsed_json.get('recommended_action') or '').strip()
+                    if parsed_json.get('dominant_intent'):
+                        dominant_intent_label = str(parsed_json['dominant_intent']).strip()
+                    if parsed_json.get('sentiment'):
+                        sentiment_label = str(parsed_json['sentiment']).strip()
+                    used_live_groq = bool(ai_summary_text)
+                else:
+                    ai_summary_text = raw_groq.strip()
+                    used_live_groq = True
+        except Exception as err:
+            logger.warning("Groq chat summarization fallback ke ekstraksi lokal: %s", err)
+
+    if not ai_summary_text:
+        last_user_q = user_messages[-1] if user_messages else 'Belum ada pertanyaan spesifik dari pengguna.'
+        first_user_q = user_messages[0] if user_messages else ''
+        if len(user_messages) > 1 and first_user_q != last_user_q:
+            ai_summary_text = (
+                f"{participant_name} ({participant_role}) memulai percakapan mengenai \"{first_user_q[:100]}\" "
+                f"dan pesan terakhir berkaitan dengan \"{last_user_q[:120]}\" "
+                f"(Total {len(recent_msgs)} pesan dalam sesi ini)."
+            )
+        else:
+            ai_summary_text = (
+                f"{participant_name} ({participant_role}) menghubungi layanan chat terkait: \"{last_user_q[:140]}\" "
+                f"dengan kategori intent terdeteksi sebagai {dominant_intent_label}."
+            )
+
+    if not ai_recommendation:
+        if handoff_active:
+            ai_recommendation = (
+                "Sesi saat ini berada dalam mode penanganan petugas (Contextual Handover aktif). "
+                "Berikan jawaban tindak lanjut secara langsung atau klik 'Kembalikan ke Chatbot AI' apabila kendala telah selesai."
+            )
+        else:
+            ai_recommendation = (
+                "Percakapan sedang ditangani secara otomatis oleh Asisten AI. "
+                "Admin dapat memantau kesesuaian respons atau mengambil alih sesi dengan mengirim balasan manual."
+            )
+
+    return {
+        'success': True,
+        'session_id': clean_sid,
+        'participant_name': participant_name,
+        'participant_role': participant_role,
+        'instansi': instansi_label,
+        'message_count': len(recent_msgs),
+        'model': 'Groq LLM (openai/gpt-oss-20b)' if used_live_groq else 'Groq LLM + NLP Analyzer',
+        'dominant_intent': dominant_intent_label,
+        'sentiment': sentiment_label,
+        'summary': ai_summary_text,
+        'recommended_action': ai_recommendation,
+        'handoff_active': handoff_active,
+    }
+
+
 def _is_valid_webhook_url(url: str) -> bool:
     """Pastikan URL webhook menggunakan skema HTTP/HTTPS yang valid (anti file:// / SSRF skema non-HTTP)."""
     from urllib.parse import urlparse
