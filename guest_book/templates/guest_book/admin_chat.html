@@ -655,9 +655,19 @@
     }
 
     /* ── Empty & Utility ── */
+    .active-room-shell {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        height: 100%;
+        min-height: 0;
+    }
+    .chat-is-hidden {
+        display: none !important;
+    }
     .empty-chat {
         flex: 1 !important;
-        display: flex !important;
+        display: flex;
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
@@ -665,6 +675,10 @@
         text-align: center !important;
         background: var(--chat-bg-soft) !important;
         padding: 2rem !important;
+    }
+    .empty-chat[style*="display: none"],
+    .empty-chat[style*="display:none"] {
+        display: none !important;
     }
     .empty-chat-icon {
         width: 72px;
@@ -802,7 +816,7 @@
                         {% else %}
                             <span class="badge-role badge-role-tamu">Tamu</span>
                         {% endif %}
-                        {% if conv.subtitle %}
+                        {% if conv.subtitle and conv.subtitle != '-' %}
                             <span class="badge-dept">{{ conv.subtitle|truncatechars:20 }}</span>
                         {% endif %}
                     </div>
@@ -837,7 +851,7 @@
 
     <!-- Right Chat Window -->
     <div class="chat-window">
-        <div id="activeRoomShell" style="display: {% if conversations %}flex{% else %}none{% endif %}; flex-direction: column; height: 100%; min-height: 0;">
+        <div id="activeRoomShell" class="active-room-shell{% if not conversations %} chat-is-hidden{% endif %}">
         {% with first_conv=conversations.0 %}
         <div class="chat-header">
             <div class="active-user-info">
@@ -859,7 +873,7 @@
                         </span>
                     </div>
                     <div class="room-subtitle">
-                        {{ first_conv.subtitle|default:"Saluran komunikasi terverifikasi" }}
+                        {% if first_conv.subtitle and first_conv.subtitle != '-' %}{{ first_conv.subtitle }}{% else %}Saluran komunikasi terverifikasi{% endif %}
                     </div>
                 </div>
             </div>
@@ -943,7 +957,7 @@
         </div>
         {% endwith %}
         </div>
-        <div class="empty-chat" id="roomEmptyPlaceholder" style="display: {% if conversations %}none{% else %}flex{% endif %};">
+        <div class="empty-chat{% if conversations %} chat-is-hidden{% endif %}" id="roomEmptyPlaceholder">
             <div class="empty-chat-icon"><i class="fas fa-comments"></i></div>
             <h5>Pilih percakapan</h5>
             <p>Pilih salah satu kontak di sebelah kiri untuk mulai mengobrol.</p>
@@ -1397,7 +1411,7 @@
         const roleBadge = role === 'pegawai'
             ? '<span class="badge-role badge-role-pegawai">Pegawai</span>'
             : '<span class="badge-role badge-role-tamu">Tamu</span>';
-        const deptBadge = safeSub ? `<span class="badge-dept">${safeSub.slice(0, 20)}</span>` : '';
+        const deptBadge = (safeSub && safeSub !== '-') ? `<span class="badge-dept">${safeSub.slice(0, 20)}</span>` : '';
         const unreadHtml = unread > 0 ? `<span class="badge-unread">${unread}</span>` : '';
 
         div.innerHTML = `
@@ -1437,8 +1451,14 @@
         ensureRoomVisible: () => {
             const shell = document.getElementById('activeRoomShell');
             const emptyPh = document.getElementById('roomEmptyPlaceholder');
-            if (shell) shell.style.display = 'flex';
-            if (emptyPh) emptyPh.style.display = 'none';
+            if (shell) {
+                shell.classList.remove('chat-is-hidden');
+                shell.style.display = 'flex';
+            }
+            if (emptyPh) {
+                emptyPh.classList.add('chat-is-hidden');
+                emptyPh.style.display = 'none';
+            }
         },
         getHeaderIconHtml: (meta) => meta.participant_type === 'pegawai'
             ? '<i class="fas fa-user-tie"></i>'

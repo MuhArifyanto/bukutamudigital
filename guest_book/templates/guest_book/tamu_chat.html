@@ -721,9 +721,12 @@
     }
 
     /* ── Empty & Utility ── */
+    .chat-is-hidden {
+        display: none !important;
+    }
     .empty-chat {
         flex: 1 !important;
-        display: flex !important;
+        display: flex;
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
@@ -980,7 +983,7 @@
                 <i class="fas fa-circle-notch fa-spin"></i> <span>Asisten AI sedang memproses jawaban...</span>
             </div>
             
-            <div class="ai-quick-chips" id="aiQuickChips" style="display: {% if active_conv.type == 'admin' and not ai_handoff_active %}flex{% else %}none{% endif %};">
+            <div class="ai-quick-chips{% if active_conv.type != 'admin' or ai_handoff_active %} chat-is-hidden{% endif %}" id="aiQuickChips">
                 <button type="button" class="ai-chip-btn" data-prompt="Cek status kunjungan saya saat ini">Cek Status Kunjungan</button>
                 <button type="button" class="ai-chip-btn" data-prompt="Berapa sisa kuota kunjungan dan jam operasional hari ini?">Jadwal & Sisa Kuota</button>
                 <button type="button" class="ai-chip-btn" data-prompt="SOP permohonan TTE BSrE dan pengajuan subdomain hosting OPD">SOP TTE & Hosting</button>
@@ -1046,7 +1049,10 @@
             btnToggleAi.innerHTML = '<i class="fas fa-user-shield"></i> <span class="d-none d-sm-inline">Terhubung ke </span>Admin';
             btnToggleAi.title = 'Saat ini terhubung langsung dengan Admin. Klik jika ingin kembali ke Asisten AI.';
         }
-        if (aiChips) aiChips.style.display = 'none';
+        if (aiChips) {
+            aiChips.classList.add('chat-is-hidden');
+            aiChips.style.display = 'none';
+        }
         if (chatInput) chatInput.placeholder = 'Ketik pesan langsung untuk Petugas Admin...';
     }
 
@@ -1061,7 +1067,10 @@
             btnToggleAi.innerHTML = '<i class="fas fa-robot"></i> <span class="d-none d-sm-inline">Dilayani </span>Asisten AI';
             btnToggleAi.title = 'Dilayani oleh Asisten AI terlebih dahulu (otomatis beralih ke Admin jika 3x belum terjawab/kurang sesuai)';
         }
-        if (aiChips) aiChips.style.display = 'flex';
+        if (aiChips) {
+            aiChips.classList.remove('chat-is-hidden');
+            aiChips.style.display = 'flex';
+        }
         if (chatInput) chatInput.placeholder = 'Tanya Asisten AI atau ketik pesan...';
     }
 
@@ -1074,7 +1083,10 @@
         const typingEl = document.getElementById('aiTypingIndicator');
         const chatInput = document.getElementById('chatInput');
         if (hdr) { hdr.classList.remove('d-flex'); hdr.classList.add('d-none'); }
-        if (aiChips) aiChips.style.display = 'none';
+        if (aiChips) {
+            aiChips.classList.add('chat-is-hidden');
+            aiChips.style.display = 'none';
+        }
         if (typingEl) typingEl.style.display = 'none';
         if (chatInput) chatInput.placeholder = 'Ketik pesan...';
     }
@@ -1245,6 +1257,8 @@
                         if (aiTypingTimeout) clearTimeout(aiTypingTimeout);
                         if (data.handoff_active || (data.message && data.message.indexOf('[Dialihkan Otomatis ke Petugas Admin]') !== -1) || (data.sender_type === 'admin' && data.message && data.message.indexOf('🤖 Asisten AI') === -1)) {
                             switchUiToAdminHandoff();
+                        } else if (isHandoffActive && data.message && data.message.indexOf('🤖 Asisten AI') !== -1) {
+                            switchUiToAiAssistant();
                         }
                     }
                     if (type === 'received' && isLive) {

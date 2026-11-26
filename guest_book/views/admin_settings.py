@@ -258,13 +258,14 @@ def admin_chat_view(request):
             if not guest:
                 continue
 
+            guest_instansi = (guest.instansi or '').strip()
             conv_data = {
                 'session_id': sid,
                 'participant_type': 'tamu',
                 'guest': guest,
                 'pegawai': None,
                 'name': guest.name,
-                'subtitle': guest.instansi or 'Tamu',
+                'subtitle': guest_instansi if (guest_instansi and guest_instansi != '-') else 'Tamu Umum',
             }
         else:
             continue
@@ -309,10 +310,11 @@ def admin_chat_view(request):
             guest = Tamu.objects.filter(id=parsed_active['entity_uuid']).first()
             if guest:
                 ChatRoom.resolve_or_create_for_session(active_session_id)
+                guest_instansi = (guest.instansi or '').strip()
                 active_conversation = {
                     'session_id': active_session_id, 'participant_type': 'tamu',
                     'guest': guest, 'pegawai': None, 'name': guest.name,
-                    'subtitle': guest.instansi or 'Tamu',
+                    'subtitle': guest_instansi if (guest_instansi and guest_instansi != '-') else 'Tamu Umum',
                     'last_message': None, 'unread_count': 0, 'messages': [],
                 }
 

@@ -351,11 +351,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
-            from .utils import is_session_handed_off_to_admin, process_n8n_chat_assistant
+            from .utils import is_session_handed_off_to_admin, process_n8n_chat_assistant, reset_session_ai_mode
+            msg_low = (message or '').strip().lower()
+            wants_ai_back = any(
+                kw in msg_low
+                for kw in (
+                    'terhubung dengan chatbot',
+                    'terhubung ke chatbot',
+                    'kembali ke chatbot',
+                    'kembali ke ai',
+                    'bicara dengan chatbot',
+                    'bicara dengan ai',
+                    'bicara dengan bot',
+                    'aktifkan chatbot',
+                    'aktifkan ai',
+                    'pakai chatbot',
+                    'gunakan chatbot',
+                )
+            )
+            if sender_type == 'tamu' and wants_ai_back:
+                reset_session_ai_mode(self.session_id)
+
             if (
                 sender_type == 'tamu'
                 and not self.session_id.startswith('kunjungan_')
-                and bool(text_data_json.get('ai_assistant'))
+                and (bool(text_data_json.get('ai_assistant')) or wants_ai_back)
                 and message_type == 'text'
                 and not is_session_handed_off_to_admin(self.session_id)
             ):
