@@ -250,6 +250,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }))
                 return
             await self._reset_ai_session()
+            if sender_type == 'admin':
+                notice_text = (
+                    "🤖 Asisten AI Diskominfosantik:\n"
+                    "Sesi percakapan telah dikembalikan oleh Petugas Admin ke Asisten AI. "
+                    "Silakan sampaikan pertanyaan Anda, saya siap membantu kembali!"
+                )
+                ai_msg = await self.save_message('admin', 'admin', notice_text, 'text', None)
+                await self._broadcast_sidebar_update(ai_msg, 'admin', 'admin', notice_text, 'text')
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'chat_message',
+                        'message_id': str(ai_msg.id),
+                        'message': notice_text,
+                        'sender_id': 'admin',
+                        'sender_type': 'admin',
+                        'message_type': 'text',
+                        'file_url': None,
+                        'created_at': timezone.localtime(ai_msg.created_at).strftime('%H:%M'),
+                        'handoff_active': False,
+                    }
+                )
             await self.send(text_data=json.dumps({
                 'action': 'reset_ai',
                 'success': True,

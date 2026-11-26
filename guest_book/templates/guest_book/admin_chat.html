@@ -377,6 +377,33 @@
         text-overflow: ellipsis !important;
         max-width: 100% !important;
     }
+    .btn-return-ai-mode {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1.5px solid #bfdbfe;
+        border-radius: 9999px;
+        padding: 0.35rem 0.85rem;
+        font-size: 0.76rem;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+        transition: all 0.15s ease;
+    }
+    .btn-return-ai-mode:hover {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    }
+    .btn-return-ai-mode.ai-active-flash {
+        background: #ecfdf5;
+        color: #059669;
+        border-color: #a7f3d0;
+    }
 
     /* ── Message Area ── */
     .page-content .message-area {
@@ -877,6 +904,10 @@
                     </div>
                 </div>
             </div>
+            <button type="button" id="btnAdminReturnToAi" class="btn-return-ai-mode{% if first_conv and first_conv.participant_type == 'pegawai' %} chat-is-hidden{% endif %}" title="Kembalikan sesi tamu ini agar dijawab otomatis oleh Chatbot AI (Gemini & Groq)">
+                <i class="fas fa-robot"></i>
+                <span class="d-none d-sm-inline">Kembalikan ke Chatbot AI</span>
+            </button>
         </div>
 
         <div class="message-area" id="messageArea">
@@ -1226,6 +1257,22 @@
             chatSocket.connect();
         };
 
+        const btnReturnAi = document.getElementById('btnAdminReturnToAi');
+        if (btnReturnAi) {
+            btnReturnAi.addEventListener('click', function() {
+                if (!chatSocket || !activeSession) return;
+                chatSocket.send(JSON.stringify({ action: 'reset_ai' }));
+                btnReturnAi.classList.add('ai-active-flash');
+                const labelEl = btnReturnAi.querySelector('span');
+                const oldText = labelEl ? labelEl.textContent : 'Kembalikan ke Chatbot AI';
+                if (labelEl) labelEl.textContent = 'Chatbot AI Aktif!';
+                setTimeout(() => {
+                    btnReturnAi.classList.remove('ai-active-flash');
+                    if (labelEl) labelEl.textContent = oldText;
+                }, 2500);
+            });
+        }
+
         if (activeSession) {
             window.__initAdminChatSocket(activeSession, lastMsgId);
         } else {
@@ -1460,9 +1507,19 @@
                 emptyPh.style.display = 'none';
             }
         },
-        getHeaderIconHtml: (meta) => meta.participant_type === 'pegawai'
-            ? '<i class="fas fa-user-tie"></i>'
-            : '<i class="fas fa-user-tag"></i>',
+        getHeaderIconHtml: (meta) => {
+            const btnAi = document.getElementById('btnAdminReturnToAi');
+            if (btnAi) {
+                if (meta.participant_type === 'pegawai') {
+                    btnAi.classList.add('chat-is-hidden');
+                } else {
+                    btnAi.classList.remove('chat-is-hidden');
+                }
+            }
+            return meta.participant_type === 'pegawai'
+                ? '<i class="fas fa-user-tie"></i>'
+                : '<i class="fas fa-user-tag"></i>';
+        },
         createSidebarItemFromEvent: (ev) => createAdminSidebarItem({
             sessionId: ev.session_id,
             name: ev.room_name || 'Kontak Baru',
